@@ -94,7 +94,7 @@ function Row(props) {
                 <TableHead>
                   <TableRow>
                     <TableCell>Starting Time</TableCell>
-                    <TableCell>Endgin Time</TableCell>
+                    <TableCell>Ending Time</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
