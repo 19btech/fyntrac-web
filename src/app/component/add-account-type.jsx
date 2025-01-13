@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete, Checkbox, FormControlLabel, Divider} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete, Checkbox, FormControlLabel, Divider } from '@mui/material';
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
@@ -13,12 +13,12 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const defaultAccountTypes = ['BALANCESHEET',
-  'INCOMESTATEMENT',
-  'CLEARING'];
+    'INCOMESTATEMENT',
+    'CLEARING'];
 
 
   const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/add';
-    
+
   React.useEffect(() => {
     if (editData) {
       // Populate form fields with editData if provided
@@ -29,7 +29,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
       // Clear form fields if no editData (e.g., for adding new transaction)
       setAccountSubType('');
       setAccountType('BALANCESHEET');
-      
+
     }
   }, [editData]);
 
@@ -40,14 +40,14 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
         accountType: accountType,
         id: id
       },
-      {
-      headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    }
-    );
+        {
+          headers: {
+            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            Accept: '*/*',
+            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+          }
+        }
+      );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
@@ -56,7 +56,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
         setShowErrorMessage(false);
         onClose(false);
       }, 3000);
-      } catch (error) {
+    } catch (error) {
       // Handle error if needed
       setErrorMessage(error);
       setShowErrorMessage(true);
@@ -70,7 +70,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
     setShowSuccessMessage(false);
     onClose(false);
   };
-  
+
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>Account Type</DialogTitle>
@@ -83,29 +83,33 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
           onChange={(e) => setAccountSubType(e.target.value)}
         />
 
-<Autocomplete
-  disablePortal
-  id="dataType-combo"
-  options={defaultAccountTypes}
-  value={accountType}
-  getOptionLabel={(option) => option}
-  onChange={(event, newValue) => { setAccountType(newValue)}} // newValue will be the selected option object
-  renderInput={(params) => <TextField {...params} label="Account Type" />}
-/>
+        <Autocomplete
+          disablePortal
+          id="dataType-combo"
+          options={defaultAccountTypes}
+          value={accountType}
+          getOptionLabel={(option) => option}
+          onChange={(event, newValue) => { setAccountType(newValue) }} // newValue will be the selected option object
+          renderInput={(params) => <TextField {...params} label="Account Type" />}
+        />
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleAddAggregation} sx={{ bgcolor: '#62CD14', color: 'white', 
-        '&:hover': {
-          color: '#62CD14', // Prevent text color from changing on hover
-        }, }}>
+        <Button onClick={handleAddAggregation} sx={{
+          bgcolor: '#39B6FF', color: 'white',
+          '&:hover': {
+            color: '#E6E6EF', // Prevent text color from changing on hover
+          },
+        }}>
           Save
         </Button>
+
+        <Button onClick={handleClose}>Cancel</Button>
+
       </DialogActions>
       <Divider />
       <div>
-      {showSuccessMessage &&  <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
-      {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
+        {showSuccessMessage && <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
+        {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
       </div>
     </Dialog>
   );
