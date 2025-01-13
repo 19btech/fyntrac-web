@@ -417,11 +417,12 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
           gap: 1,
         }} >
           <Button onClick={handleSaveConfiguration} sx={{
-            bgcolor: '#62CD14', color: 'white',
-            '&:hover': {
-              color: '#11223e', // '#62CD14' Prevent text color from changing on hover
-            },
-          }}>
+              bgcolor: '#39B6FF',
+              color: 'white',
+              '&:hover': {
+                color: '#E6E6EF', // Prevent text color from changing on hover
+              },
+            }}>
             Save Configuration
           </Button>
         </Box>

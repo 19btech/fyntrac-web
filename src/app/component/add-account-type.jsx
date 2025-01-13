@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete, Checkbox, FormControlLabel, Divider } from '@mui/material';
+import { Dialog
+  , DialogTitle
+  , DialogContent
+  , DialogActions
+  , Button
+  , TextField
+  , Autocomplete
+  , IconButton
+  , Typography
+  , Box
+  , Tooltip
+  , Divider } from '@mui/material';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+
 
 const AddAccountTypeDialog = ({ open, onClose, editData }) => {
   const [accountSubType, setAccountSubType] = useState('');
@@ -33,7 +46,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
     }
   }, [editData]);
 
-  const handleAddAggregation = async () => {
+  const handleAccountType = async () => {
     try {
       const response = await axios.post(serviceURL, {
         accountSubType: accountSubType,
@@ -73,10 +86,54 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Account Type</DialogTitle>
+      <DialogTitle>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'start',
+          }}
+        >
+          {/* Top Left: Image */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+              gap: 1,
+              width: 'fit-content' // Ensures the Box doesn't take more space than needed
+            }}
+          >
+            <img
+              src="fyntrac.png"
+              alt="Logo"
+              style={{
+                width: '100px',
+                height: 'auto',  // Maintain aspect ratio
+                maxWidth: '100%' // Ensures responsiveness
+              }}
+            />
+            <Typography variant="h6">Account Type</Typography>
+          </Box>
+          <Tooltip title='Close'>
+          <IconButton
+            onClick={handleClose}
+            edge="end"
+            aria-label="close"
+            sx={{
+              color: 'grey.500',
+              '&:hover': { color: 'black' },
+            }}
+          >
+            <HighlightOffOutlinedIcon />
+          </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
       <Divider />
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <TextField
+        sx={{ width: '500px' }} 
           label="Account Subtype"
           fullWidth
           value={accountSubType}
@@ -84,6 +141,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
         />
 
         <Autocomplete
+        sx={{ width: '500px' }} 
           disablePortal
           id="dataType-combo"
           options={defaultAccountTypes}
@@ -93,18 +151,21 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
           renderInput={(params) => <TextField {...params} label="Account Type" />}
         />
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleAddAggregation} sx={{
-          bgcolor: '#39B6FF', color: 'white',
-          '&:hover': {
-            color: '#E6E6EF', // Prevent text color from changing on hover
-          },
-        }}>
+      <DialogActions sx={{ justifyContent: "center" }}>
+        <Tooltip title='Save'>
+        <Button
+          onClick={handleAccountType}
+          sx={{
+            bgcolor: '#39B6FF',
+            color: 'white',
+            '&:hover': {
+              color: '#E6E6EF', // Prevent text color from changing on hover
+            },
+          }}
+        >
           Save
         </Button>
-
-        <Button onClick={handleClose}>Cancel</Button>
-
+        </Tooltip>
       </DialogActions>
       <Divider />
       <div>

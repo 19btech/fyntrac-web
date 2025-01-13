@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete, Checkbox, FormControlLabel, Divider} from '@mui/material';
+import { Dialog
+  , DialogTitle
+  , DialogContent
+  , DialogActions
+  , Button
+  , TextField
+  , Checkbox
+  , FormControlLabel
+  , Autocomplete
+  , IconButton
+  , Typography
+  , Tooltip
+  , Box
+  , Divider } from '@mui/material';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
@@ -16,18 +30,18 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const dataTypes = [{label: 'STRING'},
-                    {label: 'NUMBER'},
-                    {label: 'DATE'},
-                    {label: 'BOOLEAN'}];
+  const dataTypes = [{ label: 'STRING' },
+  { label: 'NUMBER' },
+  { label: 'DATE' },
+  { label: 'BOOLEAN' }];
 
-                    const defaultDataTypes = ['STRING',
-                    'NUMBER',
-                    'DATE',
-                    'BOOLEAN'];
+  const defaultDataTypes = ['STRING',
+    'NUMBER',
+    'DATE',
+    'BOOLEAN'];
 
   const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/attribute/add';
-    
+
   React.useEffect(() => {
     if (editData) {
       // Populate form fields with editData if provided
@@ -46,7 +60,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
       setIsVersionable(false);
       setIsNullable(false);
       setDataType('STRING');
-      
+
     }
   }, [editData]);
 
@@ -61,14 +75,14 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         isNullable: isNullable ? 1 : 0,
         id: id
       },
-      {
-      headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    }
-    );
+        {
+          headers: {
+            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            Accept: '*/*',
+            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+          }
+        }
+      );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
@@ -77,7 +91,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         setShowErrorMessage(false);
         onClose(false);
       }, 3000);
-      } catch (error) {
+    } catch (error) {
       // Handle error if needed
       setErrorMessage(error);
       setShowErrorMessage(true);
@@ -91,34 +105,80 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
     setShowSuccessMessage(false);
     onClose(false);
   };
-  
+
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Attribute</DialogTitle>
+      <DialogTitle>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'start',
+          }}
+        >
+          {/* Top Left: Image */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+              gap: 1,
+              width: 'fit-content' // Ensures the Box doesn't take more space than needed
+            }}
+          >
+            <img
+              src="fyntrac.png"
+              alt="Logo"
+              style={{
+                width: '100px',
+                height: 'auto',  // Maintain aspect ratio
+                maxWidth: '100%' // Ensures responsiveness
+              }}
+            />
+            <Typography variant="h6">Attribute</Typography>
+          </Box>
+          <Tooltip title='Close'>
+          <IconButton
+            onClick={handleClose}
+            edge="end"
+            aria-label="close"
+            sx={{
+              color: 'grey.500',
+              '&:hover': { color: 'black' },
+            }}
+          >
+            <HighlightOffOutlinedIcon />
+          </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
       <Divider />
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <TextField
+         sx={{ width: '500px' }}
           label="User Field"
           fullWidth
           value={userField}
           onChange={(e) => setUserField(e.target.value)}
         />
         <TextField
+         sx={{ width: '500px' }}
           label="Attribute Name"
           fullWidth
           value={attributeName}
           onChange={(e) => setAttributeName(e.target.value)}
         />
 
-<Autocomplete
-  disablePortal
-  id="dataType-combo"
-  options={defaultDataTypes}
-  value={dataType}
-  getOptionLabel={(option) => option}
-  onChange={(event, newValue) => { setDataType(newValue)}} // newValue will be the selected option object
-  renderInput={(params) => <TextField {...params} label="Data Type" />}
-/>
+        <Autocomplete
+         sx={{ width: '500px' }}
+          disablePortal
+          id="dataType-combo"
+          options={defaultDataTypes}
+          value={dataType}
+          getOptionLabel={(option) => option}
+          onChange={(event, newValue) => { setDataType(newValue) }} // newValue will be the selected option object
+          renderInput={(params) => <TextField {...params} label="Data Type" />}
+        />
 
         <FormControlLabel
           control={<Checkbox checked={isReclassable} onChange={(e) => setIsReclassable(e.target.checked)} />}
@@ -133,19 +193,27 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
           label="Is Nullable"
         />
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleAddAttribute} sx={{ bgcolor: '#62CD14', color: 'white', 
-        '&:hover': {
-          color: '#62CD14', // Prevent text color from changing on hover
-        }, }}>
+
+      <DialogActions sx={{ justifyContent: "center" }}>
+        <Tooltip title='Save'>
+        <Button
+          onClick={handleAddAttribute}
+          sx={{
+            bgcolor: '#39B6FF',
+            color: 'white',
+            '&:hover': {
+              color: '#E6E6EF', // Prevent text color from changing on hover
+            },
+          }}
+        >
           Save
         </Button>
+        </Tooltip>
       </DialogActions>
       <Divider />
       <div>
-      {showSuccessMessage &&  <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
-      {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
+        {showSuccessMessage && <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
+        {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
       </div>
     </Dialog>
   );

@@ -1,5 +1,17 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete,  Divider } from '@mui/material';
+import { Dialog
+  , DialogTitle
+  , DialogContent
+  , DialogActions
+  , Button
+  , TextField
+  , Autocomplete
+  , IconButton
+  , Typography
+  , Tooltip
+  , Box
+  , Divider } from '@mui/material';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
@@ -22,14 +34,14 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/add';
   const serviceGetTransactionNamesURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/transactions'
   const [transactionNames, setTransactionNames] = useState([]);
-  
+
   React.useEffect(() => {
-    if(transactionNames.length === 0) {
+    if (transactionNames.length === 0) {
       fetchTransactionNames();
     }
     if (editData) {
       // Populate form fields with editData if provided
-       setTransactionName(editData.transactionName);
+      setTransactionName(editData.transactionName);
       setMetricName(editData.metricName);
       setLevel(editData.level);
       setId(editData.id);
@@ -43,7 +55,7 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   }, [editData]);
 
   const fetchTransactionNames = () => {
-    
+
     axios.get(serviceGetTransactionNamesURL, {
       headers: {
         'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
@@ -52,7 +64,7 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
       }
     })
       .then(response => {
-         setTransactionNames(response.data);
+        setTransactionNames(response.data);
       })
       .catch(error => {
         // Handle error if needed
@@ -100,21 +112,67 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Aggregation</DialogTitle>
+      <DialogTitle>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'start',
+          }}
+        >
+          {/* Top Left: Image */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+              gap: 1,
+              width: 'fit-content' // Ensures the Box doesn't take more space than needed
+            }}
+          >
+            <img
+              src="fyntrac.png"
+              alt="Logo"
+              style={{
+                width: '100px',
+                height: 'auto',  // Maintain aspect ratio
+                maxWidth: '100%' // Ensures responsiveness
+              }}
+            />
+            <Typography variant="h6">Aggregation</Typography>
+          </Box>
+          <Tooltip title='Close'>
+          <IconButton
+            onClick={handleClose}
+            edge="end"
+            aria-label="close"
+            sx={{
+              color: 'grey.500',
+              '&:hover': { color: 'black' },
+            }}
+          >
+            <HighlightOffOutlinedIcon />
+          </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
+
       <Divider />
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
         <Autocomplete
+          sx={{ width: '500px' }}
           disablePortal
           id="transactionName"
           options={transactionNames}
           value={transactionName}
           getOptionLabel={(option) => option}
-          onChange={(event, newValue) => {setTransactionName(newValue) }} // newValue will be the selected option object
+          onChange={(event, newValue) => { setTransactionName(newValue) }} // newValue will be the selected option object
           renderInput={(params) => <TextField {...params} label="Transaction Name" />}
         />
 
         <TextField
+          sx={{ width: '500px' }}
           label="Metric Name"
           fullWidth
           value={metricName}
@@ -122,6 +180,7 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
         />
 
         <Autocomplete
+          sx={{ width: '500px' }}
           disablePortal
           id="dataType-combo"
           options={defaultLevels}
@@ -131,16 +190,21 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
           renderInput={(params) => <TextField {...params} label="Aggregation Level" />}
         />
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleAddAggregation} sx={{
-          bgcolor: '#62CD14', color: 'white',
-          '&:hover': {
-            color: '#62CD14', // Prevent text color from changing on hover
-          },
-        }}>
+      <DialogActions sx={{ justifyContent: "center" }}>
+        <Tooltip title='Save'>
+        <Button
+          onClick={handleAddAggregation}
+          sx={{
+            bgcolor: '#39B6FF',
+            color: 'white',
+            '&:hover': {
+              color: '#E6E6EF', // Prevent text color from changing on hover
+            },
+          }}
+        >
           Save
         </Button>
+        </Tooltip>
       </DialogActions>
       <Divider />
       <div>

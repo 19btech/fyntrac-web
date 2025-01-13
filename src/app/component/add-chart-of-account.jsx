@@ -1,18 +1,31 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,  Divider, Autocomplete} from '@mui/material';
-import { List, ListItem, ListItemText } from '@mui/material';
+import {
+  Dialog
+  , DialogTitle
+  , DialogContent
+  , DialogActions
+  , Button
+  , TextField
+  , Autocomplete
+  , IconButton
+  , Typography
+  , Tooltip
+  , Box
+  , Divider
+} from '@mui/material';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
-import CircularProgress from '@mui/material/CircularProgress';
 
 function sleep(duration) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve();
-      }, duration);
-    });setIsAddAttributeDialogOpen
-  }
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, duration);
+  }); setIsAddAttributeDialogOpen
+}
 
 const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [accountNumber, setAccountNumber] = useState('');
@@ -27,7 +40,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
   const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/chartofaccount/add';
   const sericeGetSubTypeURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/get/subtypes'
-  
+
   const [attributeMetadata, setAttributeMetadata] = useState([]);
   const [formValues, setFormValues] = useState({});
   const [formErrors, setFormErrors] = useState({});
@@ -113,11 +126,11 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const handleSubmit = (event) => {
     event.preventDefault();
     // Process form submission here, e.g., send data to backend API
-   };
+  };
 
   React.useEffect(() => {
-    if(accountSubtypes.length === 0) {
-        fetchAccountSubtypes();
+    if (accountSubtypes.length === 0) {
+      fetchAccountSubtypes();
     }
     if (editData) {
       // Populate form fields with editData if provided
@@ -131,12 +144,12 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
       setAccountName('');
       setAccountNumber('');
       setAccountSubtype('');
-      
+
     }
   }, [editData]);
 
   const fetchAccountSubtypes = () => {
-    
+
     axios.get(sericeGetSubTypeURL, {
       headers: {
         'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
@@ -163,14 +176,14 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
         id: id,
         attributes: formValues,
       },
-      {
-      headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    }
-    );
+        {
+          headers: {
+            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            Accept: '*/*',
+            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+          }
+        }
+      );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
@@ -179,7 +192,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
         setShowErrorMessage(false);
         onClose(false);
       }, 3000);
-      } catch (error) {
+    } catch (error) {
       // Handle error if needed
       setErrorMessage(error);
       setShowErrorMessage(true);
@@ -193,70 +206,121 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
     setShowSuccessMessage(false);
     onClose(false);
   };
-  
+
   return (
-    <Dialog open={open} onClose={onClose} sx={{
-      '& .MuiDialog-paper': {
-        width: '100%', // Set width to 100% (full width)
-        maxWidth: '800px', // Optional: Set a specific max-width for the dialog
-      },
-    }}>
-      <DialogTitle>Chart of Accounts</DialogTitle>
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'start',
+          }}
+        >
+          {/* Top Left: Image */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+              gap: 1,
+              width: 'fit-content' // Ensures the Box doesn't take more space than needed
+            }}
+          >
+            <img
+              src="fyntrac.png"
+              alt="Logo"
+              style={{
+                width: '100px',
+                height: 'auto',  // Maintain aspect ratio
+                maxWidth: '100%' // Ensures responsiveness
+              }}
+            />
+            <Typography variant="h6">Charts of Account</Typography>
+          </Box>
+          <Tooltip title='Close'>
+            <IconButton
+              onClick={handleClose}
+              edge="end"
+              aria-label="close"
+              sx={{
+                color: 'grey.500',
+                '&:hover': { color: 'black' },
+              }}
+            >
+              <HighlightOffOutlinedIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
+
       <Divider />
-      <DialogContent sx={{ width: '100', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <DialogContent sx={{  display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <TextField
+        sx={{ width: '500px' }}
           label="Account Number"
           fullWidth
           value={accountNumber}
           onChange={(e) => setAccountNumber(e.target.value)}
         />
         <TextField
+        sx={{ width: '500px' }}
           label="Account Name"
           fullWidth
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
 
-<Autocomplete
-  disablePortal
-  id="dataType-combo"
-  options={accountSubtypes}
-  value={accountSubtype}
-  getOptionLabel={(option) => option}
-  onChange={(event, newValue) => {setAccountSubtype(newValue)}} // newValue will be the selected option object
-  renderInput={(params) => <TextField {...params} label="Account Subtype" />}
-/>
-
-{attributeMetadata.map(attribute => (
-        <TextField
-          key={attribute.attributeName}
-          name={attribute.attributeName}
-          label={attribute.attributeName}
-          type={attribute.dataType === 'Number' ? 'number' : 'text'}
-          value={formValues[attribute.attributeName]}
-          onChange={handleInputChange}
-          error={!!formErrors[attribute.attributeName]}
-          helperText={formErrors[attribute.attributeName] || ''}
-          fullWidth
-          margin="normal"
-          variant="outlined"
+        <Autocomplete
+        sx={{ width: '500px' }}
+          disablePortal
+          id="dataType-combo"
+          options={accountSubtypes}
+          value={accountSubtype}
+          getOptionLabel={(option) => option}
+          onChange={(event, newValue) => { setAccountSubtype(newValue) }} // newValue will be the selected option object
+          renderInput={(params) => <TextField {...params} label="Account Subtype" />}
         />
-      ))}
-      
+
+        {attributeMetadata.map(attribute => (
+          <TextField
+          sx={{ width: '500px' }}
+            key={attribute.attributeName}
+            name={attribute.attributeName}
+            label={attribute.attributeName}
+            type={attribute.dataType === 'Number' ? 'number' : 'text'}
+            value={formValues[attribute.attributeName]}
+            onChange={handleInputChange}
+            error={!!formErrors[attribute.attributeName]}
+            helperText={formErrors[attribute.attributeName] || ''}
+            fullWidth
+            margin="normal"
+            variant="outlined"
+          />
+        ))}
+
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleAddChartOfAccount} sx={{ bgcolor: '#62CD14', color: 'white', 
-        '&:hover': {
-          color: '#62CD14', // Prevent text color from changing on hover
-        }, }}>
-          Save
-        </Button>
+      <DialogActions sx={{ justifyContent: "center" }}>
+        <Tooltip title='Save'>
+          <Button
+            onClick={handleAddChartOfAccount}
+            sx={{
+              bgcolor: '#39B6FF',
+              color: 'white',
+              '&:hover': {
+                color: '#E6E6EF', // Prevent text color from changing on hover
+              },
+            }}
+          >
+            Save
+          </Button>
+        </Tooltip>
       </DialogActions>
+
       <Divider />
       <div>
-      {showSuccessMessage &&  <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
-      {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
+        {showSuccessMessage && <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
+        {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
       </div>
     </Dialog>
   );

@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Checkbox, FormControlLabel, Divider} from '@mui/material';
+import { Dialog
+  , DialogTitle
+  , DialogContent
+  , DialogActions
+  , Button
+  , TextField
+  , Checkbox
+  , FormControlLabel
+  ,  IconButton
+  , Typography
+  , Tooltip
+  , Box
+  , Divider } from '@mui/material';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
@@ -73,10 +87,55 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
   
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Transaction</DialogTitle>
+      <DialogTitle>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'start',
+          }}
+        >
+          {/* Top Left: Image */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+              gap: 1,
+              width: 'fit-content' // Ensures the Box doesn't take more space than needed
+            }}
+          >
+            <img
+              src="fyntrac.png"
+              alt="Logo"
+              style={{
+                width: '100px',
+                height: 'auto',  // Maintain aspect ratio
+                maxWidth: '100%' // Ensures responsiveness
+              }}
+            />
+            <Typography variant="h6">Aggregation</Typography>
+          </Box>
+          <Tooltip title='Close'>
+          <IconButton
+            onClick={handleClose}
+            edge="end"
+            aria-label="close"
+            sx={{
+              color: 'grey.500',
+              '&:hover': { color: 'black' },
+            }}
+          >
+            <HighlightOffOutlinedIcon />
+          </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
+
       <Divider />
-      <DialogContent>
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <TextField
+        sx={{ width: '500px' }}
           label="Transaction Name"
           fullWidth
           value={transactionName}
@@ -91,15 +150,23 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
           label="Is GL"
         />
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleAddTransaction} sx={{ bgcolor: '#62CD14', color: 'white', 
-        '&:hover': {
-          color: '#62CD14', // Prevent text color from changing on hover
-        }, }}>
-          Save
-        </Button>
-      </DialogActions>
+      <DialogActions sx={{ justifyContent: "center" }}>
+        <Tooltip title='Save'>
+              <Button
+                onClick={handleAddTransaction}
+                sx={{
+                  bgcolor: '#39B6FF',
+                  color: 'white',
+                  '&:hover': {
+                    color: '#E6E6EF', // Prevent text color from changing on hover
+                  },
+                }}
+              >
+                Save
+              </Button>
+              </Tooltip>
+            </DialogActions>
+            
       <Divider />
       <div>
       {showSuccessMessage &&  <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
