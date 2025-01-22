@@ -16,6 +16,7 @@ import { Button, Dialog, DialogActions, DialogContent, Divider, Tabs } from '@mu
 import axios from 'axios';
 import Tooltip from '@mui/material/Tooltip';
 import GridHeader from '../component/gridHeader';
+import ExecuteModel from '../component/execute-model';
 import '../common.css';
 
 const VisuallyHiddenInput = styled('input')({
@@ -34,6 +35,7 @@ export default function ModelPage() {
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [panelIndex, setPanelIndex] = React.useState(0); // Initialize with the first tab index
   const [modelRefreshKey, setModelRefreshKey] = React.useState(0); // Example state for refresh key
+  const [openExecuteModel, setOpenExecuteModel] = React.useState(false);
 
   const handleModelChange = (event, newValue) => {
     setPanelIndex(newValue); // Update the panel index
@@ -67,7 +69,7 @@ export default function ModelPage() {
   };
 
   const handlePlay = () => {
-
+    setOpenExecuteModel(true);
   }
 
 
@@ -153,6 +155,7 @@ export default function ModelPage() {
 
       </div>
 
+      <><ExecuteModel open={openExecuteModel} onClose={setOpenExecuteModel}/></>
     </>
   )
 }
