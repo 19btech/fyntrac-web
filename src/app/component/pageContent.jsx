@@ -9,6 +9,7 @@ import RulePage from '../rules/page';
 import ModelPage from '../model/page';
 import SettingsPage from '../settings/page'
 import SyncPage from '../sync/page';
+import GLEReportPage from '../reports/gle-report/page';
 
 export default function PageContent({ pathname }) {
   const renderContent = () => {
@@ -28,6 +29,8 @@ export default function PageContent({ pathname }) {
         return <SettingsPage />
       case '/sync':
         return <SyncPage />
+      case '/reports/gle-report':
+          return <GLEReportPage />
       default:
         return <GridHeader>Work inprogress.</GridHeader>;
     }

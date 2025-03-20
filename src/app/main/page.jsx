@@ -58,8 +58,8 @@ const NAVIGATION = [
     icon: <BarChartIcon />,
     children: [
       {
-        segment: 'report1',
-        title: 'Report 1',
+        segment: 'gle-report',
+        title: 'Journal Entry Report',
         icon: <AutoGraphOutlinedIcon />,
       },
       {

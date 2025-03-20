@@ -4,7 +4,7 @@ import Layout from '../component/layout'
 import Header from '../component/header'
 import Body from '../component/body'
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import { DataGrid } from '@mui/x-data-grid';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import AddBoxRoundedIcon from '@mui/icons-material/AddBoxRounded';

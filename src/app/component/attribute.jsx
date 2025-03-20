@@ -4,6 +4,7 @@ import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddAttributeDialog from '../component/add-attribute'
 import axios from 'axios';
+import CustomDataGrid from "@/app/component/custom-data-grid";
 
 function Attribute({ refreshData }) {
   const columns = [

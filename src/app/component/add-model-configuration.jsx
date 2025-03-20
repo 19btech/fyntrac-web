@@ -25,20 +25,19 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [aggregationLevel, setAggregationLevel] = useState('');
-
-
-
+  const [aggregationLevel, setAggregationLevel] = React.useState("INSTRUMENT");
   const [availableTransactions, setAvailableTransactions] = useState([]);
   const [availableMetrics, setAvailableMetrics] = useState([]);
   var fixedTransactions = [];
   var fixedMetrics = [];
   const [transactions, setTransactions] = React.useState([...fixedTransactions]);
   const [metrics, setMetrics] = React.useState([...fixedMetrics]);
-  const [currentVersion, setCurrentVersion] = React.useState(false);
+  const [currentVersion, setCurrentVersion] = React.useState(true);
   const [lastOpenVersion, setLastOpenVersion] = React.useState(false);
   const [firstVersion, setFirstVersion] = React.useState(false);
-
+  const [isTransactionsError, setIsTransactionsError] = React.useState(false);
+  const [isMetricssError, setIsMetricsError] = React.useState(false);
+  const [isAggregationError, setIsAggregationError] = React.useState(false);
   const [attributeVersions, setAttributeVersions] = useState({
     currentOpen: false,
     lastOpen: false,
@@ -47,6 +46,44 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
 
   const serviceGetTransactionNamesURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/transactionNames'
   const serviceGetMetricsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/get/metrics'
+
+  const validateVariable = (value, variableName) => {
+    if (value === null || value === undefined) {
+      throw new Error(`${variableName} cannot be null or undefined.`);
+    }
+    if (Array.isArray(value) && value.length === 0) {
+      throw new Error(`${variableName} cannot be an empty array.`);
+    }
+    if (typeof value === 'string' && value.trim() === '') {
+      throw new Error(`${variableName} cannot be an empty string.`);
+    }
+  };
+
+  const validateModelConfig = () => {
+    setIsTransactionsError(false);
+    setIsMetricsError(false);
+    try {
+      validateVariable(transactions, 'transactions');
+    } catch (error) {
+      setErrorMessage(error.message);
+      setIsTransactionsError(true);
+      throw new Error(error.message);
+    }
+
+    try {
+      validateVariable(metrics, 'metrics');
+    } catch (error) {
+      setErrorMessage(error.message);
+      setIsMetricsError(true);
+      throw new Error(error.message);
+    }
+
+
+    // validateVariable(currentVersion, 'currentVersion');
+    // validateVariable(lastOpenVersion, 'lastOpenVersion');
+    // validateVariable(firstVersion, 'firstVersion');
+
+  }
 
   React.useEffect(() => {
     if (availableTransactions.length === 0) {
@@ -63,16 +100,23 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
       setCurrentVersion(editData.modelConfig.currentVersion);
       setLastOpenVersion(editData.modelConfig.lastOpenVersion);
       setFirstVersion(editData.modelConfig.firstVersion);
-      setAggregationLevel(editData.modelConfig.aggregationLevel);
+      if (!currentVersion && !lastOpenVersion && !firstVersion) {
+        setCurrentVersion(true);
+      }
+      if (editData.modelConfig.aggregationLevel === null ||
+        editData.modelConfig.aggregationLevel === undefined ||
+        editData.modelConfig.aggregationLevel === '') {
+        setAggregationLevel('INSTRUMENT');
+      } else {
+        setAggregationLevel(editData.modelConfig.aggregationLevel);
+      }
     } else {
       setTransactions([]);
       setMetrics([]);
-      setCurrentVersion(false);
+      setCurrentVersion(true);
       setLastOpenVersion(false);
       setFirstVersion(false);
-      setAggregationLevel('');
-
-
+      setAggregationLevel('INSTRUMENT');
     }
   }, [editData]);
 
@@ -155,8 +199,17 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
   };
   const handleSaveConfiguration = async () => {
     const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/save';
-    console.log('Selected Transactions:', transactions);
-    console.log('Selected Metrics:', metrics);
+
+    try {
+      setShowErrorMessage(false);
+      setErrorMessage('');
+      const modelConfig = validateModelConfig();
+    } catch (error) {
+      setErrorMessage(error.message);
+      setShowErrorMessage(true);
+      return;
+    }
+
     try {
       const model = {
         "id": editData.id,
@@ -294,7 +347,9 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
             }
             style={{ width: 500 }}
             renderInput={(params) => (
-              <TextField {...params} label="Transactions" placeholder="Select Transactions" />
+              <TextField {...params} label="Transactions" placeholder="Select Transactions"
+                error={isTransactionsError}
+                helperText={isTransactionsError ? errorMessage : ''} />
             )}
           />
           <Typography style={{ align: 'left', alignContent: 'left', fontSize: '12px', color: 'gray' }}>
@@ -328,7 +383,10 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
             }
             style={{ width: 500 }}
             renderInput={(params) => (
-              <TextField {...params} label="Metrics" placeholder="Select Metrics" />
+              <TextField {...params} label="Metrics" placeholder="Select Metrics"
+                error={isMetricssError}
+                helperText={isMetricssError ? errorMessage : ''} />
+
             )}
           />
           <Typography style={{ align: 'left', alignContent: 'left', fontSize: '12px', color: 'gray' }}>
@@ -417,12 +475,12 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
           gap: 1,
         }} >
           <Button onClick={handleSaveConfiguration} sx={{
-              bgcolor: '#39B6FF',
-              color: 'white',
-              '&:hover': {
-                color: '#E6E6EF', // Prevent text color from changing on hover
-              },
-            }}>
+            bgcolor: '#39B6FF',
+            color: 'white',
+            '&:hover': {
+              color: '#E6E6EF', // Prevent text color from changing on hover
+            },
+          }}>
             Save Configuration
           </Button>
         </Box>

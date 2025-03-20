@@ -45,38 +45,71 @@ const ExecuteModel = ({ open, onClose }) => {
     const handleModeExecution = async () => {
         if (error) {
             return;
-        }else if (date.length === 0) {
+        } else if (date.length === 0) {
             setError(true);
             return;
         }
+    
         const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/execute';
+    
         try {
             console.log('Model to execute:', date);
             const payload = { date: date };
-            const response = await axios.post(serviceURL, payload,
-                {
-                    headers: {
-                        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-                        Accept: '*/*',
-                        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-                    }
-                }
-            );
+            const response = await axios.post(serviceURL, payload, {
+                headers: {
+                    'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+                    Accept: '*/*',
+                    'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+                },
+            });
+    
+            // Handle successful response
             setSuccessMessage(response.data);
             setShowSuccessMessage(true);
-
+    
             setTimeout(() => {
                 setShowSuccessMessage(false);
                 setShowErrorMessage(false);
                 onClose(false);
             }, 3000);
+    
         } catch (error) {
-            // Handle error if needed
-            setErrorMessage(error);
+            // Handle Axios error
+            if (axios.isAxiosError(error)) {
+                console.error('Axios Error:', error);
+    
+                if (error.response) {
+                    // The request was made and the server responded with a status code
+                    // that falls out of the range of 2xx
+                    console.error('Response Data:', error.response.data);
+                    console.error('Response Status:', error.response.status);
+                    console.error('Response Headers:', error.response.headers);
+    
+                    // Set a user-friendly error message based on the status code
+                    if (error.response.status === 500) {
+                        setErrorMessage(`Internal Server Error: ${error.response.data.message || '.Please try again later.'}`);
+                    } else {
+                        setErrorMessage(`Error: ${error.response.data.message || 'Something went wrong.'}`);
+                    }
+                } else if (error.request) {
+                    // The request was made but no response was received
+                    console.error('No response received:', error.request);
+                    setErrorMessage('Network Error: Please check your internet connection.');
+                } else {
+                    // Something happened in setting up the request that triggered an error
+                    console.error('Request setup error:', error.message);
+                    setErrorMessage('Request Error: Please try again.');
+                }
+            } else {
+                // Handle non-Axios errors
+                console.error('Non-Axios Error:', error);
+                setErrorMessage('An unexpected error occurred.');
+            }
+    
+            // Show error message to the user
             setShowErrorMessage(true);
-
         }
-    }
+    };
 
     return (
         <Dialog sx={{
