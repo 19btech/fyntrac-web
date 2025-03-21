@@ -159,6 +159,12 @@ function DashboardLayoutBasic(props) {
         primary: '#666666', // Set default font color
         secondary: '#666666', // Set secondary text color (optional)
       },
+      primary: {
+        main: '#1976d2', // Custom primary color
+      },
+      secondary: {
+        main: '#dc004e', // Custom secondary color
+      },
     },
     breakpoints: {
       values: {

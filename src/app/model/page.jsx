@@ -10,8 +10,8 @@ import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
 import PlayCircleOutlineOutlinedIcon from '@mui/icons-material/PlayCircleOutlineOutlined';
 import Tab from '@mui/material/Tab';
 import Models from '../component/models';
-import CustomTabPanel from '../component/custom-tab-panel'
-import ModelUploadComponent from '../component/model-upload'
+import CustomTabPanel from '../component/custom-tab-panel';
+import ModelUploadComponent from '../component/model-upload';
 import { Button, Dialog, DialogActions, DialogContent, Divider, Tabs } from '@mui/material';
 import axios from 'axios';
 import Tooltip from '@mui/material/Tooltip';
