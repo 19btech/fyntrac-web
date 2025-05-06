@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Dialog
+import {
+  Dialog
   , DialogTitle
   , DialogContent
   , DialogActions
@@ -7,11 +8,12 @@ import { Dialog
   , TextField
   , Checkbox
   , FormControlLabel
-  ,  IconButton
+  , IconButton
   , Typography
   , Tooltip
   , Box
-  , Divider } from '@mui/material';
+  , Divider
+} from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
 import axios from 'axios';
@@ -21,6 +23,7 @@ import ErrorAlert from '../component/error-alert'
 const AddTransactionDialog = ({ open, onClose, editData }) => {
   const [transactionName, setTransactionName] = useState('');
   const [isExclusive, setIsExclusive] = useState(false);
+  const [isReplayable, setIsReplayable] = useState(false);
   const [isGL, setIsGL] = useState(false);
   const [id, setId] = useState(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -31,7 +34,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
 
 
   const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/add';
-    
+
   React.useEffect(() => {
     if (editData) {
       // Populate form fields with editData if provided
@@ -39,11 +42,13 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
       setIsExclusive(editData.exclusive === 1 ? true : false);
       setIsGL(editData.isGL === 1 ? true : false);
       setId(editData.id);
+      setIsReplayable(editData.isReplayable);
     } else {
       // Clear form fields if no editData (e.g., for adding new transaction)
       setTransactionName('');
       setIsExclusive(false);
       setIsGL(false);
+      setIsReplayable(false);
     }
   }, [editData]);
 
@@ -53,16 +58,17 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         name: transactionName,
         exclusive: isExclusive ? 1 : 0,
         isGL: isGL ? 1 : 0,
+        isReplayable: isReplayable ? 1 : 0,
         id: id
       },
-      {
-      headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    }
-    );
+        {
+          headers: {
+            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            Accept: '*/*',
+            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+          }
+        }
+      );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
@@ -71,7 +77,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         setShowErrorMessage(false);
         onClose(false);
       }, 3000);
-      } catch (error) {
+    } catch (error) {
       // Handle error if needed
       setErrorMessage(error);
       setShowErrorMessage(true);
@@ -84,7 +90,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
     setShowSuccessMessage(false);
     onClose(false);
   };
-  
+
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>
@@ -117,17 +123,17 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
             <Typography variant="h6">Aggregation</Typography>
           </Box>
           <Tooltip title='Close'>
-          <IconButton
-            onClick={handleClose}
-            edge="end"
-            aria-label="close"
-            sx={{
-              color: 'grey.500',
-              '&:hover': { color: 'black' },
-            }}
-          >
-            <HighlightOffOutlinedIcon />
-          </IconButton>
+            <IconButton
+              onClick={handleClose}
+              edge="end"
+              aria-label="close"
+              sx={{
+                color: 'grey.500',
+                '&:hover': { color: 'black' },
+              }}
+            >
+              <HighlightOffOutlinedIcon />
+            </IconButton>
           </Tooltip>
         </Box>
       </DialogTitle>
@@ -135,12 +141,17 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
       <Divider />
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <TextField
-        sx={{ width: '500px' }}
+          sx={{ width: '500px' }}
           label="Transaction Name"
           fullWidth
           value={transactionName}
           onChange={(e) => setTransactionName(e.target.value)}
         />
+        <FormControlLabel
+          control={<Checkbox checked={isReplayable} onChange={(e) => setIsReplayable(e.target.checked)} />}
+          label="Is Replayable"
+        />
+
         <FormControlLabel
           control={<Checkbox checked={isExclusive} onChange={(e) => setIsExclusive(e.target.checked)} />}
           label="Is Exclusive"
@@ -152,25 +163,25 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
       </DialogContent>
       <DialogActions sx={{ justifyContent: "center" }}>
         <Tooltip title='Save'>
-              <Button
-                onClick={handleAddTransaction}
-                sx={{
-                  bgcolor: '#39B6FF',
-                  color: 'white',
-                  '&:hover': {
-                    color: '#E6E6EF', // Prevent text color from changing on hover
-                  },
-                }}
-              >
-                Save
-              </Button>
-              </Tooltip>
-            </DialogActions>
-            
+          <Button
+            onClick={handleAddTransaction}
+            sx={{
+              bgcolor: '#39B6FF',
+              color: 'white',
+              '&:hover': {
+                color: '#E6E6EF', // Prevent text color from changing on hover
+              },
+            }}
+          >
+            Save
+          </Button>
+        </Tooltip>
+      </DialogActions>
+
       <Divider />
       <div>
-      {showSuccessMessage &&  <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
-      {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
+        {showSuccessMessage && <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
+        {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
       </div>
     </Dialog>
   );

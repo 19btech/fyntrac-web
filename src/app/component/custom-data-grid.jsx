@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {
@@ -33,7 +33,11 @@ function CustomToolbar() {
 
 // Main DataGrid Component
 export default function CustomDataGrid({ columns, rows }) {
+   const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [currentPage, setCurrentPage] = useState(0);
+   
   const initialState = {
+    pagination: { paginationModel: { pageSize: rowsPerPage } },
     columns: {
       columnVisibilityModel: {
         // Hide all columns except the first 5
@@ -46,13 +50,13 @@ export default function CustomDataGrid({ columns, rows }) {
   };
 
   return (
-    <div style={{ height: '65vh', width: '100%' }}>
+    <div style={{ width: '100%', overflow:'auto' }}>
       {columns.length === 0 || rows.length === 0 ? ( // Check for both columns and rows
         <Box
           display="flex"
           justifyContent="center"
           alignItems="center"
-          height="100%"
+          height="auto"
         >
           <Typography variant="h6" color="textSecondary">
             No filter applied
@@ -67,8 +71,12 @@ export default function CustomDataGrid({ columns, rows }) {
             toolbar: CustomToolbar, // Use the custom toolbar
           }}
           initialState={initialState} // Set the initial state
-          pageSize={5}
-          rowsPerPageOptions={[5, 10, 20]}
+          pageSize={rowsPerPage}
+                      page={currentPage}
+                      onPageChange={(newPage) => setCurrentPage(newPage)}
+                      pageSizeOptions={[5, 10, 20]}
+                      pagination
+                    paginationMode='client'
           disableSelectionOnClick // Disable selection on row click
         />
 
