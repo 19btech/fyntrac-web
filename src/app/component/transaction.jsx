@@ -1,22 +1,29 @@
-import React, { useState } from 'react';
+'use client';
+import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
-import AddTransactionDialog from '../component/add-transaction'
+import AddTransactionDialog from '../component/add-transaction';
 import axios from 'axios';
-import { Alert, AlertTitle } from '@mui/material';
-import SuccessAlert from '../component/success-alert'
-import ErrorAlert from '../component/error-alert'
 
 function Transaction({ refreshData }) {
-  localStorage.removeItem('mui-datagrid');
+  const [rows, setRows] = useState([]);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [editData, setEditData] = useState(null);
+
+  const handleEdit = (rowData) => {
+    setEditData(rowData);
+    setOpen(true);
+  };
+
   const columns = [
-    { field: 'name', headerName: 'Transaction Name', width: 400, editable: false },
+    { field: 'name', headerName: 'Transaction Name', width: 400 },
     {
       field: 'isReplayable',
       headerName: 'Is Replayable',
       width: 150,
-      editable: false,
       renderCell: (params) => (
         <input type="checkbox" checked={params.value} readOnly />
       ),
@@ -25,7 +32,6 @@ function Transaction({ refreshData }) {
       field: 'exclusive',
       headerName: 'Exclusive',
       width: 150,
-      editable: false,
       renderCell: (params) => (
         <input type="checkbox" checked={params.value} readOnly />
       ),
@@ -34,7 +40,6 @@ function Transaction({ refreshData }) {
       field: 'isGL',
       headerName: 'Journal',
       width: 150,
-      editable: false,
       renderCell: (params) => (
         <input type="checkbox" checked={params.value} readOnly />
       ),
@@ -53,91 +58,58 @@ function Transaction({ refreshData }) {
     },
   ];
 
-  const initialRows = [];
-  const [pageSize, setPageSize] = useState(10);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [isDataFetched, setIsDataFetched] = useState(false);
-  const [rows, setRows] = useState(initialRows);
-
-  const [open, setOpen] = useState(false);
-  const [editData, setEditData] = useState(null);
-
-  const handleEdit = (rowData) => {
-    setEditData(rowData); // Set the data to be edited
-    setOpen(true); // Open the dialog
-  };
-
-
-  const fetchTransactionData = () => {
-
-    const fetchTransactionDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/all';
-
-    axios.get(fetchTransactionDataCall, {
-      headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
-      .then(response => {
-        setRows(response.data);
-        // Handle success response if needed
-      })
-      .catch(error => {
-        // Handle error if needed
+  const fetchTransactionData = async () => {
+    try {
+      const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/transaction/get/all`;
+      const response = await axios.get(url, {
+        headers: {
+          'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+          Accept: '*/*',
+        },
       });
+      const data = response.data || [];
+      const dataWithIds = data.map((item, index) => ({
+        ...item,
+        id: item.id || index + 1, // fallback if no ID
+      }));
+      setRows(dataWithIds);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
   };
 
-  // Fetch data when the component mounts
-  React.useEffect(() => {
+  useEffect(() => {
     fetchTransactionData();
-    setIsDataFetched(true);
-  }, [isDataFetched || refreshData]);
-
-  const handleAddRow = () => {
-    const newRow = { id: rows.length + 1, name: '', exclusive: '', isGL: '' };
-    setRows([newRow, ...rows]);
-  };
-
-  const handleRowsPerPageChange = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setCurrentPage(0);
-  };
+  }, [refreshData]);
 
   const handleCellEditCommit = (params) => {
     const updatedRows = rows.map((row) =>
-      row.id === params.id ? { ...row, [params.field]: params.props.value } : row
+      row.id === params.id ? { ...row, [params.field]: params.value } : row
     );
     setRows(updatedRows);
   };
 
-
-
   return (
     <>
-       <div style={{ height: 'auto', width: '100%' }}>
-              <DataGrid
-                rows={rows}
-                columns={columns}
-                initialState={{
-                  pagination: { paginationModel: { pageSize: rowsPerPage } },
-                }}
-                
-               pageSize={rowsPerPage}
-                page={currentPage}
-                onPageChange={(newPage) => setCurrentPage(newPage)}
-                pageSizeOptions={[5, 10, 20]}
-                pagination
-              paginationMode='client'
-                disableSelectionOnClick
-                editMode="row"
-                onCellEditCommit={handleCellEditCommit}
-              />
-            </div>
-      <><AddTransactionDialog open={open} onClose={setOpen} editData={editData} /></>
-      </>
-
+      <div style={{ height: 600, width: '100%' }}>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          pagination
+          pageSize={rowsPerPage}
+          onPageSizeChange={(newSize) => setRowsPerPage(newSize)}
+          page={currentPage}
+          onPageChange={(params) => setCurrentPage(params)}
+          pageSizeOptions={[5, 10, 20]}
+          paginationMode="client"
+          disableRowSelectionOnClick
+          editMode="row"
+          onCellEditCommit={handleCellEditCommit}
+          getRowId={(row) => row.id}
+        />
+      </div>
+      <AddTransactionDialog open={open} onClose={() => setOpen(false)} editData={editData} />
+    </>
   );
 }
 

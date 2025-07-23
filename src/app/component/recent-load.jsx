@@ -1,50 +1,49 @@
+'use client';
+
 import * as React from 'react';
-import { Box
-  , Collapse
-  , IconButton
-  , Table
-  , TableBody
-  , TableCell
-  , TableContainer
-  , TableHead
-  , TableRow
-  , Typography
-  , Paper 
-  , Tooltip} from '@mui/material';
+import {
+  Box,
+  Collapse,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  Paper,
+  Tooltip,
+  Chip
+} from '@mui/material';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { green, orange, red } from '@mui/material/colors';
-import Chip from '@mui/material/Chip';
 import axios from 'axios';
 
-function Row(props) {
-  const { row } = props;
+function Row({ row }) {
   const [open, setOpen] = React.useState(false);
 
   const getStatusColor = (status) => {
-    // Check if status is COMPLETED and return the appropriate color
-    if (status === 'FAILED') {
-      return '#ff5757';
-
-    } else if (status === 'COMPLETED') {
-      return '#8ac92e';
-    } else {
-      return '#fca311';
+    switch (status) {
+      case 'FAILED':
+        return '#ff5757';
+      case 'COMPLETED':
+        return '#8ac92e';
+      default:
+        return '#fca311'; // For IN_PROGRESS, QUEUED, etc.
     }
-
   };
-  
 
   return (
-    <React.Fragment>
+    <>
       <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
         <TableCell>
           <IconButton
             aria-label="expand row"
             size="small"
-            onClick={() => setOpen(!open)}
+            onClick={() => setOpen((prev) => !prev)}
           >
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
@@ -60,37 +59,38 @@ function Row(props) {
             style={{
               backgroundColor: getStatusColor(row.activityStatus),
               color: '#fff',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
             }}
           />
         </TableCell>
         <TableCell align="center">
-          <IconButton aria-label="visibility" sx={{
-                '&:hover': {
-                  backgroundColor: 'darkgrey',
-                },
-              }}>
-            <VisibilityOutlinedIcon />
-          </IconButton>
-          <Tooltip title='Download'>  
-          <IconButton aria-label="download activity" sx={{
-                '&:hover': {
-                  backgroundColor: 'darkgrey',
-                },
-              }}>
-            <FileDownloadOutlinedIcon />
-          </IconButton>
+          <Tooltip title="View Details">
+            <IconButton
+              aria-label="visibility"
+              sx={{ '&:hover': { backgroundColor: 'darkgrey' } }}
+            >
+              <VisibilityOutlinedIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Download">
+            <IconButton
+              aria-label="download"
+              sx={{ '&:hover': { backgroundColor: 'darkgrey' } }}
+            >
+              <FileDownloadOutlinedIcon />
+            </IconButton>
           </Tooltip>
         </TableCell>
       </TableRow>
+
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 1 }}>
-              <Typography variant="h6" gutterBottom component="div">
+              <Typography variant="h6" gutterBottom>
                 Details
               </Typography>
-              <Table size="small" aria-label="purchases">
+              <Table size="small" aria-label="job details">
                 <TableHead>
                   <TableRow>
                     <TableCell>Starting Time</TableCell>
@@ -98,51 +98,42 @@ function Row(props) {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  <TableRow key={row.jobId}>
-                    <TableCell component="th" scope="row">
-                      {row.startingTime}
-                    </TableCell>
+                  <TableRow>
+                    <TableCell>{row.startingTime}</TableCell>
                     <TableCell>{row.endingTime}</TableCell>
                   </TableRow>
-
                 </TableBody>
               </Table>
             </Box>
           </Collapse>
         </TableCell>
       </TableRow>
-    </React.Fragment>
+    </>
   );
 }
 
-
 export default function RecentLoad() {
-
   const [logData, setLogData] = React.useState([]);
 
   React.useEffect(() => {
-    // Check if attribute metadata exists in localStorage
-    // Fetch attribute metadata from backend if not cached
     fetchRecentLoad();
   }, []);
 
   const fetchRecentLoad = () => {
-    axios.get(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/activitylog/get/recent/loads', {
-      headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
-      .then(response => {
-        const recentLoad = response.data;
-        setLogData(recentLoad);
+    axios
+      .get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/activitylog/get/recent/loads`, {
+        headers: {
+          'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+          Accept: '*/*',
+        },
       })
-      .catch(error => {
-        console.error('Error fetching attribute metadata:', error);
+      .then((response) => {
+        setLogData(response.data || []);
+      })
+      .catch((error) => {
+        console.error('Error fetching recent loads:', error);
       });
   };
-
 
   return (
     <TableContainer component={Paper} elevation={0}>
@@ -159,7 +150,7 @@ export default function RecentLoad() {
         </TableHead>
         <TableBody>
           {logData.map((log) => (
-            <Row key={log.jobId} row={log} />
+            <Row key={log.jobId || `${log.jobName}-${log.startingTime}`} row={log} />
           ))}
         </TableBody>
       </Table>
