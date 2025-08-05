@@ -15,9 +15,9 @@ export default function PageContent({ pathname }) {
   const renderContent = () => {
     console.log('pathName:', pathname);
     switch (pathname) {
-      case '/home':
+      case '/dashboard':
         return <HomePage />;
-      case '/accounting':
+      case '/mapping':
         return <AccountingPage />
       case '/settings/accounting-rules':
         return <RulePage />

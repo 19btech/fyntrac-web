@@ -3,6 +3,7 @@ import React from 'react'
 import Layout from '../component/layout'
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
+import Grid from '@mui/material/Grid2'
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import { styled } from '@mui/material/styles';
@@ -15,19 +16,96 @@ import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+import MetricWidget from '../component/metric-widget';
+import LineChartWidget from '../component/line-chat-widget';
+import BarChartWidget from '../component/bar-chart-widget';
+import DynamicTable from '../component/dynamic-data-table';
+import { Typography } from '@mui/material';
 
 const serviceGetOpenAccountingPeriodsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/open-periods'
 const serviceGetCurrentOpenAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/current-open-period'
 const serviceCloseAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/close'
 
+// const Item = styled(Paper)(({ theme }) => ({
+//   backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
+//   ...theme.typography.body2,
+//   padding: theme.spacing(1),
+//   textAlign: 'center',
+//   color: theme.palette.text.secondary,
+//   height: '100px',
+//   width: '18%'
+// }));
+
 const Item = styled(Paper)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
+  backgroundColor: '#ffffff',
   ...theme.typography.body2,
   padding: theme.spacing(1),
   textAlign: 'center',
-  color: theme.palette.text.secondary,
-  height: '100px',
-  width: '18%'
+  height: '38vh',
+  color: (theme.vars ?? theme).palette.text.secondary,
+  boxShadow: 'none', // Remove shadow (emboss effect)
+  elevation: 0,       // Optional: for clarity, though not used directly in styling
+  ...(theme.palette.mode === 'dark' && {
+    backgroundColor: '#1A2027',
+  }),
+}));
+
+
+const Container = styled(Paper)(({ theme }) => ({
+  backgroundColor: '#hhffff',
+  ...theme.typography.body2,
+  padding: theme.spacing(0),
+  textAlign: 'center',
+  height: '15vh',
+  color: (theme.vars ?? theme).palette.text.secondary,
+  boxShadow: 'none',
+   // Remove shadow (emboss effect)
+  elevation: 0,       // Optional: for clarity, though not used directly in styling
+  ...(theme.palette.mode === 'dark' && {
+    backgroundColor: '#1A2027',
+  }),
+}));
+
+// const Container = styled(Paper)(({ theme }) => ({
+//   backgroundColor: '#hhffff',
+//   ...theme.typography.body2,
+//   height: '12vh',
+//   color: (theme.vars ?? theme).palette.text.secondary,
+//   boxShadow: 'none', // Remove shadow (emboss effect)
+//   elevation: 0,       // Optional: for clarity, though not used directly in styling
+//   ...(theme.palette.mode === 'dark' && {
+//     backgroundColor: '#1A2027',
+//   }),
+// }));
+
+const PlainItem = styled(Paper)(({ theme }) => ({
+  ...theme.typography.body2,
+  padding: theme.spacing(1),
+  textAlign: 'center',
+  color: (theme.vars ?? theme).palette.text.secondary,
+  boxShadow: 'none', // Remove shadow (emboss effect)
+  elevation: 0,       // Optional: for clarity, though not used directly in styling
+  ...(theme.palette.mode === 'dark' && {
+    backgroundColor: '#1A2027',
+  }),
+}));
+
+const TopItem = styled(Paper)(({ theme }) => ({
+  backgroundColor: '#EEF6FF',
+  ...theme.typography.body2,
+  padding: theme.spacing(1),
+  textAlign: 'left',
+  height: '15vh',
+  color: (theme.vars ?? theme).palette.text.secondary,
+  boxShadow: 'none', // Remove shadow (emboss effect)
+  display: 'flex',             // Flex layout
+  alignItems: 'left',        // Vertical centering
+  justifyContent: 'left',    // Horizontal centering
+  borderRadius: theme.spacing(2), // ✅ Add rounded corners (adjust as needed)
+
+  ...(theme.palette.mode === 'dark' && {
+    backgroundColor: '#1A2027',
+  }),
 }));
 
 
@@ -39,153 +117,218 @@ const AccountingPeriodRecord = {
   status: 0,
 };
 
+const widgetOne = {
+
+  metricName: 'UPB',
+  accountingPeriodId: 202201,
+  postingDate: 20220131,
+  balance: {
+    activity: '50000.0000',
+    beginningBalance: '0.0000',
+    endingBalance: '50000.0000'
+  },
+
+};
+
+
+const widgetTwo = {
+
+  metricName: 'Unam Fee',
+  accountingPeriodId: 202201,
+  postingDate: 20220131,
+  balance: {
+    activity: '10000.0000',
+    beginningBalance: '0.0000',
+    endingBalance: '10000.0000'
+  },
+
+};
+
+
+const widgetThree = {
+
+  metricName: 'Mark to Market',
+  accountingPeriodId: 202201,
+  postingDate: 20220131,
+  balance: {
+    activity: '2000.0000',
+    beginningBalance: '0.0000',
+    endingBalance: '2000.0000'
+  },
+
+};
+const uData = [4000, 3000, 2000, 2780, 1890, 2390, 3490];
+const pData = [2400, 1398, 9800, 3908, 4800, 3800, 4300];
+const xLabels = ['Page A', 'Page B', 'Page C', 'Page D', 'Page E', 'Page F', 'Page G'];
+
+const columns = [
+  { id: 'rank', label: 'Rank' },
+  { id: 'metric', label: 'Metric', align: 'right' },
+  { id: 'amount', label: 'Amount', align: 'right' },
+];
+
+const rows = [
+  { rank: 1, metric: 'Unpaid Principal', amount: '$50000' },
+  { rank: 2, metric: 'Unam Fee', amount: '$10000' },
+  { rank: 3, metric: 'Interest Balance', amount: '$5000' },
+  { rank: 4, metric: 'Mark to Market', amount: '$2000' },
+  { rank: 5, metric: 'Payment', amount: '$1000' },
+  // ... more rows
+];
+
+
+const momDataset = [
+  { accountingPeriodId: '2022-1', payment: 1000, upb: 2000, unam: -1000, interest: 2000 },
+  { accountingPeriodId: '2022-2', payment: 1200, upb: 1800, unam: -950, interest: 1800 },
+  { accountingPeriodId: '2022-3', payment: 1400, upb: 1600, unam: -800, interest: 1600 },
+  { accountingPeriodId: '2022-4', payment: 1750, upb: 1200, unam: -550, interest: 1300 },
+];
+
+const valueFormatter = (value) => `$ ${value}`;
+
+const momSeries = [
+  { dataKey: 'payment', label: 'Payment', valueFormatter },
+  { dataKey: 'upb', label: 'Unpaid Principal', valueFormatter },
+  { dataKey: 'unam', label: 'Unpaid Fee', valueFormatter },
+  { dataKey: 'interest', label: 'Interest Balance', valueFormatter },
+];
+
+const defaultChartSetting = {
+  yAxis: [{ label: 'Balance', width: 60 }],
+  height: 300,
+  margin: { top: 30, bottom: 50, left: 70, right: 20 },
+};
+
 export default function HomePage() {
-const [anchorEl, setAnchorEl] = React.useState(null);
-const [openPeriodCloseDialog, setOpenPeriodCloseDialog] = React.useState(false);
-const [isDataFetched, setIsDataFetched] = React.useState(false);
-const [year, setYear] = React.useState('');
-var [years, setYears] = React.useState([]);
-const [month, setMonth] = React.useState('');
-var [months, setMonths] = React.useState([]);
-const [showSuccessMessage, setShowSuccessMessage] = React.useState(false);
-const [successMessage, setSuccessMessage] = React.useState('');
-const [showErrorMessage, setShowErrorMessage] = React.useState(false);
-const [errorMessage, setErrorMessage] = React.useState('');
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const [openPeriodCloseDialog, setOpenPeriodCloseDialog] = React.useState(false);
+  const [isDataFetched, setIsDataFetched] = React.useState(false);
+  const [year, setYear] = React.useState('');
+  var [years, setYears] = React.useState([]);
+  const [month, setMonth] = React.useState('');
+  var [months, setMonths] = React.useState([]);
+  const [showSuccessMessage, setShowSuccessMessage] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState('');
+  const [showErrorMessage, setShowErrorMessage] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState('');
 
   const [accountingPeriods, setAccountingPeriods] = React.useState([
-    {...AccountingPeriodRecord,
+    {
+      ...AccountingPeriodRecord,
       "periodId": 0,
-  "period": "_ _ / _ _",
-  "fiscalPeriod": 0,
-  "year": 0,
-  "status": 0
+      "period": "_ _ / _ _",
+      "fiscalPeriod": 0,
+      "year": 0,
+      "status": 0
     }]);
 
-    const handleClickOpen = (event) => {
-      setAnchorEl(event.currentTarget);
-      setOpenPeriodCloseDialog(true);
-    };
-    
-    const handleClose = () => {
-      setAnchorEl(null);
-      setOpenPeriodCloseDialog(false);
+  const handleClickOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+    setOpenPeriodCloseDialog(true);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+    setOpenPeriodCloseDialog(false);
+  };
+
+
+  const [currentOpenAccountingPeriod, setCurrentOpenAccountingPeriod] = React.useState({
+    ...AccountingPeriodRecord,
+    "periodId": 0,
+    "period": "__ / __",
+    "fiscalPeriod": 0,
+    "year": 0,
+    "status": 0
+  });
+
+  // Fetch data when the component mounts
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch open accounting periods first
+        await fetchOpenAccountingPeriods();
+
+        // Then fetch the last closed accounting period
+        await fetchCurrentOpenAccountingPeriod();
+
+        // Mark data fetching as complete
+        setIsDataFetched(true);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
     };
 
-    
-const [currentOpenAccountingPeriod, setCurrentOpenAccountingPeriod] = React.useState({
-  ...AccountingPeriodRecord,
-  "periodId": 0,
-  "period": "__ / __",
-  "fiscalPeriod": 0,
-  "year": 0,
-  "status": 0
-});
+    fetchData();
 
-// Fetch data when the component mounts
-React.useEffect(() => {
-  const fetchData = async () => {
+    // Log the `years` after both fetches are complete
+  }, [isDataFetched]);
+
+  const fillYearList = (apList) => {
+    var yearList = [];
+    var uniquePeriodIds = [...new Set(apList.map((record) => record.year))];
+    uniquePeriodIds.forEach((ap) => { if (ap > 0) yearList.push(ap.toString()) });
+
+    setYears(yearList);
+    setYear(yearList[0]);
+  }
+
+  const fillMonthList = (apList) => {
+    var monthList = [];
+    var uniquePeriodIds = [...new Set(apList.map((record) => record.fiscalPeriod))];
+    uniquePeriodIds.forEach((ap) => {
+      if (ap > 0 && ap < 10) {
+        monthList.push("0" + ap.toString());
+      } else {
+        monthList.push(ap.toString());
+      }
+
+    });
+
+    setMonths(monthList);
+    setMonth(monthList[0]);
+  }
+
+  const handlecloseAccountingPeriod = async () => {
     try {
-      // Fetch open accounting periods first
-      await fetchOpenAccountingPeriods();
+      const response = await axios.post(serviceCloseAccountingPeriodURL, {
+        ...AccountingPeriodRecord,
+        "periodId": parseInt(year + month),
+        "period": year + '-' + month,
+        "fiscalPeriod": parseInt(month),
+        "year": parseInt(year),
+        "status": 1
+      },
+        {
+          headers: {
+            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            Accept: '*/*',
+            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+          }
+        }
+      );
+      setLastClosedAccountingPeriod(response.data);
+      setSuccessMessage(response.data);
+      setShowSuccessMessage(true);
 
-      // Then fetch the last closed accounting period
-      await fetchCurrentOpenAccountingPeriod();
-
-      // Mark data fetching as complete
-      setIsDataFetched(true);
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+        setShowErrorMessage(false);
+        fetchOpenAccountingPeriods();
+        handleClose();
+        // onClose(false);
+      }, 3000);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      // Handle error if needed
+      setErrorMessage(error);
+      setShowErrorMessage(true);
+
     }
   };
 
-  fetchData();
+  const fetchOpenAccountingPeriods = () => {
 
-  // Log the `years` after both fetches are complete
- }, [isDataFetched]);
-
-const fillYearList = (apList) => {
-  var yearList = [];
-  var uniquePeriodIds = [...new Set(apList.map((record) => record.year))];
-  uniquePeriodIds.forEach((ap) => {if(ap > 0) yearList.push(ap.toString())});
-
-  setYears(yearList);
-  setYear(yearList[0]);
-}
-
-const fillMonthList = (apList) => {
-  var monthList = [];
-  var uniquePeriodIds = [...new Set(apList.map((record) => record.fiscalPeriod))];
-  uniquePeriodIds.forEach((ap) => {
-    if(ap > 0 && ap < 10) {
-      monthList.push("0" + ap.toString());
-    }else{
-      monthList.push(ap.toString());
-    }
-    
-    });
-
-  setMonths(monthList);
-  setMonth(monthList[0]);
-}
-
-const handlecloseAccountingPeriod = async () => {
-  try {
-    const response = await axios.post(serviceCloseAccountingPeriodURL, {...AccountingPeriodRecord,
-      "periodId": parseInt(year + month),
-  "period": year + '-' + month,
-  "fiscalPeriod": parseInt(month),
-  "year": parseInt(year),
-  "status": 1
-    },
-    {
-    headers: {
-      'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-      Accept: '*/*',
-      'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-    }
-  }
-  );
-    setLastClosedAccountingPeriod(response.data);
-    setSuccessMessage(response.data);
-    setShowSuccessMessage(true);
-
-    setTimeout(() => {
-      setShowSuccessMessage(false);
-      setShowErrorMessage(false);
-      fetchOpenAccountingPeriods();
-      handleClose();
-     // onClose(false);
-    }, 3000);
-    } catch (error) {
-    // Handle error if needed
-    setErrorMessage(error);
-    setShowErrorMessage(true);
-
-  }
-};
-
-const fetchOpenAccountingPeriods = () => {
-    
-axios.get(serviceGetOpenAccountingPeriodsURL, {
-    headers: {
-      'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-      Accept: '*/*',
-      'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-    }
-  })
-    .then(response => {
-      setAccountingPeriods(response.data);
-      fillYearList(response.data);
-      fillMonthList(response.data);
-    })
-    .catch(error => {
-      // Handle error if needed
-    });
-};
-
-const fetchCurrentOpenAccountingPeriod = () => {
-    
-  axios.get(serviceGetCurrentOpenAccountingPeriodURL, {
+    axios.get(serviceGetOpenAccountingPeriodsURL, {
       headers: {
         'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
         Accept: '*/*',
@@ -193,155 +336,220 @@ const fetchCurrentOpenAccountingPeriod = () => {
       }
     })
       .then(response => {
-        
-          setCurrentOpenAccountingPeriod(response.data);
-        
+        setAccountingPeriods(response.data);
+        fillYearList(response.data);
+        fillMonthList(response.data);
       })
       .catch(error => {
         // Handle error if needed
       });
   };
-  
+
+  const fetchCurrentOpenAccountingPeriod = () => {
+
+    axios.get(serviceGetCurrentOpenAccountingPeriodURL, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+
+        setCurrentOpenAccountingPeriod(response.data);
+
+      })
+      .catch(error => {
+        // Handle error if needed
+      });
+  };
+
   return (
-    <>
-      
-    <Box component="section" sx={{ 
-      p: 5,     
-      bgcolor: 'background.paper',
-      borderColor: 'text.primary', 
-      borderRadius: '7px', 
-      border: '1px grey'
-      }}>
-         <div>
-      <Stack
-        direction="row"
-        divider={<Divider orientation="vertical" flexItem />}
-        spacing={2}
-      >
-        <Item sx={{bgcolor: '#0097B2' }}>Accounting Period
-          <div>
+
+    <Container>
+      <Grid container spacing={3}>
+        <Grid size={.25}></Grid>
+        <Grid size={2.3}>
+          <TopItem>
+
             
+              <Typography variant="h8" fontWeight="medium" sx={{ color: '#2f3a53', width: '100px', paddingTop: 1, paddingLeft: 1}}>
+                Accounting&nbsp;Period
+              </Typography>
 
-{/*      
-          <Autocomplete
-      id="combo-box-demo"
-      options={accountingPeriods}
-      getOptionLabel={(option) => option.period}
-      value={lastClosedAccountingPeriod}
-      onChange={(event, newValue) => {
-        setLastClosedAccountingPeriod(newValue); // Update state when the user selects a new value
-      }}
-      isOptionEqualToValue={(option, value) => option.periodId === value.periodId}
-      sx={{
-        width: 250,
-        '& .MuiOutlinedInput-root': {
-          '& fieldset': {
-            border: 'none',
-            fontSize: '20px',  // Increase font size here
-              fontWeight: '700', // Adjust font weight here
-          },
-        },
-      }}
-      renderInput={(params) => (
-        <TextField
-          {...params}
+            <Box
+              sx={{
+                fontSize: '20px',
+                fontWeight: 'bold',
+                display: 'flex',
+                gridTemplateColumns: '6fr 2fr',
+                alignItems: 'center',
+              }}
+            >
+              <div>{currentOpenAccountingPeriod.period}</div>
+              <div>
+                <Button id="period-close-button" onClick={handleClickOpen}>
+                  <ArrowDropDownIcon />
+                </Button>
+              </div>
+            </Box>
+
+            {openPeriodCloseDialog && (
+              <Menu
+                open={openPeriodCloseDialog}
+                anchorEl={anchorEl}
+                onClose={handleClose}
+                MenuListProps={{
+                  'aria-labelledby': 'period-close-button',
+                }}
+              >
+                <MenuItem>
+                  <Autocomplete
+                    options={years}
+                    value={year}
+                    onChange={(event, newValue) => setYear(newValue)}
+                    inputValue={year}
+                    disableClearable
+                    id="year-list"
+                    sx={{ width: 120 }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Year"
+                        InputProps={{ ...params.InputProps, readOnly: true }}
+                      />
+                    )}
+                  />
+                  <Box sx={{ width: '10px' }} />
+                  <Autocomplete
+                    options={months}
+                    value={month}
+                    onChange={(event, newValue) => setMonth(newValue)}
+                    inputValue={month}
+                    disableClearable
+                    id="month-list"
+                    sx={{ width: 100 }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Month"
+                        InputProps={{ ...params.InputProps, readOnly: true }}
+                      />
+                    )}
+                  />
+                  <Box sx={{ width: '10px' }} />
+                  <Button variant="contained" onClick={handlecloseAccountingPeriod} sx={{ bgcolor: '#0097B2' }}>
+                    Close
+                  </Button>
+                </MenuItem>
+              </Menu>
+            )}
+          </TopItem>
+        </Grid>
+
+
+        <Grid size={2.3}>
+          <TopItem>
+            <MetricWidget metric={widgetOne} />
+          </TopItem>
+        </Grid>
+        <Grid size={2.3}>
+          <TopItem>
+            <MetricWidget metric={widgetTwo} />
+          </TopItem>
+        </Grid>
+        <Grid size={2.3}>
+          <TopItem>
+            <MetricWidget metric={widgetThree} />
+          </TopItem>
+        </Grid>
+        <Grid size={2.3}>
+          <TopItem>
+            <MetricWidget metric={widgetThree} />
+          </TopItem>
+        </Grid>
+        <Grid size={.25}></Grid>
+
+        <Grid
+          size={12}
           sx={{
-            '& .MuiInputBase-input': {
-              textAlign: 'center',
-              fontSize: '20px',  // Increase font size here
-              fontWeight: '900', // Adjust font weight here
-            },
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#ffffff',
+            height: '6vh',
           }}
-        />
-      )}
-    />
-      */}
-          </div>
-          <div style={{
-    marginTop: '30px',
-    fontSize: '25px',
-    fontWeight: 'bold',
-    display: 'grid',
-    gridTemplateColumns: '3fr 1fr'
-  }}>
-    <div > {currentOpenAccountingPeriod.period}</div>
-    <div > 
-      <Button id="period-close-button" onClick={handleClickOpen} color="primary" >
-        <ArrowDropDownIcon sx={{ color: 'white' }}/>
-      </Button>
-    </div>
-    {
-  openPeriodCloseDialog && (
-    <Menu
-      open={openPeriodCloseDialog}
-      anchorEl={anchorEl}
-      onClose={handleClose}
-      MenuListProps={{
-        'aria-labelledby': 'period-close-button',
-      }}
-    >
-      <MenuItem>
-      <Autocomplete
-        options={years}
-        value={year}
-        onChange={(event, newValue) => {
-          setYear(newValue); // Update state when the user selects a new value
-        }}
-        inputValue={year}
-        onInputChange={(event, newInputValue) => {
-         // setYear(newInputValue);
-         //do nothing
-        }}
-        // getOptionLabel={(option) => typeof option === 'number' ? option.toString() : option}
-        disableClearable={true}
-        id="year-list"
-        
-        sx={{ width: 120, height: 1}}
-        renderInput={(params) => <TextField {...params} label="Year" InputProps={{
-          ...params.InputProps,
-          readOnly: true, // Prevent manual editing
-        }}/>}
-      />
-      <div style={{width: '10px'}}/>
-      <Autocomplete
-        options={months}
-        value={month}
-        onChange={(event, newValue) => {
-          setMonth(newValue); // Update state when the user selects a new value
-        }}
-        inputValue={month}
-        onInputChange={(event, newInputValue) => {
-         // setYear(newInputValue);
-         //do nothing
-        }}
-        // getOptionLabel={(option) => typeof option === 'number' ? option.toString() : option}
-        disableClearable={true}
-        id="month-list"
-        sx={{ width: 80, height: 1}}
-        renderInput={(params) => <TextField {...params} label="Month" InputProps={{
-          ...params.InputProps,
-          readOnly: true, // Prevent manual editing
-        }}/>}
-      />
-      
-<div style={{width: '10px'}}/>
-    <Button variant="contained" onClick={handlecloseAccountingPeriod} sx={{bgcolor: '#0097B2'}}>
-      Close
-    </Button>
-      </MenuItem>
-    </Menu>
-  )
-}
-  </div>
-        </Item>
-        <Item>Item 2</Item>
-        <Item>Item 3</Item>
-        <Item>Item 4</Item>
-      </Stack>
-    </div>
+        >
+          <TextField
+            label="Currency"
+            defaultValue="US Dollar"
+            variant="outlined"
+            fullWidth
+            InputProps={{
+              readOnly: true,
+            }}
+            sx={{
+              ml: 2,
+              '& .MuiInputBase-root': {
+                borderRadius: '16px',
+                height: '4vh',
+                width: '15vh',
+                fontSize: '0.875rem',
+              },
+              '& label': {
+                transform: 'translate(14px, -9px) scale(0.75)',
+              },
 
+            }}
+          />
+        </Grid>
 
-    </Box>
-    </>
+        <Grid size={8}>
+          <Item>
+
+            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px',}}>
+              Trend Analysis
+            </Typography>
+            <Divider />
+            <LineChartWidget
+              height={300}
+              series={[
+                { data: pData, label: 'pv' },
+                { data: uData, label: 'uv' },
+              ]}
+              xLabels={xLabels}
+            />
+          </Item>
+        </Grid>
+        <Grid size={4}>
+          <Item>
+            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px',}}>
+              Top Five Metrics
+            </Typography>
+            <Divider />
+            <DynamicTable
+              columns={columns}
+              rows={rows}
+              rowKey="rank" // Unique identifier property
+            />
+          </Item>
+        </Grid>
+        <Grid size={12}>
+          <Item>
+            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px', }}>
+              Month Over Month Activity
+            </Typography>
+            <Divider />
+
+            <BarChartWidget
+              dataset={momDataset}
+              xAxis={[{ dataKey: 'accountingPeriodId' }]}
+              series={momSeries}
+              chartSetting={defaultChartSetting}
+            />
+          </Item>
+        </Grid>
+      </Grid>
+    </Container>
+
   )
 }

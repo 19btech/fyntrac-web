@@ -27,13 +27,13 @@ const NAVIGATION = [
     icon: <StartOutlinedIcon />,
   },
   {
-    segment: 'home',
-    title: 'Home',
+    segment: 'dashboard',
+    title: 'Dashboard',
     icon: <CottageOutlinedIcon />
   },
   {
-    segment: 'pipeline',
-    title: 'Pipeline',
+    segment: 'diagnostic',
+    title: 'Diagnostic',
     icon: <AccountTreeOutlinedIcon />,
   },
   {
@@ -42,8 +42,8 @@ const NAVIGATION = [
     icon: <ArticleOutlinedIcon />,
   },
   {
-    segment: 'accounting',
-    title: 'Accounting',
+    segment: 'mapping',
+    title: 'Mapping',
     icon: <AccountBalanceOutlinedIcon />,
   },
   {
@@ -189,7 +189,7 @@ function DashboardLayoutBasic(props) {
       theme={demoTheme}
       // window={demoWindow}
     >
-      <DashboardLayout sx={{background: '#e4e8ee'}} theme={demoTheme}>
+      <DashboardLayout  sx={{background: '#e4e8ee'}} theme={demoTheme}>
         <PageContent pathname={router.pathname} />
       </DashboardLayout>
     </AppProvider>

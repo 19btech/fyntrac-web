@@ -1,57 +1,26 @@
 "use client"
-import React from 'react'
-import PropTypes from 'prop-types';
+import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { Paper } from '@mui/material';
+import { Paper, Autocomplete, TextField } from '@mui/material';
 import Grid from '@mui/material/Grid2';
-import Divider from '@mui/material/Divider';
-import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
+import Link from '@mui/material/Link';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import SuccessAlert from '../component/success-alert'
-import ErrorAlert from '../component/error-alert'
-import ConfirmationDialog from '../component/confirmation-dialog'
-import ReopenAccountingPeriodDialog from '../component/reopen-accounting-period-dialog'
+import CustomTabPanel from '../component/custom-tab-panel'
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import RefreshSharpIcon from '@mui/icons-material/RefreshSharp';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import AddDashboardConfiguration from '../component/add-update-dashboard-config';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import '../common.css';
 
-function CustomTabPanel(props) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ p: 3, alignContent: 'initial' }}>
-          <>{children}</>
-        </Box>
-      )}
-    </div>
-  );
-}
-
-CustomTabPanel.propTypes = {
-  children: PropTypes.node,
-  index: PropTypes.number.isRequired,
-  value: PropTypes.number.isRequired,
-};
-
-function a11yProps(index) {
-  return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`,
-  };
-}
 
 export default function SettingsPage() {
   const [value, setValue] = React.useState(0);
@@ -68,6 +37,30 @@ export default function SettingsPage() {
   const [showReopenAccountingPeriodDialog, setShowReopenAccountingPeriodDialog] = React.useState(false);
   const [showSchemaRefreshDialog, setShowSchemaRefreshDialog] = React.useState(false);
   const [isFiscalPeriodButtonDisabled, setIsFiscalPeriodButtonDisabled] = React.useState(true);
+  const [panelIndex, setPanelIndex] = React.useState(0);
+  const [isDashboardConfigurationDialogOpen, setIsDashboardConfigurationDialogOpen] = React.useState(false);
+  const [currency, setCurrency] = useState('USD');
+  const currencyList = ['USD',
+    'PKR',
+    'EUR',
+    'AED'];
+
+  const [replayBoundry, setReplayBoundry] = useState('3');
+  const replayBoundryList = ['3', '4',
+    '5',
+    '6',
+    '7', '8', '9', '10', '11', '12'];
+
+  const [reportingPeriod, setReportingPeriod] = useState('6');
+  const reportingPeriodList = [
+    '6',
+    '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
+
+  const [reopenPeriod, setReopenPeriod] = useState('Nov-2022');
+  const reopenPriodList = ['Nov-2022',
+    'Oct-2022',
+    'Sep-2022',
+    'Aug-2022'];
 
   const rows = [
     { left: 'Item 1 Left', right: 'Item 1 Right' },
@@ -78,7 +71,7 @@ export default function SettingsPage() {
     { left: 'Item 6 Left', right: 'Item 6 Right' },
     { left: 'Item 7 Left', right: 'Item 7 Right' },
   ];
-
+  const [editData, setEditData] = useState(null);
   const saveFiscalPeriodServiceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/fiscal-priod/save';
   const handleFiscalPeriodChange = (date) => {
     setFiscalPeriodStaringDate(date);
@@ -88,6 +81,18 @@ export default function SettingsPage() {
   };
 
 
+
+  const handleConfigurationTabChange = (event, newValue) => {
+    setPanelIndex(newValue);
+  };
+
+  const handleAddDashboardConfigurationDialogOpen= () => {
+    setIsDashboardConfigurationDialogOpen(true);
+  }
+
+  const handleAddDashboardConfigurationDialogClose= (val) => {
+    setIsDashboardConfigurationDialogOpen(val);
+  }
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -248,246 +253,448 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ width: '100%', margin: 'auto' }}>
-      <Paper key={1} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '109px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Reset Environment</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              Completely refresh your environment
-            </Typography>
-          </Grid>
+    <Box>
+      <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
+        <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleConfigurationTabChange} aria-label="Accounting Configuration">
+          <Tab label="General Settings" sx={{ textTransform: 'none' }} />
+          <Tab label="User Managment" sx={{ textTransform: 'none' }} />
+        </Tabs>
+      </Box>
 
-          {/* Right Aligned */}
-          <Grid>
-            <Tooltip title="Reset Environment">
-              <Button className='button-size' onClick={handleSchemaRefresh} variant="outlined" sx={{
-                marginLeft: 2,
-                color: 'white',
-                backgroundColor: '#34b444  !important',
-                '&:hover': {
-                  backgroundColor: 'lightgrey',
-                },
-              }}>
+      <CustomTabPanel value={panelIndex} index={0}>
+        <div style={{ width: '100%', margin: 'auto' }}>
+          <Paper key={1} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Reset Environment</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  Resetting your environment will remove all current settings and data.
+                </Typography>
+              </Grid>
 
-                &nbsp; &nbsp; Reset &nbsp;  &nbsp;
+              {/* Right Aligned */}
+              <Grid>
 
-              </Button>
-            </Tooltip>
-          </Grid>
-        </Grid>
+                <IconButton aria-label="Reset Environment" onClick={handleSchemaRefresh} sx={{
+                  '&:hover': {
+                    backgroundColor: '#14213d',
+                  },
+                }}>
+                  <Tooltip title="Reset Environment">
+                    <RefreshSharpIcon
+                      sx={{
+                        fontSize: '40px',
+                        transform: 'scale(1.1)',  // Slightly thicker appearance
+                      }}
+                    />
+                  </Tooltip>
+                </IconButton>
+              </Grid>
+            </Grid>
 
-      </Paper>
-      <Divider />
+          </Paper>
 
-      <Paper key={2} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '110px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Home Currencty</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              What is home currencty?
-            </Typography>
-          </Grid>
+          <Paper key={2} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid size={8}>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Home Currencty</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  Choose default currency of your environment.
+                </Typography>
+              </Grid>
 
-          {/* Right Aligned */}
-          <Grid>
-            <Tooltip title="Currency">
-              <Button className='button-size' variant="outlined" sx={{
-                marginLeft: 2,
-                color: 'white',
-                backgroundColor: '#34b444  !important',
-                '&:hover': {
-                  backgroundColor: 'lightgrey',
-                },
-              }}>
-
-                &nbsp; &nbsp; Save &nbsp;  &nbsp;
-
-              </Button>
-            </Tooltip>
-          </Grid>
-        </Grid>
-
-      </Paper>
-      <Divider />
-
-      <Paper key={3} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '110px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>General Ledger Accounts Mapping Fields</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              What are journal mapping fields?
-            </Typography>
-          </Grid>
-
-          {/* Right Aligned */}
-          <Grid>
-            <Tooltip title="Mappings">
-              <Button className='button-size' variant="outlined" sx={{
-                marginLeft: 2,
-                color: 'white',
-                backgroundColor: '#34b444  !important',
-                '&:hover': {
-                  backgroundColor: 'lightgrey',
-                },
-              }}>
-
-                &nbsp; &nbsp; Save &nbsp;  &nbsp;
-
-              </Button>
-            </Tooltip>
-          </Grid>
-        </Grid>
-
-      </Paper>
-      <Divider />
-
-      <Paper key={4} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '110px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid size={8}>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Fiscal Period Start Date</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              learn more!
-            </Typography>
-          </Grid>
-
-          {/* Right Aligned */}
-          <Grid size={2} >
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-
-              <DatePicker
-                value={fiscalPeriodStaringDate}
-                onChange={handleFiscalPeriodChange}
-                sx={{
-                  "& .MuiInputBase-root": {
-                    height: "40px"
-                  }
-                }}
-              />
-            </LocalizationProvider>
-
-          </Grid>
-
-          <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-
-            <Tooltip title="Generate Accounting Periods" arrow>
-              <span>
-                <Button
-                className='button-size'
-                  disabled={isFiscalPeriodButtonDisabled}
-                  onClick={handleSaveFiscalPeriod}
-                  variant="outlined"
+              {/* Right Aligned */}
+              <Grid size={2}>
+                <Autocomplete
                   sx={{
-                    marginLeft: 2,
-                    color: 'white',
-                    backgroundColor: '#34b444 !important',
-                    '&:hover': {
-                      backgroundColor: 'lightgrey',
-                    },
+                    "& .MuiInputBase-root": {
+                      height: "40px"
+                    }
                   }}
-                >
-                  &nbsp; &nbsp; Save &nbsp; &nbsp;
-                </Button>
-              </span>
-            </Tooltip>
+                  disablePortal
+                  id="currency-combo"
+                  options={currencyList}
+                  value={currency}
+                  getOptionLabel={(option) => option}
+                  onChange={(event, newValue) => { setCurrency(newValue) }} // newValue will be the selected option object
+                  renderInput={(params) => <TextField {...params} label="Currency" />}
+                />
 
-          </Grid>
-        </Grid>
 
-      </Paper>
-      <Divider />
+              </Grid>
+              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Tooltip title="Currency">
+                  <span>
+                    <Link
+                      component="button"
+                      // onClick={handleCurrencySave} // Replace with your actual function
+                      underline="none"
+                      sx={{
+                        marginLeft: 2,
+                        color: '#1a6ab9',
+                        fontWeight: 500,
+                        px: 1,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: '#14213d',
+                        },
+                      }}
+                    >
+                      Save
+                    </Link>
+                  </span>
+                </Tooltip>
+              </Grid>
+            </Grid>
 
-      <Paper key={5} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '110px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Reporting Period</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              What is reporting period?
-            </Typography>
-          </Grid>
+          </Paper>
 
-          {/* Right Aligned */}
-          <Grid>
-            <Tooltip title="Reporting Period">
-              <Button variant="outlined" 
-              className='button-size'
-              sx={{
-                marginLeft: 2,
-                color: 'white',
-                backgroundColor: '#34b444  !important',
-                '&:hover': {
-                  backgroundColor: 'lightgrey',
-                },
-              }}>
+          <Paper key={4} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid size={8}>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Fiscal Period Start Date</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  Specify starting date of your fiscal period.
+                </Typography>
+              </Grid>
 
-                &nbsp; &nbsp; Save &nbsp;  &nbsp;
+              {/* Right Aligned */}
+              <Grid size={2} >
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
 
-              </Button>
-            </Tooltip>
-          </Grid>
-        </Grid>
+                  <DatePicker
+                    value={fiscalPeriodStaringDate}
+                    onChange={handleFiscalPeriodChange}
+                    sx={{
+                      "& .MuiInputBase-root": {
+                        height: "40px"
+                      }
+                    }}
+                  />
+                </LocalizationProvider>
 
-      </Paper>
-      <Divider />
+              </Grid>
 
-      <Paper key={6} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '110px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Restatement Mode</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              What is restatement mode?
-            </Typography>
-          </Grid>
+              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Tooltip title="Generate Accounting Periods" arrow>
+                  <span>
+                    <Link
+                      component="button"
+                      onClick={handleSaveFiscalPeriod}
+                      underline="none"
+                      disabled={isFiscalPeriodButtonDisabled}
+                      sx={{
+                        marginLeft: 2,
+                        color: '#1a6ab9',
+                        fontWeight: 500,
+                        px: 1,
+                        cursor: isFiscalPeriodButtonDisabled ? 'not-allowed' : 'pointer',
+                        pointerEvents: isFiscalPeriodButtonDisabled ? 'none' : 'auto',
+                        '&:hover': {
+                          color: '#14213d',
+                        },
+                      }}
+                    >
+                      Save
+                    </Link>
+                  </span>
+                </Tooltip>
 
-          {/* Right Aligned */}
-          <Grid>
-            <Switch checked={restatementMode} onChange={handleRestatementMode} />
-          </Grid>
-        </Grid>
+              </Grid>
+            </Grid>
 
-      </Paper>
-      <Divider />
+          </Paper>
+          <Paper key={6} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Restatement Mode</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  This action will reopen previously closed accounting periods.
+                </Typography>
+              </Grid>
 
-      <Paper key={7} elevation={0} sx={{ padding: '10px', marginBottom: '8px' }}>
-        <Grid container sx={{ height: '110px' }} alignItems="center" justifyContent="space-between">
-          {/* Left Aligned */}
-          <Grid>
-            <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Reopen Accounting Period</Typography>
-            <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#691091' }}>
-              What is an accounting period?
-            </Typography>
-          </Grid>
+              {/* Right Aligned */}
+              <Grid>
+                <Switch
+                  sx={{
+                    fontSize: '40px',
+                    transform: 'scale(1.1)'
+                  }}
+                  checked={restatementMode} onChange={handleRestatementMode} />
+              </Grid>
+            </Grid>
 
-          {/* Right Aligned */}
-          <Grid>
-            <Tooltip title='Reopen accounting period'>
-              <Button variant="outlined" 
-              className='button-size'
-              sx={{
-                marginLeft: 2,
-                color: 'white',
-                backgroundColor: '#34b444  !important',
-                '&:hover': {
-                  backgroundColor: 'lightgrey',
-                },
-              }} onClick={handleReopenAccountingPeriod} >
+          </Paper>
 
-                &nbsp; &nbsp; Reopen &nbsp;  &nbsp;
+          <Paper key={7} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid size={8}>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Re-Open Accounting Period</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  Choose a closed period to reopen.
+                </Typography>
+              </Grid>
 
-              </Button>
-            </Tooltip>
-          </Grid>
-        </Grid>
+              {/* Right Aligned */}
+              <Grid size={2}>
+                <Autocomplete
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      height: "40px"
+                    }
+                  }}
+                  disablePortal
+                  id="reopen-period-combo"
+                  options={reopenPriodList}
+                  value={reopenPeriod}
+                  getOptionLabel={(option) => option}
+                  onChange={(event, newValue) => { setReopenPeriod(newValue) }} // newValue will be the selected option object
+                  renderInput={(params) => <TextField {...params} label="Reopen Period" />}
+                />
 
-      </Paper>
-      <Divider />
 
-    </div>
+              </Grid>
+              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Tooltip title="Reopen Period">
+                  <span>
+                    <Link
+                      component="button"
+                      // onClick={handleReopenPeriod} // Replace with your actual handler
+                      underline="none"
+                      sx={{
+                        marginLeft: 2,
+                        color: '#1a6ab9',
+                        fontWeight: 500,
+                        px: 1,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: '#14213d',
+                        },
+                      }}
+                    >
+                      Reopen
+                    </Link>
+                  </span>
+                </Tooltip>
+              </Grid>
+            </Grid>
+
+          </Paper>
+
+          <Paper key={9} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid size={8}>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Delete Entries</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  This action will delete all transactions, balances, GL for selected date.
+                </Typography>
+              </Grid>
+
+              {/* Right Aligned */}
+              <Grid size={2} >
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+
+                  <DatePicker
+                    value={fiscalPeriodStaringDate}
+                    onChange={handleFiscalPeriodChange}
+                    sx={{
+                      "& .MuiInputBase-root": {
+                        height: "40px"
+                      }
+                    }}
+                  />
+                </LocalizationProvider>
+
+              </Grid>
+
+              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Tooltip title="Generate Accounting Periods" arrow>
+                  <span>
+                    <Link
+                      component="button" // behaves like a button
+                      onClick={handleSaveFiscalPeriod}
+                      underline="none"
+                      sx={{
+                        marginLeft: 2,
+                        // bgcolor: '#c7c8d7',
+                        px: 2,
+                        color: '#1a6ab9',
+                        cursor: isFiscalPeriodButtonDisabled ? 'not-allowed' : 'pointer',
+                        pointerEvents: isFiscalPeriodButtonDisabled ? 'none' : 'auto',
+                        '&:hover': {
+                          color: '#14213d',
+                        },
+                      }}
+                    >
+                      Delete
+                    </Link>
+                  </span>
+                </Tooltip>
+
+              </Grid>
+            </Grid>
+
+          </Paper>
+
+          <Paper key={11} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Configure Dashboard</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  update dashboard settings.
+                </Typography>
+              </Grid>
+
+              {/* Right Aligned */}
+              <Grid>
+
+                <IconButton aria-label="Reset Environment" onClick={handleAddDashboardConfigurationDialogOpen} sx={{
+                  '&:hover': {
+                    backgroundColor: '#14213d',
+                  },
+                }}>
+                  <Tooltip title="Configure Dashboard">
+                    <SettingsOutlinedIcon
+                      sx={{
+                        fontSize: '40px',
+                        transform: 'scale(1.1)',  // Slightly thicker appearance
+                      }}
+                    />
+                  </Tooltip>
+                </IconButton>
+              </Grid>
+            </Grid>
+
+          </Paper>
+
+          <Paper key={12} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid size={8}>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Rewind/Replay Look Back Period</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  Specify the number of postings to include in the rewind replay operations.
+                </Typography>
+              </Grid>
+
+              {/* Right Aligned */}
+              <Grid size={2}>
+                <Autocomplete
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      height: "40px"
+                    }
+                  }}
+                  disablePortal
+                  id="currency-combo"
+                  options={replayBoundryList}
+                  value={replayBoundry}
+                  getOptionLabel={(option) => option}
+                  onChange={(event, newValue) => { setReplayBoundry(newValue) }} // newValue will be the selected option object
+                  renderInput={(params) => <TextField {...params} label="Lookback Period" />}
+                />
+
+
+              </Grid>
+              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Tooltip title="Rewind/Replay lookback period">
+                  <span>
+                    <Link
+                      component="button"
+                      // onClick={handleCurrencySave} // Replace with your actual function
+                      underline="none"
+                      sx={{
+                        marginLeft: 2,
+                        color: '#1a6ab9',
+                        fontWeight: 500,
+                        px: 1,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: '#14213d',
+                        },
+                      }}
+                    >
+                      Save
+                    </Link>
+                  </span>
+                </Tooltip>
+              </Grid>
+            </Grid>
+
+          </Paper>
+
+          <Paper key={13} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
+            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
+              {/* Left Aligned */}
+              <Grid size={8}>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Reporting Period</Typography>
+                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
+                  Set the number of recent posting periods to include in report.
+                </Typography>
+              </Grid>
+
+              {/* Right Aligned */}
+              <Grid size={2}>
+                <Autocomplete
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      height: "40px"
+                    }
+                  }}
+                  disablePortal
+                  id="currency-combo"
+                  options={reportingPeriodList}
+                  value={reportingPeriod}
+                  getOptionLabel={(option) => option}
+                  onChange={(event, newValue) => { setReportingPeriod(newValue) }} // newValue will be the selected option object
+                  renderInput={(params) => <TextField {...params} label="Reporting Period" />}
+                />
+
+
+              </Grid>
+              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Tooltip title="Reporting Period">
+                  <span>
+                    <Link
+                      component="button"
+                      // onClick={handleCurrencySave} // Replace with your actual function
+                      underline="none"
+                      sx={{
+                        marginLeft: 2,
+                        color: '#1a6ab9',
+                        fontWeight: 500,
+                        px: 1,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: '#14213d',
+                        },
+                      }}
+                    >
+                      Save
+                    </Link>
+                  </span>
+                </Tooltip>
+              </Grid>
+            </Grid>
+
+          </Paper>
+
+
+        </div>
+      </CustomTabPanel>
+
+      <CustomTabPanel value={panelIndex} index={1}>
+        <div>work inprogress</div>
+      </CustomTabPanel>
+
+      <><AddDashboardConfiguration open={isDashboardConfigurationDialogOpen} onClose={handleAddDashboardConfigurationDialogClose} editData={settings.dashboardConfiguration}/></>
+    </Box>
   );
 }
