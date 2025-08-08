@@ -21,10 +21,16 @@ import LineChartWidget from '../component/line-chat-widget';
 import BarChartWidget from '../component/bar-chart-widget';
 import DynamicTable from '../component/dynamic-data-table';
 import { Typography } from '@mui/material';
+import { LineChart } from '@mui/x-charts/LineChart';
 
 const serviceGetOpenAccountingPeriodsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/open-periods'
 const serviceGetCurrentOpenAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/current-open-period'
 const serviceCloseAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/close'
+const serviceGetWidgetDataURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/widget-data'
+const serviceGetTrendAnalysisURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/trend-analysis-data'
+const serviceGetRankedMetricURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/ranked-metrics'
+const serviceGetMomActivityDataURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/mom-activity-data'
+
 
 // const Item = styled(Paper)(({ theme }) => ({
 //   backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
@@ -59,7 +65,7 @@ const Container = styled(Paper)(({ theme }) => ({
   height: '15vh',
   color: (theme.vars ?? theme).palette.text.secondary,
   boxShadow: 'none',
-   // Remove shadow (emboss effect)
+  // Remove shadow (emboss effect)
   elevation: 0,       // Optional: for clarity, though not used directly in styling
   ...(theme.palette.mode === 'dark' && {
     backgroundColor: '#1A2027',
@@ -117,63 +123,10 @@ const AccountingPeriodRecord = {
   status: 0,
 };
 
-const widgetOne = {
-
-  metricName: 'UPB',
-  accountingPeriodId: 202201,
-  postingDate: 20220131,
-  balance: {
-    activity: '50000.0000',
-    beginningBalance: '0.0000',
-    endingBalance: '50000.0000'
-  },
-
-};
-
-
-const widgetTwo = {
-
-  metricName: 'Unam Fee',
-  accountingPeriodId: 202201,
-  postingDate: 20220131,
-  balance: {
-    activity: '10000.0000',
-    beginningBalance: '0.0000',
-    endingBalance: '10000.0000'
-  },
-
-};
-
-
-const widgetThree = {
-
-  metricName: 'Mark to Market',
-  accountingPeriodId: 202201,
-  postingDate: 20220131,
-  balance: {
-    activity: '2000.0000',
-    beginningBalance: '0.0000',
-    endingBalance: '2000.0000'
-  },
-
-};
-const uData = [4000, 3000, 2000, 2780, 1890, 2390, 3490];
-const pData = [2400, 1398, 9800, 3908, 4800, 3800, 4300];
-const xLabels = ['Page A', 'Page B', 'Page C', 'Page D', 'Page E', 'Page F', 'Page G'];
-
 const columns = [
   { id: 'rank', label: 'Rank' },
-  { id: 'metric', label: 'Metric', align: 'right' },
-  { id: 'amount', label: 'Amount', align: 'right' },
-];
-
-const rows = [
-  { rank: 1, metric: 'Unpaid Principal', amount: '$50000' },
-  { rank: 2, metric: 'Unam Fee', amount: '$10000' },
-  { rank: 3, metric: 'Interest Balance', amount: '$5000' },
-  { rank: 4, metric: 'Mark to Market', amount: '$2000' },
-  { rank: 5, metric: 'Payment', amount: '$1000' },
-  // ... more rows
+  { id: 'metricName', label: 'Metric', align: 'left' },
+  { id: 'balance', label: 'Balance', align: 'right' },
 ];
 
 
@@ -192,9 +145,9 @@ const momSeries = [
   { dataKey: 'unam', label: 'Unpaid Fee', valueFormatter },
   { dataKey: 'interest', label: 'Interest Balance', valueFormatter },
 ];
-
+Map
 const defaultChartSetting = {
-  yAxis: [{ label: 'Balance', width: 60 }],
+  yAxis: [{ label: 'Activity', width: 60 }],
   height: 300,
   margin: { top: 30, bottom: 50, left: 70, right: 20 },
 };
@@ -211,7 +164,9 @@ export default function HomePage() {
   const [successMessage, setSuccessMessage] = React.useState('');
   const [showErrorMessage, setShowErrorMessage] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
-
+  const [rankedMetrics, setRankedMetrics] = React.useState([]);
+  const [momData, setMomData] = React.useState([]);
+  const [momMetricSeries, setMomMetricSeries] = React.useState([]);
   const [accountingPeriods, setAccountingPeriods] = React.useState([
     {
       ...AccountingPeriodRecord,
@@ -221,6 +176,23 @@ export default function HomePage() {
       "year": 0,
       "status": 0
     }]);
+
+  const [widgetDataList, setWidgetDataList] = React.useState([]);
+  const [trendAnalysisData, setTrendAnalysisData] = React.useState([]);
+  const [moMActivityData, setMoMActivityData] = React.useState([]);
+
+  const transformToMomDataset = (data) => {
+    const result = {};
+
+    data.forEach(({ accountingPeriodId, activity, value }) => {
+      if (!result[accountingPeriodId]) {
+        result[accountingPeriodId] = { accountingPeriodId };
+      }
+      result[accountingPeriodId][activity] = value;
+    });
+
+    return Object.values(result);
+  };
 
   const handleClickOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -247,11 +219,15 @@ export default function HomePage() {
     const fetchData = async () => {
       try {
         // Fetch open accounting periods first
-        await fetchOpenAccountingPeriods();
+        fetchOpenAccountingPeriods();
 
         // Then fetch the last closed accounting period
-        await fetchCurrentOpenAccountingPeriod();
+        fetchCurrentOpenAccountingPeriod();
 
+        fetchWidgetData();
+        fetchTrendAnalysisData();
+        fetchRankedMetricData();
+        fetchMoMActivityData();
         // Mark data fetching as complete
         setIsDataFetched(true);
       } catch (error) {
@@ -345,6 +321,87 @@ export default function HomePage() {
       });
   };
 
+
+  const fetchWidgetData = () => {
+
+    axios.get(serviceGetWidgetDataURL, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+        setWidgetDataList(response.data);
+      })
+      .catch(error => {
+        // Handle error if needed
+      });
+  };
+
+
+
+  const fetchTrendAnalysisData = () => {
+
+    axios.get(serviceGetTrendAnalysisURL, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+        setTrendAnalysisData(response.data);
+      })
+      .catch(error => {
+        // Handle error if needed
+      });
+  };
+
+
+  const fetchRankedMetricData = () => {
+
+    axios.get(serviceGetRankedMetricURL, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+        console.log('Ranked Metric:', response.data);
+        setRankedMetrics(response.data);
+      })
+      .catch(error => {
+        // Handle error if needed
+      });
+  };
+
+
+
+  const fetchMoMActivityData = () => {
+
+    axios.get(serviceGetMomActivityDataURL, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+        console.log('MOM Activity Response:', response.data);
+
+        setMomData(response.data.momData);
+        setMomMetricSeries(response.data.monthOverMonthSeries);
+        console.log('MOM Activity Data:', momData);
+        console.log('MOM Activity Metrics:', momMetricSeries);
+        // setMoMActivityData(response.data);
+      })
+      .catch(error => {
+        // Handle error if needed
+      });
+  };
+
   const fetchCurrentOpenAccountingPeriod = () => {
 
     axios.get(serviceGetCurrentOpenAccountingPeriodURL, {
@@ -372,10 +429,10 @@ export default function HomePage() {
         <Grid size={2.3}>
           <TopItem>
 
-            
-              <Typography variant="h8" fontWeight="medium" sx={{ color: '#2f3a53', width: '100px', paddingTop: 1, paddingLeft: 1}}>
-                Accounting&nbsp;Period
-              </Typography>
+
+            <Typography variant="h8" fontWeight="medium" sx={{ color: '#2f3a53', width: '100px', paddingTop: 1, paddingLeft: 1 }}>
+              Accounting&nbsp;Period
+            </Typography>
 
             <Box
               sx={{
@@ -450,22 +507,22 @@ export default function HomePage() {
 
         <Grid size={2.3}>
           <TopItem>
-            <MetricWidget metric={widgetOne} />
+            <MetricWidget metric={widgetDataList[0]} />
           </TopItem>
         </Grid>
         <Grid size={2.3}>
           <TopItem>
-            <MetricWidget metric={widgetTwo} />
+            <MetricWidget metric={widgetDataList[1]} />
           </TopItem>
         </Grid>
         <Grid size={2.3}>
           <TopItem>
-            <MetricWidget metric={widgetThree} />
+            <MetricWidget metric={widgetDataList[2]} />
           </TopItem>
         </Grid>
         <Grid size={2.3}>
           <TopItem>
-            <MetricWidget metric={widgetThree} />
+            <MetricWidget metric={widgetDataList[3]} />
           </TopItem>
         </Grid>
         <Grid size={.25}></Grid>
@@ -506,29 +563,62 @@ export default function HomePage() {
         <Grid size={8}>
           <Item>
 
-            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px',}}>
-              Trend Analysis
+            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px', }}>
+              {trendAnalysisData.metricName}  Trend Analysis
             </Typography>
             <Divider />
-            <LineChartWidget
-              height={300}
-              series={[
-                { data: pData, label: 'pv' },
-                { data: uData, label: 'uv' },
-              ]}
-              xLabels={xLabels}
-            />
+            {trendAnalysisData?.accountingPeriods?.length > 0 && trendAnalysisData?.endingBalances?.length > 0 ? (
+              <LineChart sx={{paddingBottom: 2}}
+                xAxis={[
+                  {
+                    id: 'accountingPeriod',
+                    data: trendAnalysisData.accountingPeriods, // Must be sorted if desired
+                    scaleType: 'point'
+                  }
+                ]}
+                yAxis={[
+                  {
+                    label: 'Ending Balance ($)',
+                  }
+                ]}
+                series={[
+                  {
+                    data: trendAnalysisData.endingBalances,
+                    label: 'Balance Trend',
+                    showMark: true,
+                    color: '#1976d2',
+                    xAxisKey: 'accountingPeriod' // optional but useful when multiple axes
+                  }
+                ]}
+              />
+
+            ) : (
+              <Box
+                sx={{
+                  height: 300,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px dashed #ccc',
+                  borderRadius: 1
+                }}
+              >
+                <Typography color="text.secondary">
+                  {!trendAnalysisData ? 'Loading data...' : 'No data available'}
+                </Typography>
+              </Box>
+            )}
           </Item>
         </Grid>
         <Grid size={4}>
           <Item>
-            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px',}}>
+            <Typography variant="h6" fontWeight={600} sx={{ color: '#2f3a53', letterSpacing: '-1px', }}>
               Top Five Metrics
             </Typography>
             <Divider />
             <DynamicTable
               columns={columns}
-              rows={rows}
+              rows={rankedMetrics}
               rowKey="rank" // Unique identifier property
             />
           </Item>
@@ -539,11 +629,10 @@ export default function HomePage() {
               Month Over Month Activity
             </Typography>
             <Divider />
-
             <BarChartWidget
-              dataset={momDataset}
+              dataset={momData}
               xAxis={[{ dataKey: 'accountingPeriodId' }]}
-              series={momSeries}
+              series={momMetricSeries}
               chartSetting={defaultChartSetting}
             />
           </Item>

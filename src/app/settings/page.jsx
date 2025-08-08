@@ -40,10 +40,7 @@ export default function SettingsPage() {
   const [panelIndex, setPanelIndex] = React.useState(0);
   const [isDashboardConfigurationDialogOpen, setIsDashboardConfigurationDialogOpen] = React.useState(false);
   const [currency, setCurrency] = useState('USD');
-  const currencyList = ['USD',
-    'PKR',
-    'EUR',
-    'AED'];
+  const [currencyList, setCurrencyList] = useState();
 
   const [replayBoundry, setReplayBoundry] = useState('3');
   const replayBoundryList = ['3', '4',
@@ -108,6 +105,48 @@ export default function SettingsPage() {
     setShowReopenAccountingPeriodDialog(true);
   }
 
+    const saveCurrency = async () => {
+    try {
+      const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/save/currency', currency,
+        {
+          headers: {
+            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            Accept: '*/*',
+            'Content-Type': 'application/json',
+            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+          }
+        }
+      );
+      setSuccessMessage('');
+      setShowSuccessMessage(true);
+
+    } catch (error) {
+      // Handle error if needed
+      setErrorMessage(error);
+      setShowErrorMessage(true);
+
+    }
+  };
+
+      const fetchCurrencies = () => {
+    const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/currencies';
+    axios.get(fetchSettings, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+        setCurrencyList(response.data);
+
+        // Handle success response if needed
+      })
+      .catch(error => {
+        // Handle error if needed
+      });
+  };
+
   const fetchSettings = () => {
     const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/settings';
     axios.get(fetchSettings, {
@@ -133,6 +172,7 @@ export default function SettingsPage() {
   React.useEffect(() => {
     fetchSettings();
     setIsDataFetched(true);
+    fetchCurrencies();
   }, [isDataFetched]);
 
 
@@ -329,7 +369,7 @@ export default function SettingsPage() {
                   <span>
                     <Link
                       component="button"
-                      // onClick={handleCurrencySave} // Replace with your actual function
+                      onClick={saveCurrency} // Replace with your actual function
                       underline="none"
                       sx={{
                         marginLeft: 2,

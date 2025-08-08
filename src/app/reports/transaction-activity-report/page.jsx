@@ -28,7 +28,7 @@ import axios from 'axios';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
 
-const GLEReportPage = () => {
+const TransactionActivityReportPage = () => {
   // State to manage the list of criteria
   const [criteriaList, setCriteriaList] = useState([
     {
@@ -58,7 +58,7 @@ const GLEReportPage = () => {
   };
 
   const fetchReportAttributes = () => {
-    const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/get/attributes`;
+    const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/transaction-activity/get/attributes`;
     axios.get(fetchSettings, {
       headers: {
         'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
@@ -92,7 +92,7 @@ const GLEReportPage = () => {
 
     const filteredCriteriaList = criteriaList.filter(criteria => criteria.filters.length > 0);
     console.log('filters:', filteredCriteriaList);
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/execute`;
+    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/transaction-activity/execute`;
     axios.post(executeReportAPI, filteredCriteriaList, {
       headers: {
         'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
@@ -196,7 +196,7 @@ const GLEReportPage = () => {
       <Grid container spacing={3}>
         <Grid size="auto">
           <div className="left">
-            <GridHeader>Journal Entry Report</GridHeader>
+            <GridHeader>Transaction Activity Report</GridHeader>
           </div>
         </Grid>
         <Grid size={6} />
@@ -432,4 +432,4 @@ const GLEReportPage = () => {
   );
 };
 
-export default GLEReportPage;
+export default TransactionActivityReportPage;

@@ -16,6 +16,7 @@ import ConstructionOutlinedIcon from '@mui/icons-material/ConstructionOutlined';
 import Diversity3OutlinedIcon from '@mui/icons-material/Diversity3Outlined';
 import BusinessCenterOutlinedIcon from '@mui/icons-material/BusinessCenterOutlined';
 import RuleFolderOutlinedIcon from '@mui/icons-material/RuleFolderOutlined';
+import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import PageContent from '../component/pageContent';
 import { Inter } from 'next/font/google'; // Use built-in Next.js font loader
 
@@ -63,9 +64,9 @@ const NAVIGATION = [
         icon: <AutoGraphOutlinedIcon />,
       },
       {
-        segment: 'report2',
-        title: 'Report 2',
-        icon: <AutoGraphOutlinedIcon />,
+        segment: 'transaction-activity-report',
+        title: 'Activity Report',
+        icon: <TrendingUpOutlinedIcon />,
       },
     ],
   },

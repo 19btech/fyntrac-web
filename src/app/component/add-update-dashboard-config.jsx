@@ -34,6 +34,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [widgetOne, setWidgetOne] = useState('');
     const [widgetTwo, setWidgetTwo] = useState('');
     const [widgetThree, setWidgetThree] = useState('');
+     const [widgetFour, setWidgetFour] = useState('');
     const [trendAnalysisGraph, setTrendAnalysisGraph] = useState('');
     const [activityGraphMetrics, setActivityGraphMetrics] = useState([...fixedMetrics]);;
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -56,6 +57,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
             setWidgetOne(editData.widgetOneMetric);
             setWidgetTwo(editData.widgetTwoMetric);
             setWidgetThree(editData.widgetThreeMetric);
+            setWidgetFour(editData.widgetFourMetric);
             setTrendAnalysisGraph(editData.trendAnalysisGraphMetric);
             setActivityGraphMetrics(graphMetrics);      
             setId(editData.id);
@@ -64,6 +66,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
             setWidgetOne('');
             setWidgetTwo('');
             setWidgetThree('');
+            setWidgetFour('');
             setTrendAnalysisGraph('');
             setActivityGraphMetrics([]); 
         }
@@ -95,9 +98,10 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
             const metricNames = activityGraphMetrics.map(item => item.metricName);
 
             const response = await axios.post(serviceURL, {
-                widgetOneMetric: widgetOne.metricName,
-                widgetTwoMetric: widgetTwo.metricName,
-                widgetThreeMetric: widgetThree.metricName,
+                widgetOneMetric: widgetOne,
+                widgetTwoMetric: widgetTwo,
+                widgetThreeMetric: widgetThree,
+                widgetFourMetric: widgetFour,
                 trendAnalysisGraphMetric: trendAnalysisGraph.metricName,
                 activityGraphMetrics: metricNames,
                 id: id
@@ -262,6 +266,31 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                     <Autocomplete
                         sx={{ width: '500px' }}
                         disablePortal
+                        id="widget-3"
+                        options={availableMetrics}
+                        getOptionLabel={(option) =>
+                            typeof option === 'string' ? option : option?.metricName || ''
+                        }
+                        value={widgetFour}
+                        onChange={(event, newValue) => setWidgetFour(newValue)}
+                        renderInput={(params) => <TextField {...params} label="Widget 4" />}
+                    />
+                    <Typography
+                        sx={{
+                            fontSize: '0.7rem',
+                            textAlign: 'left',
+                            color: '#14213d',
+                            mt: 0.5, // Adds a small margin-top
+                        }}
+                    >
+                        Define a Metric to be included in this widget.
+                    </Typography>
+                </Box>
+
+                <Box sx={{ width: '500px' }}>
+                    <Autocomplete
+                        sx={{ width: '500px' }}
+                        disablePortal
                         id="trend-analysis-graph"
                         options={availableMetrics}
                         getOptionLabel={(option) =>
@@ -339,7 +368,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                     <Button
                         onClick={handleSaveDashboardConfiguration}
                         sx={{
-                            bgcolor: '#39B6FF',
+                            bgcolor: '#14213d',
                             color: 'white',
                             '&:hover': {
                                 color: '#E6E6EF', // Prevent text color from changing on hover

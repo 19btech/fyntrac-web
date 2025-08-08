@@ -33,7 +33,7 @@ const MetricWidget = ({ metric }) => {
       </Typography>
 
       <Typography variant="h4" fontWeight={600} sx={{color: '#2f3a53',}}>
-        {parseFloat(balance.endingBalance).toLocaleString()}
+        {parseFloat(balance.activity).toLocaleString()}
       </Typography>
 
 <Typography
