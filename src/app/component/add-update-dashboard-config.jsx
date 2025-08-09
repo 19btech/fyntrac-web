@@ -34,7 +34,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [widgetOne, setWidgetOne] = useState('');
     const [widgetTwo, setWidgetTwo] = useState('');
     const [widgetThree, setWidgetThree] = useState('');
-     const [widgetFour, setWidgetFour] = useState('');
+    const [widgetFour, setWidgetFour] = useState('');
     const [trendAnalysisGraph, setTrendAnalysisGraph] = useState('');
     const [activityGraphMetrics, setActivityGraphMetrics] = useState([...fixedMetrics]);;
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -59,7 +59,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
             setWidgetThree(editData.widgetThreeMetric);
             setWidgetFour(editData.widgetFourMetric);
             setTrendAnalysisGraph(editData.trendAnalysisGraphMetric);
-            setActivityGraphMetrics(graphMetrics);      
+            setActivityGraphMetrics(graphMetrics);
             setId(editData.id);
         } else {
             // Clear form fields if no editData (eaccountSubtypes.g., for adding new transaction)
@@ -68,7 +68,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
             setWidgetThree('');
             setWidgetFour('');
             setTrendAnalysisGraph('');
-            setActivityGraphMetrics([]); 
+            setActivityGraphMetrics([]);
         }
     }, [editData]);
 
@@ -96,7 +96,15 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
         const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/dashboard-configuration/save';
         try {
             const metricNames = activityGraphMetrics.map(item => item.metricName);
-
+            console.log("Dashboard Configuration:", {
+                widgetOneMetric: widgetOne,
+                widgetTwoMetric: widgetTwo,
+                widgetThreeMetric: widgetThree,
+                widgetFourMetric: widgetFour,
+                trendAnalysisGraphMetric: trendAnalysisGraph.metricName,
+                activityGraphMetrics: metricNames,
+                id: id
+            });
             const response = await axios.post(serviceURL, {
                 widgetOneMetric: widgetOne,
                 widgetTwoMetric: widgetTwo,
@@ -123,10 +131,20 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 onClose(false);
             }, 3000);
         } catch (error) {
-            // Handle error if needed
-            setErrorMessage(error);
-            setShowErrorMessage(true);
+            console.error("Save Dashboard Configuration Error:", error); // for debugging
 
+            let userFriendlyMessage = 'An unexpected error occurred';
+
+            if (error.response?.data?.message) {
+                // Your backend explicitly sent a message
+                userFriendlyMessage = error.response.data.message;
+            } else if (error.message) {
+                // Axios error message
+                userFriendlyMessage = error.message;
+            }
+
+            setErrorMessage(userFriendlyMessage); // Pass a string
+            setShowErrorMessage(true);
         }
     };
 
@@ -313,42 +331,42 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                     </Typography>
                 </Box>
 
-                
-                <Box sx={{ width: '500px' }}>
-                <Autocomplete
-                    multiple
-                    id="activity-graph"
-                    value={activityGraphMetrics}
-                    onChange={(event, newValue) => {
-                        setActivityGraphMetrics([
-                            ...fixedMetrics,
-                            ...newValue.filter((option) => !fixedMetrics.includes(option)),
-                        ]);
-                    }}
-                    options={availableMetrics}
-                    getOptionLabel={(option) => option.metricName}
-                    isOptionEqualToValue={(option, value) => option.metricName === value.metricName}
-                    renderTags={(tagValue, getTagProps) =>
-                        tagValue.map((option, index) => {
-                            const { key, ...tagProps } = getTagProps({ index });
-                            return (
-                                <Chip
-                                    key={key}
-                                    label={option.metricName}
-                                    {...tagProps}
-                                    disabled={fixedMetrics.includes(option)}
-                                />
-                            );
-                        })
-                    }
-                    style={{ width: 500 }}
-                    renderInput={(params) => (
-                        <TextField {...params} label="Metrics" placeholder="Select Metrics"
-                            error={isMetricssError}
-                            helperText={isMetricssError ? errorMessage : ''} />
 
-                    )}
-                />
+                <Box sx={{ width: '500px' }}>
+                    <Autocomplete
+                        multiple
+                        id="activity-graph"
+                        value={activityGraphMetrics}
+                        onChange={(event, newValue) => {
+                            setActivityGraphMetrics([
+                                ...fixedMetrics,
+                                ...newValue.filter((option) => !fixedMetrics.includes(option)),
+                            ]);
+                        }}
+                        options={availableMetrics}
+                        getOptionLabel={(option) => option.metricName}
+                        isOptionEqualToValue={(option, value) => option.metricName === value.metricName}
+                        renderTags={(tagValue, getTagProps) =>
+                            tagValue.map((option, index) => {
+                                const { key, ...tagProps } = getTagProps({ index });
+                                return (
+                                    <Chip
+                                        key={key}
+                                        label={option.metricName}
+                                        {...tagProps}
+                                        disabled={fixedMetrics.includes(option)}
+                                    />
+                                );
+                            })
+                        }
+                        style={{ width: 500 }}
+                        renderInput={(params) => (
+                            <TextField {...params} label="Metrics" placeholder="Select Metrics"
+                                error={isMetricssError}
+                                helperText={isMetricssError ? errorMessage : ''} />
+
+                        )}
+                    />
 
                     <Typography
                         sx={{

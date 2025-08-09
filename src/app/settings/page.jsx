@@ -83,11 +83,11 @@ export default function SettingsPage() {
     setPanelIndex(newValue);
   };
 
-  const handleAddDashboardConfigurationDialogOpen= () => {
+  const handleAddDashboardConfigurationDialogOpen = () => {
     setIsDashboardConfigurationDialogOpen(true);
   }
 
-  const handleAddDashboardConfigurationDialogClose= (val) => {
+  const handleAddDashboardConfigurationDialogClose = (val) => {
     setIsDashboardConfigurationDialogOpen(val);
   }
 
@@ -105,7 +105,7 @@ export default function SettingsPage() {
     setShowReopenAccountingPeriodDialog(true);
   }
 
-    const saveCurrency = async () => {
+  const saveCurrency = async () => {
     try {
       const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/save/currency', currency,
         {
@@ -128,7 +128,7 @@ export default function SettingsPage() {
     }
   };
 
-      const fetchCurrencies = () => {
+  const fetchCurrencies = () => {
     const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/currencies';
     axios.get(fetchSettings, {
       headers: {
@@ -734,7 +734,7 @@ export default function SettingsPage() {
         <div>work inprogress</div>
       </CustomTabPanel>
 
-      <><AddDashboardConfiguration open={isDashboardConfigurationDialogOpen} onClose={handleAddDashboardConfigurationDialogClose} editData={settings.dashboardConfiguration}/></>
+      <><AddDashboardConfiguration open={isDashboardConfigurationDialogOpen} onClose={handleAddDashboardConfigurationDialogClose} editData={settings.dashboardConfiguration} /></>
     </Box>
   );
 }

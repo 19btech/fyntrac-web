@@ -1,8 +1,8 @@
 import React from 'react';
 import Snackbar from '@mui/material/Snackbar';
-import {Alert, AlertTitle } from '@mui/material';
+import { Alert, AlertTitle } from '@mui/material';
 
-function ErrorAlert({title, message}) {
+function ErrorAlert({ title, message }) {
   const [open, setOpen] = React.useState(true);
 
   const handleClose = (event, reason) => {
@@ -11,6 +11,12 @@ function ErrorAlert({title, message}) {
     }
     setOpen(false);
   };
+
+  // Ensure message is always a string
+  const safeMessage = 
+    typeof message === 'string'
+      ? message
+      : JSON.stringify(message, null, 2); // fallback for objects
 
   return (
     <div>
@@ -21,12 +27,11 @@ function ErrorAlert({title, message}) {
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
         <Alert variant="filled" severity="error" onClose={handleClose}>
-        <AlertTitle>{title}</AlertTitle>
-            <div>
-                    {message}
-                </div>
-    </Alert>
-
+          <AlertTitle>{title}</AlertTitle>
+          <div style={{ whiteSpace: 'pre-wrap' }}>
+            {safeMessage}
+          </div>
+        </Alert>
       </Snackbar>
     </div>
   );
