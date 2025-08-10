@@ -101,7 +101,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 widgetTwoMetric: widgetTwo,
                 widgetThreeMetric: widgetThree,
                 widgetFourMetric: widgetFour,
-                trendAnalysisGraphMetric: trendAnalysisGraph.metricName,
+                trendAnalysisGraphMetric: trendAnalysisGraph,
                 activityGraphMetrics: metricNames,
                 id: id
             });
@@ -110,7 +110,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 widgetTwoMetric: widgetTwo,
                 widgetThreeMetric: widgetThree,
                 widgetFourMetric: widgetFour,
-                trendAnalysisGraphMetric: trendAnalysisGraph.metricName,
+                trendAnalysisGraphMetric: trendAnalysisGraph,
                 activityGraphMetrics: metricNames,
                 id: id
             },
@@ -214,8 +214,18 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                         getOptionLabel={(option) =>
                             typeof option === 'string' ? option : option?.metricName || ''
                         }
-                        value={widgetOne}
-                        onChange={(event, newValue) => setWidgetOne(newValue)}
+                        value={
+                            typeof widgetOne === 'string'
+                                ? widgetOne
+                                : widgetOne?.metricName || ''
+                        }
+                        onChange={(event, newValue) =>
+                            setWidgetOne(
+                                typeof newValue === 'string'
+                                    ? newValue
+                                    : newValue?.metricName || ''
+                            )
+                        }
                         renderInput={(params) => <TextField {...params} label="Widget 1" />}
                     />
                     <Typography
@@ -239,8 +249,18 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                         getOptionLabel={(option) =>
                             typeof option === 'string' ? option : option?.metricName || ''
                         }
-                        value={widgetTwo}
-                        onChange={(event, newValue) => setWidgetTwo(newValue)}
+                        value={
+                            typeof widgetTwo === 'string'
+                                ? widgetTwo
+                                : widgetTwo?.metricName || ''
+                        }
+                        onChange={(event, newValue) =>
+                            setWidgetTwo(
+                                typeof newValue === 'string'
+                                    ? newValue
+                                    : newValue?.metricName || ''
+                            )
+                        }
                         renderInput={(params) => <TextField {...params} label="Widget 2" />}
                     />
                     <Typography
@@ -264,8 +284,18 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                         getOptionLabel={(option) =>
                             typeof option === 'string' ? option : option?.metricName || ''
                         }
-                        value={widgetThree}
-                        onChange={(event, newValue) => setWidgetThree(newValue)}
+                        value={
+                            typeof widgetThree === 'string'
+                                ? widgetThree
+                                : widgetThree?.metricName || ''
+                        }
+                        onChange={(event, newValue) =>
+                            setWidgetThree(
+                                typeof newValue === 'string'
+                                    ? newValue
+                                    : newValue?.metricName || ''
+                            )
+                        }
                         renderInput={(params) => <TextField {...params} label="Widget 3" />}
                     />
                     <Typography
@@ -289,8 +319,18 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                         getOptionLabel={(option) =>
                             typeof option === 'string' ? option : option?.metricName || ''
                         }
-                        value={widgetFour}
-                        onChange={(event, newValue) => setWidgetFour(newValue)}
+                        value={
+                            typeof widgetFour === 'string'
+                                ? widgetFour
+                                : widgetFour?.metricName || ''
+                        }
+                        onChange={(event, newValue) =>
+                            setWidgetFour(
+                                typeof newValue === 'string'
+                                    ? newValue
+                                    : newValue?.metricName || ''
+                            )
+                        }
                         renderInput={(params) => <TextField {...params} label="Widget 4" />}
                     />
                     <Typography
@@ -314,8 +354,19 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                         getOptionLabel={(option) =>
                             typeof option === 'string' ? option : option?.metricName || ''
                         }
-                        value={trendAnalysisGraph}
-                        onChange={(event, newValue) => setTrendAnalysisGraph(newValue)}
+
+                        value={
+                            typeof trendAnalysisGraph === 'string'
+                                ? trendAnalysisGraph
+                                : trendAnalysisGraph?.metricName || ''
+                        }
+                        onChange={(event, newValue) =>
+                            setTrendAnalysisGraph(
+                                typeof newValue === 'string'
+                                    ? newValue
+                                    : newValue?.metricName || ''
+                            )
+                        }
                         renderInput={(params) => <TextField {...params} label="Trend Analysis Graph" />}
                     />
 

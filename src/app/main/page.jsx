@@ -19,6 +19,7 @@ import RuleFolderOutlinedIcon from '@mui/icons-material/RuleFolderOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import PageContent from '../component/pageContent';
 import { Inter } from 'next/font/google'; // Use built-in Next.js font loader
+import TimelineIcon from '@mui/icons-material/Timeline';
 
 const inter = Inter({ subsets: ['latin'] });
 const NAVIGATION = [
@@ -67,6 +68,10 @@ const NAVIGATION = [
         segment: 'transaction-activity-report',
         title: 'Activity Report',
         icon: <TrendingUpOutlinedIcon />,
+      },{
+        segment: 'rollforward-report',
+        title: 'Rollforward Report',
+        icon: <TimelineIcon />,
       },
     ],
   },

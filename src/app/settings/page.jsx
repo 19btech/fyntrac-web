@@ -39,6 +39,7 @@ export default function SettingsPage() {
   const [isFiscalPeriodButtonDisabled, setIsFiscalPeriodButtonDisabled] = React.useState(true);
   const [panelIndex, setPanelIndex] = React.useState(0);
   const [isDashboardConfigurationDialogOpen, setIsDashboardConfigurationDialogOpen] = React.useState(false);
+  const [dashboardConfiguration, setDashboardConfiguration] = React.useState(false);
   const [currency, setCurrency] = useState('USD');
   const [currencyList, setCurrencyList] = useState();
 
@@ -117,7 +118,7 @@ export default function SettingsPage() {
           }
         }
       );
-      setSuccessMessage('');
+      setSuccessMessage('Currency save successfully');
       setShowSuccessMessage(true);
 
     } catch (error) {
@@ -161,6 +162,8 @@ export default function SettingsPage() {
         const fiscalPeriodDate = new Date(response.data.fiscalPeriodStartDate);
         setFiscalPeriodStaringDate(dayjs(fiscalPeriodDate));
         setRestatementMode(response.data.restatementMode === 1 ? true : false);
+        setCurrency(response.data.currency);
+        setDashboardConfiguration(response.data.dashboardConfiguration);
         // Handle success response if needed
       })
       .catch(error => {
