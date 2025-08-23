@@ -12,6 +12,7 @@ import SyncPage from '../sync/page';
 import GLEReportPage from '../reports/gle-report/page';
 import TransactionActivityReportPage from '../reports/transaction-activity-report/page';
 import RollforwardReportPage from '../reports/rollforward-report/page';
+import InstrumentDiagnosticPage from '../diagnostic/page';
 
 export default function PageContent({ pathname }) {
   const renderContent = () => {
@@ -37,6 +38,8 @@ export default function PageContent({ pathname }) {
         return <TransactionActivityReportPage />
       case '/reports/rollforward-report':
         return <RollforwardReportPage />
+      case '/diagnostic':
+        return <InstrumentDiagnosticPage />
       default:
         return <GridHeader>Work inprogress.</GridHeader>;
     }

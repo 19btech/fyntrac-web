@@ -17,6 +17,7 @@ import Diversity3OutlinedIcon from '@mui/icons-material/Diversity3Outlined';
 import BusinessCenterOutlinedIcon from '@mui/icons-material/BusinessCenterOutlined';
 import RuleFolderOutlinedIcon from '@mui/icons-material/RuleFolderOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
+import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
 import PageContent from '../component/pageContent';
 import { Inter } from 'next/font/google'; // Use built-in Next.js font loader
 import TimelineIcon from '@mui/icons-material/Timeline';
@@ -36,7 +37,7 @@ const NAVIGATION = [
   {
     segment: 'diagnostic',
     title: 'Diagnostic',
-    icon: <AccountTreeOutlinedIcon />,
+    icon: <TroubleshootIcon />,
   },
   {
     segment: 'model',
