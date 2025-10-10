@@ -6,7 +6,6 @@ import { AppProvider } from '@toolpad/core/AppProvider';
 import { DashboardLayout } from '@toolpad/core/DashboardLayout';
 import StartOutlinedIcon from '@mui/icons-material/StartOutlined';
 import CottageOutlinedIcon from '@mui/icons-material/CottageOutlined';
-import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import SyncAltOutlinedIcon from '@mui/icons-material/SyncAltOutlined';
@@ -54,7 +53,7 @@ const NAVIGATION = [
     title: 'Sync',
     icon: <SyncAltOutlinedIcon />,
   },
-  {kind: 'divider'},
+  { kind: 'divider' },
   {
     segment: 'reports',
     title: 'Reports',
@@ -69,15 +68,15 @@ const NAVIGATION = [
         segment: 'transaction-activity-report',
         title: 'Activity Report',
         icon: <TrendingUpOutlinedIcon />,
-      },{
+      }, {
         segment: 'rollforward-report',
         title: 'Rollforward Report',
         icon: <TimelineIcon />,
       },
     ],
   },
-  
-  
+
+
   {
     kind: 'divider',
   },
@@ -103,7 +102,7 @@ const NAVIGATION = [
       },
     ],
   },
-  {kind: 'divider'},
+  { kind: 'divider' },
   {
     segment: 'merchant',
     title: 'Merchant',
@@ -115,7 +114,7 @@ const demoTheme = createTheme({
   cssVariables: {
     colorSchemeSelector: 'data-toolpad-color-scheme',
   },
-  
+
   colorSchemes: {
     light: {
       palette: { mode: 'light' }, // Ensure proper theme definition
@@ -155,7 +154,7 @@ function DashboardLayoutBasic(props) {
       setMode(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'light');
     }
   }, []);
-  
+
   // const [mode, setMode] = React.useState('light');
   const demoTheme = createTheme({
     typography: {
@@ -183,20 +182,20 @@ function DashboardLayoutBasic(props) {
       },
     }, // Dynamically updates theme based on client mode
   });
-  
+
   return (
     // preview-start
     <AppProvider
-    branding={{
-      logo: <img src="fyntrac-small.png" alt="Fyntrac" />,
-      title: '',
+      branding={{
+        logo: <img src="fyntrac-small.png" alt="Fyntrac" />,
+        title: '',
       }}
       navigation={NAVIGATION}
       router={router}
       theme={demoTheme}
-      // window={demoWindow}
+    // window={demoWindow}
     >
-      <DashboardLayout  sx={{background: '#e4e8ee'}} theme={demoTheme}>
+      <DashboardLayout sx={{ background: '#e4e8ee' }} theme={demoTheme}>
         <PageContent pathname={router.pathname} />
       </DashboardLayout>
     </AppProvider>

@@ -149,6 +149,12 @@ function Models({ refreshData }) {
       width: 250,
       editable: false,
     },
+        {
+      field: 'modelType',
+      headerName: 'Model Type',
+      width: 250,
+      editable: false,
+    },
     {
       field: 'uploadDate',
       headerName: 'Upload Date',

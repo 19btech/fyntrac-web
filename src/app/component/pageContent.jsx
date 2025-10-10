@@ -13,8 +13,9 @@ import GLEReportPage from '../reports/gle-report/page';
 import TransactionActivityReportPage from '../reports/transaction-activity-report/page';
 import RollforwardReportPage from '../reports/rollforward-report/page';
 import InstrumentDiagnosticPage from '../diagnostic/page';
+import PythonModel from './python-model';
 
-export default function PageContent({ pathname }) {
+export default function PageContent({ pathname, method }) {
   const renderContent = () => {
     console.log('pathName:', pathname);
     switch (pathname) {
@@ -40,6 +41,8 @@ export default function PageContent({ pathname }) {
         return <RollforwardReportPage />
       case '/diagnostic':
         return <InstrumentDiagnosticPage />
+      case '/python-model':
+        return <PythonModel setOpenPythonModel={method} />
       default:
         return <GridHeader>Work inprogress.</GridHeader>;
     }
