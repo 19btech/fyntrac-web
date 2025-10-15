@@ -11,6 +11,9 @@ import {
   Tabs,
   Tab,
   ReturnType,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
@@ -106,50 +109,50 @@ const InstrumentDiagnosticPage = () => {
       });
   };
 
-const downloadDiagnostic = () => {
-  const downloadFile = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/download`;
+  const downloadDiagnostic = () => {
+    const downloadFile = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/download`;
 
-  const diagnosticRequest = {
-    tenant: process.env.NEXT_PUBLIC_TENANT,
-    instrumentId: instrumentId,
-    modelId: model,
+    const diagnosticRequest = {
+      tenant: process.env.NEXT_PUBLIC_TENANT,
+      instrumentId: instrumentId,
+      modelId: model,
+    };
+
+    console.log('Download Request:', diagnosticRequest);
+
+    axios.post(downloadFile, diagnosticRequest, {
+      headers: {
+        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+      responseType: 'blob' // ✅ required
+    })
+      .then(response => {
+        const url = window.URL.createObjectURL(
+          new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        );
+
+        // Use backend-provided filename, fallback to default
+        const disposition = response.headers['content-disposition'];
+        let fileName = "report.xlsx";
+        if (disposition && disposition.includes("filename=")) {
+          fileName = disposition.split("filename=")[1].replace(/"/g, '');
+        }
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        // cleanup
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(error => {
+        console.error('Error downloading Excel file:', error);
+      });
   };
-
-  console.log('Download Request:', diagnosticRequest);
-
-  axios.post(downloadFile, diagnosticRequest, {
-    headers: {
-      'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
-      Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    },
-    responseType: 'blob' // ✅ required
-  })
-  .then(response => {
-    const url = window.URL.createObjectURL(
-      new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    );
-
-    // Use backend-provided filename, fallback to default
-    const disposition = response.headers['content-disposition'];
-    let fileName = "report.xlsx";
-    if (disposition && disposition.includes("filename=")) {
-      fileName = disposition.split("filename=")[1].replace(/"/g, '');
-    }
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-
-    // cleanup
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  })
-  .catch(error => {
-    console.error('Error downloading Excel file:', error);
-  });
-};
 
 
   useEffect(() => {
@@ -335,30 +338,24 @@ const downloadDiagnostic = () => {
                 </Grid>
 
                 <Grid xs={12} sm={3}>
-                  <TextField
-                    size="small"
-                    label={`Select Model`}
-                    variant="outlined"
-                    select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    fullWidth
-                    sx={{ width: '900px' }}
-
-
-                  >
-                    {models.length > 0 ? (
-                      models.map((option, i) => (
-                        <MenuItem key={i} value={option.id}>
-                          {option.modelName}
+                  <FormControl fullWidth sx={{ m: 1, minWidth: 350 }}>
+                    <InputLabel id="sort-by-select-model">Select Model</InputLabel>
+                    <Select
+                      labelId="sort-by-select-model"
+                      id="sort-by-select"
+                      value={model}
+                      label="Select Model"
+                      size="small" 
+                      onChange={(e) => setModel(e.target.value)}
+                    >
+                      {/* Map over the sort options to create a menu item for each */}
+                      {models.map((model) => (
+                        <MenuItem key={model.id} value={model.id}>
+                          {model.modelName}
                         </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem disabled value="">
-                        No Model available
-                      </MenuItem>
-                    )}
-                  </TextField>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Grid>
 
                 <Grid xs={12} sm={3}>
