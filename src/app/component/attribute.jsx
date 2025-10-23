@@ -5,8 +5,9 @@ import { Edit } from '@mui/icons-material';
 import AddAttributeDialog from '../component/add-attribute'
 import axios from 'axios';
 import CustomDataGrid from "@/app/component/custom-data-grid";
-
+import { useTenant } from "../tenant-context";
 function Attribute({ refreshData }) {
+  const { tenant } = useTenant();
   const columns = [
     { field: 'userField', headerName: 'User Field Name', width: 200, editable: false },
     { field: 'attributeName', headerName: 'Attribute Name', width: 200, editable: false },
@@ -75,7 +76,7 @@ function Attribute({ refreshData }) {
 
     axios.get(fetchAttributeDataCall, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }

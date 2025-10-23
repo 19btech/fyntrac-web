@@ -27,8 +27,10 @@ import Grid from "@mui/material/Grid2"; // Import stable Grid2
 import axios from 'axios';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
+import { useTenant } from "../../tenant-context";
 
 const GLEReportPage = () => {
+  const { tenant } = useTenant();
   // State to manage the list of criteria
   const [criteriaList, setCriteriaList] = useState([
     {
@@ -58,10 +60,11 @@ const GLEReportPage = () => {
   };
 
   const fetchReportAttributes = () => {
+    
     const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/get/attributes`;
     axios.get(fetchSettings, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -95,7 +98,7 @@ const GLEReportPage = () => {
     const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/execute`;
     axios.post(executeReportAPI, filteredCriteriaList, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }

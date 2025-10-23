@@ -14,8 +14,10 @@ import {
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+import { useTenant } from "../tenant-context";
 
 const ExecuteModel = ({ open, onClose }) => {
+    const { tenant } = useTenant();
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -58,7 +60,7 @@ const ExecuteModel = ({ open, onClose }) => {
             const payload = { date: date };
             const response = await axios.post(serviceURL, payload, {
                 headers: {
-                    'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+                    'X-Tenant': tenant,
                     Accept: '*/*',
                     'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
                 },
@@ -193,7 +195,7 @@ const ExecuteModel = ({ open, onClose }) => {
                     gap: 1,
                 }} >
                     <Button onClick={handleModeExecution} sx={{
-                        bgcolor: '#39B6FF',
+                        bgcolor: '#14213d',
                         color: 'white',
                         '&:hover': {
                             color: '#E6E6EF', // Prevent text color from changing on hover

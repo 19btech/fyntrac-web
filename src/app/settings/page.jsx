@@ -20,9 +20,10 @@ import AddDashboardConfiguration from '../component/add-update-dashboard-config'
 import axios from 'axios';
 import dayjs from 'dayjs';
 import '../common.css';
-
+import { useTenant } from "../tenant-context";
 
 export default function SettingsPage() {
+  const { tenant } = useTenant();
   const [value, setValue] = React.useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState('');
@@ -111,7 +112,7 @@ export default function SettingsPage() {
       const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/save/currency', currency,
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Content-Type': 'application/json',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
@@ -133,7 +134,7 @@ export default function SettingsPage() {
     const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/currencies';
     axios.get(fetchSettings, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -152,7 +153,7 @@ export default function SettingsPage() {
     const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/settings';
     axios.get(fetchSettings, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -191,7 +192,7 @@ export default function SettingsPage() {
       },
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Content-Type': 'application/json',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
@@ -232,7 +233,7 @@ export default function SettingsPage() {
       },
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Content-Type': 'application/json',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
@@ -264,7 +265,7 @@ export default function SettingsPage() {
       const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/refresh/schema', true,
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Content-Type': 'application/json',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
@@ -361,7 +362,7 @@ export default function SettingsPage() {
                   options={currencyList}
                   value={currency}
                   getOptionLabel={(option) => option}
-                  onChange={(event, newValue) => { setCurrency(newValue) }} // newValue will be the selected option object
+                  onChange={(event, newValue) => { setCurrency(newValue || ''); }} // Ensure it's never undefined
                   renderInput={(params) => <TextField {...params} label="Currency" />}
                 />
 

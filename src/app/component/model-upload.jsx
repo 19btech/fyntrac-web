@@ -5,8 +5,10 @@ import { TextField, Divider, DialogContent, Box, Typography, LinearProgress, Ale
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+import { useTenant } from "../tenant-context";
 
 function ModelUploadComponent({ onDrop, text, iconColor, borderColor, backgroundColor, filesLimit }) {
+  const { tenant } = useTenant();
   const [uploading, setUploading] = useState(false);
   const [progressMap, setProgressMap] = useState({});
   const [modelName, setModelName] = useState('');
@@ -133,7 +135,7 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
     
     axios.post(serviceURL, formData, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }

@@ -5,8 +5,10 @@ import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddTransactionDialog from '../component/add-transaction';
 import axios from 'axios';
+import { useTenant } from "../tenant-context";
 
 function Transaction({ refreshData }) {
+  const { tenant } = useTenant();
   const [rows, setRows] = useState([]);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
@@ -59,11 +61,12 @@ function Transaction({ refreshData }) {
   ];
 
   const fetchTransactionData = async () => {
+    console.log('Tenant...', tenant);
     try {
       const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/transaction/get/all`;
       const response = await axios.get(url, {
         headers: {
-          'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+          'X-Tenant': tenant,
           Accept: '*/*',
         },
       });

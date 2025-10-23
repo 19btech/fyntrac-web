@@ -6,8 +6,10 @@ import { IconButton, Tooltip } from '@mui/material';
 import { Edit } from '@mui/icons-material';
 import AddChartOfAccountDialog from '../component/add-chart-of-account';
 import axios from 'axios';
+import { useTenant } from "../tenant-context";
 
 function ChartOfAccount({ refreshData }) {
+  const { tenant } = useTenant();
   const [rows, setRows] = useState([]);
   const [columns, setColumns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ function ChartOfAccount({ refreshData }) {
   const fetchAttributeMetadata = () => {
     axios.get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/attribute/get/isreclassable/attributes`, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
       },
     })
@@ -111,7 +113,7 @@ function ChartOfAccount({ refreshData }) {
   const fetchChartOfAccountData = () => {
     axios.get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/chartofaccount/get/all`, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
       },
     })

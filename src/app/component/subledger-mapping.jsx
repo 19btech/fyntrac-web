@@ -7,8 +7,10 @@ import axios from 'axios';
 import { Alert, AlertTitle, Tooltip } from '@mui/material';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+import { useTenant } from "../tenant-context";
 
 function SubledgerMapping({ refreshData }) {
+  const { tenant } = useTenant();
   const columns = [
     { field: 'transactionName', headerName: 'Transaction Name', width: 200, editable: false },
     { field: 'sign', headerName: 'Criteria', width: 200, editable: false },
@@ -53,7 +55,7 @@ function SubledgerMapping({ refreshData }) {
 
     axios.get(fetchTransactionDataCall, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }

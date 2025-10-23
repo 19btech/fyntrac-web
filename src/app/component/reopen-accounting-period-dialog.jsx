@@ -12,6 +12,7 @@ import Box from '@mui/material/Box';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import axios from 'axios';
+import { useTenant } from "../tenant-context";
 
 export default function ReopenAccountingPeriodDialog({ dialogTitle, dialogDescription, open, onClose }) {
     const [isDataFetched, setIsDataFetched] = React.useState(false);
@@ -27,7 +28,7 @@ export default function ReopenAccountingPeriodDialog({ dialogTitle, dialogDescri
         const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/closed/accounting-periods';
         axios.get(fetchSettings, {
             headers: {
-                'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+                'X-Tenant': tenant,
                 Accept: '*/*',
                 'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
             }
@@ -54,7 +55,7 @@ export default function ReopenAccountingPeriodDialog({ dialogTitle, dialogDescri
                 ,
                 {
                     headers: {
-                        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+                        'X-Tenant': tenant,
                         Accept: '*/*',
                         'Content-Type': 'application/json',
                         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',

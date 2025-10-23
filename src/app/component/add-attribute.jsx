@@ -17,8 +17,10 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+import { useTenant } from "../tenant-context";
 
 const AddAttributeDialog = ({ open, onClose, editData }) => {
+  const { tenant } = useTenant();
   const [userField, setUserField] = useState('');
   const [attributeName, setAttributeName] = useState('');
   const [isReclassable, setIsReclassable] = useState(false);
@@ -65,6 +67,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   }, [editData]);
 
   const handleAddAttribute = async () => {
+    console.log('Tenant...', tenant);
     try {
       const response = await axios.post(serviceURL, {
         userField: userField,
@@ -77,7 +80,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
       },
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
           }

@@ -16,10 +16,13 @@ import InstrumentDiagnosticPage from '../diagnostic/page';
 import PythonModel from './python-model';
 
 export default function PageContent({ pathname, method }) {
+
   const renderContent = () => {
     console.log('pathName:', pathname);
     switch (pathname) {
-      case '/dashboard':
+      case '/home':
+        return <HomePage />;
+      case '/main':
         return <HomePage />;
       case '/mapping':
         return <AccountingPage />

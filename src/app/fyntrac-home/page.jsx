@@ -22,6 +22,7 @@ import BarChartWidget from '../component/bar-chart-widget';
 import DynamicTable from '../component/dynamic-data-table';
 import { Typography } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
+import { useTenant } from "../tenant-context";
 
 const serviceGetOpenAccountingPeriodsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/open-periods'
 const serviceGetCurrentOpenAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/current-open-period'
@@ -153,6 +154,7 @@ const defaultChartSetting = {
 };
 
 export default function HomePage() {
+    const { tenant } = useTenant();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [openPeriodCloseDialog, setOpenPeriodCloseDialog] = React.useState(false);
   const [isDataFetched, setIsDataFetched] = React.useState(false);
@@ -267,6 +269,7 @@ export default function HomePage() {
 
   const handlecloseAccountingPeriod = async () => {
     try {
+      console.log('Tenant...', tenant);
       const response = await axios.post(serviceCloseAccountingPeriodURL, {
         ...AccountingPeriodRecord,
         "periodId": parseInt(year + month),
@@ -277,7 +280,7 @@ export default function HomePage() {
       },
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
           }
@@ -306,7 +309,7 @@ export default function HomePage() {
 
     axios.get(serviceGetOpenAccountingPeriodsURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -323,10 +326,10 @@ export default function HomePage() {
 
 
   const fetchWidgetData = () => {
-
+console.log('Tenant...', tenant);
     axios.get(serviceGetWidgetDataURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -345,7 +348,7 @@ export default function HomePage() {
 
     axios.get(serviceGetTrendAnalysisURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -363,7 +366,7 @@ export default function HomePage() {
 
     axios.get(serviceGetRankedMetricURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -383,7 +386,7 @@ export default function HomePage() {
 
     axios.get(serviceGetMomActivityDataURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -406,7 +409,7 @@ export default function HomePage() {
 
     axios.get(serviceGetCurrentOpenAccountingPeriodURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }

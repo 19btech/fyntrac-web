@@ -4,8 +4,10 @@ import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddAccountTypeDialog from '../component/add-account-type';
 import axios from 'axios';
+import { useTenant } from "../tenant-context";
 
 function AccountType({ refreshData }) {
+  const { tenant } = useTenant();
   const columns = [
     { field: 'accountSubType', headerName: 'Account Subtype', width: 200, editable: false },
     { field: 'accountType', headerName: 'Account Type', width: 200, editable: false },
@@ -43,7 +45,7 @@ function AccountType({ refreshData }) {
     axios
       .get(fetchAccountTypeDataCall, {
         headers: {
-          'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+          'X-Tenant': tenant,
           Accept: '*/*',
         },
       })

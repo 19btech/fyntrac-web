@@ -29,7 +29,10 @@ import Fab from '@mui/material/Fab';
 import CheckIcon from '@mui/icons-material/Check';
 import SaveIcon from '@mui/icons-material/Save';
 import UpdateIcon from '@mui/icons-material/Update';
+import { useTenant } from "../tenant-context";
+
 const InstrumentDiagnosticPage = () => {
+  const { tenant } = useTenant();
   // State to manage the list of criteria
   const [criteriaList, setCriteriaList] = useState([
     {
@@ -96,7 +99,7 @@ const InstrumentDiagnosticPage = () => {
     const fetchModels = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/get/all`;
     axios.get(fetchModels, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -113,7 +116,7 @@ const InstrumentDiagnosticPage = () => {
     const downloadFile = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/download`;
 
     const diagnosticRequest = {
-      tenant: process.env.NEXT_PUBLIC_TENANT,
+      tenant: tenant,
       instrumentId: instrumentId,
       modelId: model,
     };
@@ -122,7 +125,7 @@ const InstrumentDiagnosticPage = () => {
 
     axios.post(downloadFile, diagnosticRequest, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       },
       responseType: 'blob' // ✅ required
@@ -175,7 +178,7 @@ const InstrumentDiagnosticPage = () => {
     setLoading(true);
 
     const diagnosticRequest = {
-      tenant: process.env.NEXT_PUBLIC_TENANT,
+      tenant: tenant,
       instrumentId: instrumentId,
       modelId: model
     };
@@ -186,7 +189,7 @@ const InstrumentDiagnosticPage = () => {
 
     axios.post(executeReportAPI, diagnosticRequest, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
       }
     })
@@ -348,7 +351,7 @@ const InstrumentDiagnosticPage = () => {
                       size="small" 
                       onChange={(e) => setModel(e.target.value)}
                     >
-                      {/* Map over the sort options to create a menu item for each */}
+                      {/* Map over the sort options Select Modelto create a menu item for each */}
                       {models.map((model) => (
                         <MenuItem key={model.id} value={model.id}>
                           {model.modelName}

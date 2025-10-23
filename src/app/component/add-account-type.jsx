@@ -15,9 +15,10 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import axios from 'axios';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
-
+import { useTenant } from "../tenant-context";
 
 const AddAccountTypeDialog = ({ open, onClose, editData }) => {
+  const { tenant } = useTenant();
   const [accountSubType, setAccountSubType] = useState('');
   const [accountType, setAccountType] = useState('');
   const [id, setId] = useState(null);
@@ -55,7 +56,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
       },
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
           }

@@ -19,6 +19,7 @@ import RecentLoad from '../component/recent-load'
 import axios from 'axios';
 import '../common.css';
 import GridHeader from '../component/gridHeader';
+import { useTenant } from "../tenant-context";
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -35,6 +36,7 @@ const VisuallyHiddenInput = styled('input')({
 
 export default function SyncPage() {
 
+  const { tenant } = useTenant();
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [refreshChartOfAccountKey, setRefreshChartOfAccountKey] = React.useState(0);
   const [refreshSubledgerMapping, setRefreshSubledgerMapping] = React.useState(0);
@@ -68,7 +70,7 @@ export default function SyncPage() {
     
     axios.post(serviceURL, formData, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }

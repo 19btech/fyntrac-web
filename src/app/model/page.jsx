@@ -39,6 +39,7 @@ import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined
 import FileUploadComponent from '../component/file-upload';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
 import DataFileList from '../component/data-file-list';
+import { useTenant } from "../tenant-context";
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -53,6 +54,7 @@ const VisuallyHiddenInput = styled('input')({
 });
 
 export default function ModelPage() {
+   const { tenant } = useTenant();
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [openTestDataFileUpload, setOpenTestDataFileUpload] = React.useState(false);
   const [panelIndex, setPanelIndex] = React.useState(0); // Initialize with the first tab index
@@ -68,7 +70,7 @@ export default function ModelPage() {
   const [outputDataFiles, setOutputDataFiles] = React.useState([]);
   const [projectDataFiles, setProjectDataFiles] = React.useState([]);
   // define the tenant name once
-  const TENANT_NAME = `Test_${process.env.NEXT_PUBLIC_TENANT}`;
+  const TENANT_NAME = `Test_${tenant}`;
 
   const [tabValue, setTabValue] = React.useState(0);
 

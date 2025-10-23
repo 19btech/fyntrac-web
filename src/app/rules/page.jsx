@@ -23,6 +23,7 @@ import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Tooltip, Div
 import axios from 'axios';
 import AddAggregationDialog from '../component/add-aggregation';
 import GridHeader from '../component/gridHeader';
+import { useTenant } from "../tenant-context";
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -38,7 +39,7 @@ const VisuallyHiddenInput = styled('input')({
 
 
 export default function RulePage() {
-
+  const { tenant } = useTenant();
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [reTransactionfreshKey, setTransactionRefreshKey] = React.useState(0);
   const [refreshAttributeKey, setRefreshAttributeKey] = React.useState(0);
@@ -78,7 +79,7 @@ export default function RulePage() {
 
     axios.post(serviceURL, formData, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -139,11 +140,11 @@ export default function RulePage() {
   return (
     <>
 
-<Grid container spacing={3}>
+      <Grid container spacing={3}>
         <Grid size="auto">
           <div className='left'>
             <GridHeader>
-            Accounting Rules
+              Accounting Rules
             </GridHeader>
           </div>
         </Grid>
@@ -186,18 +187,18 @@ export default function RulePage() {
           </div>
         </Grid>
       </Grid>
-      
-      
+
+
       <Divider />
 
       <Box sx={{ height: '1rem', }} />
       <Box>
         <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
           <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleTransactionChange} aria-label="Accounting Configuration">
-            <Tab label="Transactions" sx={{ textTransform: 'none' }}/>
-            <Tab label="Attributes" sx={{ textTransform: 'none' }}/>
-            <Tab label="Aggregation" sx={{ textTransform: 'none' }}/>
-            <Tab label="Account Type" sx={{ textTransform: 'none' }}/>
+            <Tab label="Transactions" sx={{ textTransform: 'none' }} />
+            <Tab label="Attributes" sx={{ textTransform: 'none' }} />
+            <Tab label="Aggregation" sx={{ textTransform: 'none' }} />
+            <Tab label="Account Type" sx={{ textTransform: 'none' }} />
           </Tabs>
         </Box>
         <CustomTabPanel value={panelIndex} index={0}>

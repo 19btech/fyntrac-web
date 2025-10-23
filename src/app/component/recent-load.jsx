@@ -21,6 +21,7 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import axios from 'axios';
+import { useTenant } from "../tenant-context";
 
 function Row({ row }) {
   const [open, setOpen] = React.useState(false);
@@ -113,6 +114,7 @@ function Row({ row }) {
 }
 
 export default function RecentLoad() {
+  const { tenant } = useTenant();
   const [logData, setLogData] = React.useState([]);
 
   React.useEffect(() => {
@@ -123,7 +125,7 @@ export default function RecentLoad() {
     axios
       .get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/activitylog/get/recent/loads`, {
         headers: {
-          'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+          'X-Tenant': tenant,
           Accept: '*/*',
         },
       })

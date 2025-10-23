@@ -19,8 +19,10 @@ import {
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
+import { useTenant } from "../tenant-context";
 
 const AddModelConfiguration = ({ open, onClose, editData }) => {
+  const { tenant } = useTenant();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -124,7 +126,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
 
     axios.get(serviceGetMetricsURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -142,7 +144,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
 
     axios.get(serviceGetTransactionNamesURL, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
@@ -236,7 +238,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
       const response = await axios.post(serviceURL, model,
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
           }
@@ -475,7 +477,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
           gap: 1,
         }} >
           <Button onClick={handleSaveConfiguration} sx={{
-            bgcolor: '#39B6FF',
+            bgcolor: '#14213d',
             color: 'white',
             '&:hover': {
               color: '#E6E6EF', // Prevent text color from changing on hover

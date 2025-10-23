@@ -11,9 +11,10 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import AddModelConfiguration from '../component/add-model-configuration'
 import { styled } from '@mui/material/styles';
 import GridHeader from './gridHeader';
+import { useTenant } from "../tenant-context";
 
 function Models({ refreshData }) {
-
+const { tenant } = useTenant();
   const initialRows = [];
 
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -103,7 +104,7 @@ function Models({ refreshData }) {
       const response = await axios.post(serviceURL, model,
         {
           headers: {
-            'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+            'X-Tenant': tenant,
             Accept: '*/*',
             'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
           }
@@ -237,7 +238,7 @@ function Models({ refreshData }) {
 
     axios.get(fetchTransactionDataCall, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
