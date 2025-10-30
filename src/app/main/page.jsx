@@ -18,10 +18,10 @@ import {
 } from '@mui/material';
 import { useTenant, TenantProvider } from "../tenant-context";
 import { useRouter } from 'next/navigation';
-import { Inter } from 'next/font/google';
 import PageContent from '../component/pageContent';
 
-// Import MUI icons
+// MUI Icons
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import LogoutIcon from '@mui/icons-material/Logout';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
@@ -37,33 +37,53 @@ import Diversity3OutlinedIcon from '@mui/icons-material/Diversity3Outlined';
 import BusinessCenterOutlinedIcon from '@mui/icons-material/BusinessCenterOutlined';
 import RuleFolderOutlinedIcon from '@mui/icons-material/RuleFolderOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
+import FeedOutlinedIcon from '@mui/icons-material/FeedOutlined';
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import SettingsInputCompositeOutlinedIcon from '@mui/icons-material/SettingsInputCompositeOutlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import localFont from "next/font/local";
 
-const inter = Inter({ subsets: ['latin'] });
+// ✅ Load local Inter font correctly
+const inter = localFont({
+  src: [
+    { path: '../../../public/fonts/inter/Inter-Regular.woff2', weight: '400' },
+    { path: '../../../public/fonts/inter/Inter-Bold.woff2', weight: '700' },
+  ],
+  variable: '--font-inter',
+});
 
 const demoTheme = createTheme({
-  typography: { fontFamily: `${inter.style.fontFamily}, sans-serif` },
+  typography: {
+    fontFamily: `${inter.style.fontFamily}, sans-serif`,
+  },
   palette: {
-    primary: { main: '#1976d2' },
-    secondary: { main: '#dc004e' },
-    text: { primary: '#444', secondary: '#777' },
-    background: { default: '#e4e8ee' },
+    primary: { main: "#1976d2" },
+    secondary: { main: "#dc004e" },
+    text: { primary: "#444", secondary: "#777" },
+    background: { default: "#e4e8ee" },
   },
   components: {
-    MuiDivider: { styleOverrides: { root: { display: 'none' } } },
+    MuiDivider: { styleOverrides: { root: { display: "block" } } },
   },
 });
 
-// Custom TopBar
+// ✅ Custom TopBar with hydration-safe rendering
 function CustomTopBar() {
   const { tenant, user } = useTenant();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, pr: 3 }}>
       {tenant && user && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32, fontSize: 14 }}>
-            {user.firstName[0]?.toUpperCase()}
+            {user.firstName?.[0]?.toUpperCase()}
           </Avatar>
           <Typography variant="body2" color="text.secondary">
             {user.firstName} / {tenant}
@@ -79,6 +99,11 @@ function DashboardLayoutBasic() {
   const router = useRouter();
   const [pathname, setPathname] = React.useState('/home');
   const [openDialog, setOpenDialog] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogoutConfirm = () => {
     localStorage.removeItem('selectedTenant');
@@ -87,50 +112,55 @@ function DashboardLayoutBasic() {
     router.replace('/');
   };
 
-  // Navigation with icons created only on client
-const NAVIGATION = React.useMemo(() => [
-  { segment: 'getstarted', title: 'Get Started', icon: <StartOutlinedIcon /> },
-  { segment: 'main', title: 'Dashboard', icon: <CottageOutlinedIcon /> },
-  { segment: 'diagnostic', title: 'Diagnostic', icon: <TroubleshootIcon /> },
-  { segment: 'model', title: 'Model', icon: <ArticleOutlinedIcon /> },
-  { segment: 'mapping', title: 'Mapping', icon: <AccountBalanceOutlinedIcon /> },
-  { segment: 'sync', title: 'Sync', icon: <SyncAltOutlinedIcon /> },
-  { kind: 'divider' },
-  {
-    segment: 'reports',
-    title: 'Reports',
-    icon: <BarChartIcon />,
-    children: [
-      { segment: 'gle-report', title: 'Journal Entry Report', icon: <AutoGraphOutlinedIcon /> },
-      { segment: 'transaction-activity-report', title: 'Activity Report', icon: <TrendingUpOutlinedIcon /> },
-      { segment: 'rollforward-report', title: 'Rollforward Report', icon: <TimelineIcon /> },
-    ],
-  },
-  { kind: 'divider' },
-  {
-    segment: 'settings',
-    title: 'Settings',
-    icon: <ConstructionOutlinedIcon />,
-    children: [
-      { segment: 'configure', title: 'Configure', icon: <SettingsSuggestOutlinedIcon /> },
-      { segment: 'accounting-rules', title: 'Accounting Rules', icon: <RuleFolderOutlinedIcon /> },
-      { segment: 'team-members', title: 'Team Members', icon: <Diversity3OutlinedIcon /> },
-    ],
-  },
-  { kind: 'divider' },
-  { segment: 'merchant', title: 'Merchant', icon: <BusinessCenterOutlinedIcon /> },
-  { kind: 'divider' },
-{ kind: 'divider', height: '10px', visibility: 'hidden'},
-{ kind: 'divider', height: '10px', visibility: 'hidden'},
-  {
-    segment: 'logout',
-    title: 'Sign Out',
-    icon: <LogoutIcon sx={{ color: 'error.main' }} />,
-    onClick: () => setOpenDialog(true),
-    sx: { mt: 3 }
-  },
-  { kind: 'divider' },
-], []);
+  const NAVIGATION = React.useMemo(() => [
+    { segment: 'getstarted', title: 'Get Started', icon: <StartOutlinedIcon /> },
+    { segment: 'main', title: 'Dashboard', icon: <CottageOutlinedIcon /> },
+    { segment: 'diagnostic', title: 'Diagnostic', icon: <TroubleshootIcon /> },
+    { segment: 'model', title: 'Model', icon: <ArticleOutlinedIcon /> },
+    { segment: 'mapping', title: 'Mapping', icon: <AccountBalanceOutlinedIcon /> },
+    { segment: 'sync', title: 'Sync', icon: <SyncAltOutlinedIcon /> },
+    { kind: 'divider' },
+    {
+      segment: 'reports',
+      title: 'Reports',
+      icon: <BarChartIcon />,
+      children: [
+        { segment: 'gle-report', title: 'Journal Entry Report', icon: <AutoGraphOutlinedIcon /> },
+        { segment: 'transaction-activity-report', title: 'Activity Report', icon: <TrendingUpOutlinedIcon /> },
+        { segment: 'rollforward-report', title: 'Rollforward Report', icon: <TimelineIcon /> },
+      ],
+    },
+    { kind: 'divider' },
+    {
+      segment: 'settings',
+      title: 'Settings',
+      icon: <ConstructionOutlinedIcon />,
+      children: [
+        { segment: 'configure', title: 'Configure', icon: <SettingsSuggestOutlinedIcon /> },
+        {
+          segment: 'accounting-rules',
+          title: 'Accounting Rules',
+          icon: <TuneOutlinedIcon />,
+          children: [
+            { segment: 'reference-data', title: 'Reference Data', icon: <FeedOutlinedIcon /> },
+            { segment: 'event-configuration', title: 'Event Configuration', icon: <SettingsInputCompositeOutlinedIcon /> },
+          ],
+        },
+        { segment: 'team-members', title: 'Team Members', icon: <Diversity3OutlinedIcon /> },
+      ],
+    },
+    { kind: 'divider' },
+    { segment: 'merchant', title: 'Merchant', icon: <BusinessCenterOutlinedIcon /> },
+    { kind: 'divider' },
+    {
+      segment: 'logout',
+      title: 'Sign Out',
+      icon: <LogoutIcon sx={{ color: 'error.main' }} />,
+      onClick: () => setOpenDialog(true),
+      sx: { mt: 3 }
+    },
+    { kind: 'divider' },
+  ], []);
 
   const customRouter = React.useMemo(() => ({
     pathname,
@@ -144,56 +174,10 @@ const NAVIGATION = React.useMemo(() => [
     },
   }), [pathname]);
 
+  if (!mounted) return null; // ✅ prevents hydration mismatch
+
   return (
     <TenantProvider>
-      <Dialog
-        open={openDialog}
-        onClose={() => setOpenDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            p: 3,
-            bgcolor: '#f9f9f9',
-            boxShadow: 6,
-            position: 'relative',
-          },
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <WarningAmberIcon color="warning" fontSize="large" />
-          <DialogTitle sx={{ fontWeight: 'bold', fontSize: '1.5rem' }}>
-            Confirm Logout
-          </DialogTitle>
-        </Box>
-
-        <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Are you sure you want to log out? Any unsaved changes will be lost.
-          </Typography>
-        </DialogContent>
-
-        <DialogActions sx={{ justifyContent: 'space-between', pt: 2 }}>
-          <Button
-            onClick={() => setOpenDialog(false)}
-            color="inherit"
-            variant="outlined"
-            sx={{ borderRadius: 2, px: 3 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleLogoutConfirm}
-            color="error"
-            variant="contained"
-            sx={{ borderRadius: 2, px: 4 }}
-          >
-            Logout
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       <AppProvider
         branding={{ logo: <img src="fyntrac-small.png" alt="Fyntrac" />, title: '' }}
         navigation={NAVIGATION}
@@ -206,6 +190,51 @@ const NAVIGATION = React.useMemo(() => [
           slots={{ toolbarActions: CustomTopBar }}
         >
           <PageContent pathname={customRouter.pathname} />
+
+          <Dialog
+            open={openDialog}
+            onClose={() => setOpenDialog(false)}
+            maxWidth="sm"
+            fullWidth
+            slotProps={{
+              paper: {
+                sx: {
+                  width: '100%',
+                  maxWidth: 600,
+                  borderRadius: 3,
+                  p: 3,
+                  bgcolor: '#f9f9f9',
+                  boxShadow: 6,
+                  position: 'relative',
+                },
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <WarningAmberIcon color="warning" fontSize="large" />
+              <DialogTitle sx={{ fontWeight: 'bold', fontSize: '1.5rem' }}>
+                Confirm Logout
+              </DialogTitle>
+            </Box>
+
+            <DialogContent>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                Are you sure you want to log out? Any unsaved changes will be lost.
+              </Typography>
+            </DialogContent>
+
+
+            <DialogActions sx={{ justifyContent: 'space-between', pt: 2 }}>
+              <Button onClick={() => setOpenDialog(false)} color="inherit" variant="outlined" sx={{ borderRadius: 2, px: 3 }}>
+                Cancel
+              </Button>
+              <Button onClick={handleLogoutConfirm} color="error" variant="contained" sx={{ borderRadius: 2, px: 4 }}>
+                Logout
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+
         </DashboardLayout>
       </AppProvider>
     </TenantProvider>

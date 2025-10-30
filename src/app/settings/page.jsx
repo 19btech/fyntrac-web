@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { Paper, Autocomplete, TextField } from '@mui/material';
+import { Paper, Autocomplete, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Switch from '@mui/material/Switch';
@@ -21,6 +21,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import '../common.css';
 import { useTenant } from "../tenant-context";
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 export default function SettingsPage() {
   const { tenant } = useTenant();
@@ -78,6 +79,7 @@ export default function SettingsPage() {
       setIsFiscalPeriodButtonDisabled(false);
     }
   };
+
 
 
 
@@ -298,6 +300,62 @@ export default function SettingsPage() {
 
   return (
     <Box>
+
+      <Dialog
+        open={showSchemaRefreshDialog}
+        onClose={() => setShowSchemaRefreshDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              width: '100%',
+              maxWidth: 600, // same as "maxWidth='sm'"
+              borderRadius: 3,
+              p: 3,
+              bgcolor: '#f9f9f9',
+              boxShadow: 6,
+              position: 'relative',
+            },
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <WarningAmberIcon color="warning" fontSize="large" />
+          <DialogTitle sx={{ fontWeight: 'bold', fontSize: '1.5rem' }}>
+            Confirm Reset Environment
+          </DialogTitle>
+        </Box>
+
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
+            Are you sure to reset the environment [{tenant}]?
+            <br />
+            Resetting your environment [{tenant}] will remove all current settings and data.
+          </Typography>
+
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: 'space-between', pt: 2 }}>
+          <Button
+            onClick={() => setShowSchemaRefreshDialog(false)}
+            color="inherit"
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={refreshEnvironment}
+            color="error"
+            variant="contained"
+            sx={{ borderRadius: 2, px: 4 }}
+          >
+            Refresh Environment !
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
         <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleConfigurationTabChange} aria-label="Accounting Configuration">
           <Tab label="General Settings" sx={{ textTransform: 'none' }} />
@@ -322,7 +380,7 @@ export default function SettingsPage() {
 
                 <IconButton aria-label="Reset Environment" onClick={handleSchemaRefresh} sx={{
                   '&:hover': {
-                    backgroundColor: '#14213d',
+                    backgroundColor: '#D8E4F1',
                   },
                 }}>
                   <Tooltip title="Reset Environment">
@@ -601,7 +659,7 @@ export default function SettingsPage() {
 
                 <IconButton aria-label="Reset Environment" onClick={handleAddDashboardConfigurationDialogOpen} sx={{
                   '&:hover': {
-                    backgroundColor: '#14213d',
+                    backgroundColor: '#D8E4F1',
                   },
                 }}>
                   <Tooltip title="Configure Dashboard">

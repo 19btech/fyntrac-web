@@ -14,6 +14,7 @@ import TransactionActivityReportPage from '../reports/transaction-activity-repor
 import RollforwardReportPage from '../reports/rollforward-report/page';
 import InstrumentDiagnosticPage from '../diagnostic/page';
 import PythonModel from './python-model';
+import EventConfigurationMain from '../event-configuration/page';
 
 export default function PageContent({ pathname, method }) {
 
@@ -26,8 +27,10 @@ export default function PageContent({ pathname, method }) {
         return <HomePage />;
       case '/mapping':
         return <AccountingPage />
-      case '/settings/accounting-rules':
+      case '/settings/accounting-rules/reference-data':
         return <RulePage />
+            case '/settings/accounting-rules/event-configuration':
+        return <EventConfigurationMain />
       case '/orders':
         return <GridHeader>Inprogress</GridHeader>;
       case '/model':

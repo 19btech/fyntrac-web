@@ -1,15 +1,25 @@
-import { Geist, Geist_Mono } from "next/font/google";
+
+
 import "./globals.css";
 import { TenantProvider } from "./tenant-context";
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+
+import localFont from "next/font/local";
+
+const geistSans = localFont({
+  src: [
+    { path: "../../public/fonts/geist/Geist-Regular.woff2", weight: "400" },
+    { path: "../../public/fonts/geist/Geist-Medium.woff2", weight: "500" },
+    { path: "../../public/fonts/geist/Geist-Bold.woff2", weight: "700" },
+  ],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const geistMono = localFont({
+  src: [
+    { path: "../../public/fonts/geist-mono/GeistMono-Regular.woff2", weight: "400" },
+    { path: "../../public/fonts/geist-mono/GeistMono-Medium.woff2", weight: "500" },
+  ],
 });
+
 
 export const metadata = {
   title: "fyntrac",

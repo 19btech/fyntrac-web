@@ -1,30 +1,30 @@
 # Stage 1: Build the app
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package.json and lock file
+# Copy package.json and lock files
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy source files
+# Copy all project files (including public folder and fonts)
 COPY . .
 
-# Build the app
+# Verify fonts exist
+RUN ls -la public/fonts
+
+# Build Next.js app
 RUN npm run build
 
-# Stage 2: Run the app in production
-FROM node:20-alpine
+# Stage 2: Run the app
+FROM node:20-slim
 
 WORKDIR /app
 
-# Copy from builder
 COPY --from=builder /app ./
 
-# Expose port
 EXPOSE 3030
 
-# Start the app using npm
 CMD ["npm", "start"]

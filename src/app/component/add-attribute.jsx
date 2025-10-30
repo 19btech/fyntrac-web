@@ -202,7 +202,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         <Button
           onClick={handleAddAttribute}
           sx={{
-            bgcolor: '#39B6FF',
+            bgcolor: '#14213d',
             color: 'white',
             '&:hover': {
               color: '#E6E6EF', // Prevent text color from changing on hover

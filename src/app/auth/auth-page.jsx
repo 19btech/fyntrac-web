@@ -45,7 +45,7 @@ export default function LoginPage() {
         { email, pswd },
         {
           headers: {
-            "X-Tenant": "Test",
+            "X-Tenant": "master",
             Accept: "*/*",
           },
         }

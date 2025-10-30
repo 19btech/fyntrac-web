@@ -167,13 +167,13 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         <Tooltip title='Save'>
           <Button
             onClick={handleAddTransaction}
-            sx={{
-              bgcolor: '#39B6FF',
-              color: 'white',
-              '&:hover': {
-                color: '#E6E6EF', // Prevent text color from changing on hover
-              },
-            }}
+          sx={{
+            bgcolor: '#14213d',
+            color: 'white',
+            '&:hover': {
+              color: '#E6E6EF', // Prevent text color from changing on hover
+            },
+          }}
           >
             Save
           </Button>
