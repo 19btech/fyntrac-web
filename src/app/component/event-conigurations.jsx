@@ -1,15 +1,38 @@
 import React, { useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import axios from 'axios';
-import { Typography, Box, Switch, IconButton, Tooltip } from '@mui/material';
-import SuccessAlert from '../component/success-alert'
-import ErrorAlert from '../component/error-alert'
+import { 
+    Typography, 
+    Box, 
+    Switch, 
+    IconButton, 
+    Tooltip, 
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions 
+} from '@mui/material';
+import SuccessAlert from '../component/success-alert';
+import ErrorAlert from '../component/error-alert';
 import { styled } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
-import { DeleteOutlineOutlined, Edit } from '@mui/icons-material';
+import { DeleteOutlineOutlined, Edit, Add } from '@mui/icons-material';
 import EventConfiguration from './event-configuration';
+
 function EventConfigurations({ refreshData }) {
-    const { tenant } = useTenant();
+    const { tenant, user } = useTenant();
+    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/event-configurations';
+    const apiClient = axios.create({
+        baseURL: serviceURL,
+        headers: {
+            'X-Tenant': tenant,
+            'X-User-Id': user.id,
+            Accept: '*/*',
+        },
+    });
+
     const initialRows = [];
 
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -22,6 +45,11 @@ function EventConfigurations({ refreshData }) {
     const [errorMessage, setErrorMessage] = useState('');
     const [open, setOpen] = useState(false);
     const [editData, setEditData] = useState(null);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    
+    // Delete confirmation dialog state
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState(null);
 
     const Android12Switch = styled(Switch)(({ theme }) => ({
         padding: 8,
@@ -57,7 +85,6 @@ function EventConfigurations({ refreshData }) {
     }));
 
     const setModelStatus = (param) => {
-        // handleCellEditCommit(param);
         if (param.row.modelStatus === 'ACTIVE') {
             setIsModelActive(true);
         } else {
@@ -80,81 +107,129 @@ function EventConfigurations({ refreshData }) {
                 console.log('Event configuration [EventId]:', eventId, metadata);
                 setEditData(metadata);
                 setOpen(true);
-
             })
             .catch(error => {
                 console.error('Error fetching Event configuration [EventId]:', eventId, error);
             });
     };
 
-    const handleActiveModelAction = async (editData) => {
-        const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/save';
+    async function updateEventConfigurationStatus(id, isActive) {
         try {
-            if (editData.row.modelStatus === 'INACTIVE') {
-                editData.row.modelStatus = 'ACTIVE';
-            } else {
-                editData.row.modelStatus = 'INACTIVE';
-            }
-            const model = {
-                "id": editData.row.id,
-                "orderId": editData.row.orderId,
-                "modelName": editData.row.modelName,
-                "uploadDate": editData.row.uploadDate,
-                "uploadStatus": editData.row.uploadStatus,
-                "modelStatus": editData.row.modelStatus,
-                "uploadedBy": editData.row.uploadedBy,
-                "isDeleted": editData.row.isDeleted,
-                "lastModifiedDate": editData.row.lastModifiedDate,
-                "modifiedBy": editData.row.modifiedBy,
-                "modelConfig": {
-                    "transactions": editData.row.modelConfig.transactions,
-                    "metrics": editData.row.modelConfig.metrics,
-                    "aggregationLevel": editData.row.modelConfig.aggregationLevel,
-                    "currentVersion": editData.row.modelConfig.currentVersion,
-                    "lastOpenVersion": editData.row.modelConfig.lastOpenVersion,
-                    "firstVersion": editData.row.modelConfig.firstVersion
-                },
-                "modelFileId": editData.row.modelFileId
-            };
-            console.log('Model to Save:', model);
-            const response = await axios.post(serviceURL, model,
-                {
-                    headers: {
-                        'X-Tenant': tenant,
-                        Accept: '*/*',
-                        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-                    }
-                }
-            );
-            setSuccessMessage(response.data);
-            setShowSuccessMessage(true);
-
-            setTimeout(() => {
-                const updatedRows = rows.map((row) =>
-                    row.id === editData.id ? { ...row, [editData.field]: editData.value } : row
-                );
-                setRows(updatedRows);
-                setShowSuccessMessage(false);
-                setShowErrorMessage(false);
-                setOpen(false);
-            }, 3000);
+            const response = await apiClient.put(`/update/status/${id}/${isActive}`);
+            return response.data;
         } catch (error) {
-            // Handle error if needed
-            setErrorMessage(error);
-            setShowErrorMessage(true);
-
+            console.error('Error updating status:', error.response?.data || error.message || error);
+            throw error;
         }
     }
 
+    async function deleteEventConfiguration(eventId) {
+        try {
+            const response = await apiClient.delete(`/delete/${eventId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating status:', error.response?.data || error.message || error);
+            throw error;
+        }
+    }
+
+    const handleEventConfigurationAction = async (row, isActive) => {
+        try {
+            const response = await updateEventConfigurationStatus(row.eventId, isActive);
+            row.isActive = response.isActive;
+            setRows(prevRows =>
+                prevRows.map(r =>
+                    r.eventId === row.eventId ? { ...r, isActive: isActive } : r
+                )
+            );
+
+            setSuccessMessage('Status updated successfully!');
+            setShowSuccessMessage(true);
+        } catch (error) {
+            console.error('Error in handleEventConfigurationAction:', error);
+            setErrorMessage(error.response?.data?.message || error.message || 'An error occurred');
+            setShowErrorMessage(true);
+        }
+    };
+
+    // Open delete confirmation dialog
+    const handleDeleteClick = (row) => {
+        setEventToDelete(row);
+        setDeleteDialogOpen(true);
+    };
+
+    // Handle confirmed delete
+    const handleConfirmDelete = async () => {
+        if (!eventToDelete) return;
+
+        try {
+            const response = await deleteEventConfiguration(eventToDelete.eventId);
+            eventToDelete.isDeleted = response.isDeleted;
+            setRows(prevRows =>
+                prevRows.map(r =>
+                    r.eventId === eventToDelete.eventId ? { ...r, isDeleted: true } : r
+                )
+            );
+
+            setSuccessMessage('Event configuration deleted successfully!');
+            setShowSuccessMessage(true);
+            refreshGridData(); // Refresh the grid after deletion
+            
+            // Close the confirmation dialog
+            setDeleteDialogOpen(false);
+            setEventToDelete(null);
+        } catch (error) {
+            console.error('Error in handleConfirmDelete:', error);
+            setErrorMessage(error.response?.data?.message || error.message || 'An error occurred while deleting');
+            setShowErrorMessage(true);
+            // Close the confirmation dialog even on error
+            setDeleteDialogOpen(false);
+            setEventToDelete(null);
+        }
+    };
+
+    // Handle cancel delete
+    const handleCancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setEventToDelete(null);
+    };
+
+    // Function to refresh the grid data
+    const refreshGridData = () => {
+        fetchModels();
+        setRefreshTrigger(prev => prev + 1); // Force re-render
+    };
+
+    // Function to handle successful save from EventConfiguration (simplified)
+    const handleEventConfigurationSave = (message, responseData) => {
+        console.log('handleEventConfigurationSave called:', message);
+        // Refresh grid data
+        refreshGridData();
+        // Success message will be set in onClose
+    };
+
+    // Function to handle errors from EventConfiguration
+    const handleEventConfigurationError = (error) => {
+        console.error('Save error:', error);
+        setErrorMessage(error);
+        setShowErrorMessage(true);
+        // Don't close modal on error - let user see the error
+    };
+
+    // Function to open modal for creating new event configuration
+    const handleCreateNew = () => {
+        setEditData(null);
+        setOpen(true);
+    };
+
     const getStatusColor = (status) => {
-        // Check if status is COMPLETED and return the appropriate color
         if (status === true) {
             return '#8ac92e';
         } else {
             return 'lightgrey';
         }
-
     };
+
     const columns = [
         { field: 'eventId', headerName: 'Event Id', width: 200, editable: false },
         {
@@ -187,7 +262,7 @@ function EventConfigurations({ refreshData }) {
                             checked={params.row.isActive}
                             onChange={(e) => {
                                 e.stopPropagation();
-                                handleToggleActive(params.row.id, !params.row.isActive);
+                                handleEventConfigurationAction(params.row, !params.row.isActive);
                             }}
                             sx={{
                                 '& .MuiSwitch-switchBase.Mui-checked': {
@@ -211,7 +286,6 @@ function EventConfigurations({ refreshData }) {
                             }}
                         />
                     </Tooltip>
-
                 </Box>
             ),
         },
@@ -219,7 +293,7 @@ function EventConfigurations({ refreshData }) {
             field: 'action',
             headerName: 'Action',
             headerAlign: 'center',
-            width: 100,  // Increased width to accommodate all three buttons
+            width: 100,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
@@ -229,8 +303,8 @@ function EventConfigurations({ refreshData }) {
                             <Edit />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title='Move to trash'>
-                        <IconButton onClick={() => handleDelete(params.row)} >
+                    <Tooltip title='Delete Event Configuration'>
+                        <IconButton onClick={() => handleDeleteClick(params.row)} >
                             <DeleteOutlineOutlined />
                         </IconButton>
                     </Tooltip>
@@ -239,14 +313,11 @@ function EventConfigurations({ refreshData }) {
         },
     ];
 
-
     const handleEdit = (rowData) => {
         fetchEventConfiguration(rowData.eventId);
     };
 
-
     const fetchModels = () => {
-
         const fetchTransactionDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/event-configurations/all';
 
         axios.get(fetchTransactionDataCall, {
@@ -257,20 +328,19 @@ function EventConfigurations({ refreshData }) {
             }
         })
             .then(response => {
-                console.log('Evnet Configurations', response.data);
+                console.log('Event Configurations', response.data);
                 setRows(response.data);
-                // Handle success response if needed
             })
             .catch(error => {
-                // Handle error if needed
+                console.error('Error fetching event configurations:', error);
             });
     };
 
-    // Fetch data when the component mounts
+    // Fetch data when the component mounts or when refreshTrigger changes
     React.useEffect(() => {
         fetchModels();
         setIsDataFetched(true);
-    }, [isDataFetched || refreshData]);
+    }, [isDataFetched, refreshData, refreshTrigger]);
 
     const handleAddRow = () => {
         const newRow = { id: rows.length + 1, name: '', exclusive: '', isGL: '' };
@@ -289,10 +359,9 @@ function EventConfigurations({ refreshData }) {
         setRows(updatedRows);
     };
 
-
-
     return (
         <div>
+        
             <div style={{ height: 'auto', width: '100%' }}>
                 <DataGrid
                     rows={rows}
@@ -300,7 +369,6 @@ function EventConfigurations({ refreshData }) {
                     initialState={{
                         pagination: { paginationModel: { pageSize: rowsPerPage } },
                     }}
-
                     pageSize={rowsPerPage}
                     page={currentPage}
                     onPageChange={(newPage) => setCurrentPage(newPage)}
@@ -310,17 +378,77 @@ function EventConfigurations({ refreshData }) {
                     disableSelectionOnClick
                     editMode="row"
                     onCellEditCommit={handleCellEditCommit}
+                    key={refreshTrigger} // Add key to force re-render
                 />
             </div>
-            <><EventConfiguration open={open} onClose={setOpen} editData={editData} /></>
 
-            <>
-                {showSuccessMessage && <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => onClose(false)} />}
-                {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => onClose(false)} />}
-            </>
+            {/* Event Configuration Modal */}
+            <EventConfiguration
+                open={open}
+                onClose={(result) => {
+                    console.log('Parent: Modal onClose called with result:', result);
+                    // Always close the modal
+                    setOpen(false);
+                    setEditData(null);
+
+                    // Refresh data if it was a successful save
+                    if (result === true) {
+                        console.log('Parent: Refreshing grid data...');
+                        refreshGridData();
+                    }
+                }}
+                editData={editData}
+            />
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                aria-labelledby="delete-dialog-title"
+                aria-describedby="delete-dialog-description"
+            >
+                <DialogTitle id="delete-dialog-title">
+                    Confirm Delete
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="delete-dialog-description">
+                        Are you sure you want to delete the event configuration "{eventToDelete?.eventName}" (ID: {eventToDelete?.eventId})? 
+                        This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelDelete} color="primary">
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleConfirmDelete} 
+                        color="error" 
+                        variant="contained"
+                        autoFocus
+                    >
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Alerts */}
+            {showSuccessMessage && (
+                <SuccessAlert
+                    title="Success!"
+                    message={successMessage}
+                    open={showSuccessMessage}
+                    onClose={() => setShowSuccessMessage(false)}
+                />
+            )}
+            {showErrorMessage && (
+                <ErrorAlert
+                    title="Error!"
+                    message={errorMessage}
+                    open={showErrorMessage}
+                    onClose={() => setShowErrorMessage(false)}
+                />
+            )}
         </div>
-
-
     );
 }
 

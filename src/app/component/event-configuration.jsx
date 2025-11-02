@@ -16,7 +16,6 @@ import {
     Autocomplete,
     IconButton,
     Tooltip,
-    Divider,
     Chip,
     Table,
     TableBody,
@@ -26,6 +25,8 @@ import {
     TableRow,
     Paper,
     Grid2 as Grid,
+    Alert,
+    Snackbar,
 } from '@mui/material';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -34,8 +35,6 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
-import SuccessAlert from '../component/success-alert';
-import ErrorAlert from '../component/error-alert';
 import axios from 'axios';
 
 export default function EventConfiguration({ open, onClose, editData }) {
@@ -66,36 +65,6 @@ export default function EventConfiguration({ open, onClose, editData }) {
         }
     );
 
-    // Add response interceptor for error handling
-    apiClient.interceptors.response.use(
-        (response) => {
-            return response.data;
-        },
-        (error) => {
-            if (error.response?.status === 401) {
-                localStorage.removeItem('authToken');
-                window.location.href = '/login';
-            }
-
-            // Improved error handling
-            console.error('API Error Details:', {
-                status: error.response?.status,
-                statusText: error.response?.statusText,
-                data: error.response?.data,
-                url: error.config?.url,
-                method: error.config?.method,
-            });
-
-            const errorMessage = error.response?.data?.message ||
-                error.response?.data?.error ||
-                error.response?.statusText ||
-                error.message ||
-                'An unexpected error occurred';
-
-            return Promise.reject(new Error(errorMessage));
-        }
-    );
-
     const [eventData, setEventData] = useState({
         eventId: '',
         eventName: '',
@@ -118,13 +87,17 @@ export default function EventConfiguration({ open, onClose, editData }) {
         sourceTable: '',
         sourceColumns: [],
         versionType: [],
+        fieldType: '',
         dataMapping: [],
     });
 
-    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
-    const [showErrorMessage, setShowErrorMessage] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
+    // === Alert states ===
+    const [alert, setAlert] = useState({
+        open: false,
+        message: '',
+        severity: 'success', // 'success' or 'error'
+    });
+
     const [attributeList, setAttributeList] = useState([]);
     const [transactionList, setTransactionList] = useState([]);
     const [metricList, setMetricList] = useState([]);
@@ -236,13 +209,32 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
             // Transform source mappings from editData
             if (editData.sourceMappings) {
-                const transformedMappings = editData.sourceMappings.map((mapping, index) => ({
-                    id: index + 1,
-                    sourceTable: mapping.sourceTable, // Keep original case for display
-                    sourceColumns: mapping.sourceColumns?.map(col => col.value || col) || [],
-                    versionType: mapping.versionType?.map(ver => ver.value || ver) || [],
-                    dataMapping: mapping.dataMapping?.map(map => map.value || map) || [],
-                }));
+                const transformedMappings = editData.sourceMappings.map((mapping, index) => {
+                    // Transform sourceColumns - extract just the values for storage
+                    const sourceColumns = mapping.sourceColumns?.map(col => {
+                        return typeof col === 'object' ? col.value : col;
+                    }) || [];
+
+                    // Transform versionType - extract just the values for storage
+                    const versionType = mapping.versionType?.map(ver => {
+                        return typeof ver === 'object' ? ver.value : ver;
+                    }) || [];
+
+                    // Transform dataMapping - extract just the values for storage
+                    const dataMapping = mapping.dataMapping?.map(map => {
+                        return typeof map === 'object' ? map.value : map;
+                    }) || [];
+
+                    return {
+                        id: index + 1,
+                        sourceTable: mapping.sourceTable,
+                        sourceColumns: sourceColumns, // Store as array of values
+                        versionType: versionType, // Store as array of values
+                        fieldType: mapping.fieldType || '',
+                        dataMapping: dataMapping, // Store as array of values
+                    };
+                });
+
                 setSourceMappings(transformedMappings);
 
                 // Update available sources with case-insensitive filtering
@@ -256,8 +248,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 setAvailableSources(newAvailableSources);
 
                 console.log('Edit Data Loaded:');
-                console.log('Used Sources (case-insensitive):', usedSources);
-                console.log('Available Sources:', newAvailableSources);
+                console.log('Transformed Mappings:', transformedMappings);
             }
         } else if (open) {
             // Reset form when opening for new configuration
@@ -283,8 +274,24 @@ export default function EventConfiguration({ open, onClose, editData }) {
             sourceTable: '',
             sourceColumns: [],
             versionType: [],
+            fieldType: '',
             dataMapping: [],
         });
+        setAlert({ open: false, message: '', severity: 'success' });
+    };
+
+    // Show alert function
+    const showAlert = (message, severity = 'success') => {
+        setAlert({
+            open: true,
+            message,
+            severity
+        });
+    };
+
+    // Close alert function
+    const closeAlert = () => {
+        setAlert(prev => ({ ...prev, open: false }));
     };
 
     const handleChange = (key, value) => {
@@ -295,6 +302,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
         { label: 'Current', value: 'Current' },
         { label: 'Prior', value: 'Prior' },
         { label: 'First', value: 'First' },
+    ];
+
+    const fieldTypeOptions = [
+        { label: 'Aggregated', value: 'Aggregated' },
+        { label: 'Array', value: 'Array' },
+        { label: 'None', value: 'None' },
     ];
 
     const dataMappingOptions = {
@@ -324,6 +337,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
         return sourceTable === 'Attribute';
     };
 
+    const isFieldTypeEnabled = (sourceTable) => {
+        return sourceTable === 'Transactions';
+    };
+
     const isDataMappingEnabled = (sourceTable) => {
         return sourceTable === 'Transactions' || sourceTable === 'Balances';
     };
@@ -351,6 +368,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
     const getOptionLabels = (values, options) => {
         return values.map(value => {
+            // If value is a string, find the matching option
             const option = options.find(opt => opt.value === value);
             return option ? option.label : value;
         });
@@ -376,19 +394,19 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const handleAddNew = () => {
         if (!canAddSource()) {
             if (!eventData.triggerType) {
-                setErrorMessage("Please select a Trigger Type first");
+                showAlert("Please select a Trigger Type first", 'error');
             } else if (showTriggerSource && (!eventData.triggerSource || eventData.triggerSource.length === 0)) {
-                setErrorMessage("Please select Trigger Source first");
+                showAlert("Please select Trigger Source first", 'error');
             } else {
-                setErrorMessage("No more sources available to add");
+                showAlert("No more sources available to add", 'error');
             }
-            setShowErrorMessage(true);
             return;
         }
         setNewSource({
             sourceTable: availableSources[0],
             sourceColumns: [],
             versionType: [],
+            fieldType: '',
             dataMapping: [],
         });
         setIsAddingNew(true);
@@ -396,27 +414,27 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
     const handleSaveNew = () => {
         if (!newSource.sourceTable) {
-            setErrorMessage("Please select a source table");
-            setShowErrorMessage(true);
+            showAlert("Please select a source table", 'error');
             return;
         }
 
         const newRow = {
             id: Date.now(),
             sourceTable: newSource.sourceTable,
-            sourceColumns: newSource.sourceColumns.map(item => item.value || item),
-            versionType: newSource.versionType.map(item => item.value || item),
-            dataMapping: newSource.dataMapping.map(item => item.value || item),
+            sourceColumns: newSource.sourceColumns.map(item => item.value),
+            versionType: newSource.versionType.map(item => item.value),
+            fieldType: newSource.fieldType,
+            dataMapping: newSource.dataMapping.map(item => item.value),
         };
 
         setSourceMappings(prev => [...prev, newRow]);
         setAvailableSources(prev => prev.filter(s => s !== newSource.sourceTable));
-        setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], dataMapping: [] });
+        setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] });
         setIsAddingNew(false);
     };
 
     const handleCancelNew = () => {
-        setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], dataMapping: [] });
+        setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] });
         setIsAddingNew(false);
     };
 
@@ -446,7 +464,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 setSourceMappings(prev =>
                     prev.map(row =>
                         row.id === rowId
-                            ? { ...row, [field]: value, sourceColumns: [], versionType: [], dataMapping: [] }
+                            ? { ...row, [field]: value, sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] }
                             : row
                     )
                 );
@@ -468,28 +486,27 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setSourceMappings(prev => prev.filter(row => row.id !== rowId));
     };
 
-    // === Axios API Calls ===
+    // === Fixed Save Function ===
     const handleSaveConfiguration = async () => {
+        console.log('=== SAVE FUNCTION STARTED ===');
+        console.log('Edit Data:', editData);
+        console.log('Operation Type:', editData ? 'UPDATE' : 'CREATE');
+
         if (!eventData.eventId || !eventData.eventName || !eventData.priority) {
-            setErrorMessage("Please fill in all required fields: Event ID, Event Name, and Priority");
-            setShowErrorMessage(true);
+            showAlert("Please fill in all required fields: Event ID, Event Name, and Priority", 'error');
             return;
         }
 
         if (sourceMappings.length === 0) {
-            setErrorMessage("Please add at least one source mapping");
-            setShowErrorMessage(true);
+            showAlert("Please add at least one source mapping", 'error');
             return;
         }
 
         setLoading(true);
-        setShowErrorMessage(false);
-
-        let requestData;
 
         try {
             // Transform data for API
-            requestData = {
+            const requestData = {
                 eventId: eventData.eventId,
                 eventName: eventData.eventName,
                 priority: parseInt(eventData.priority),
@@ -518,6 +535,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                             value: ver
                         };
                     }),
+                    fieldType: mapping.fieldType,
                     dataMapping: mapping.dataMapping.map(map => {
                         const option = dataMappingOptions[mapping.sourceTable]?.find(opt => opt.value === map);
                         return {
@@ -528,42 +546,49 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 }))
             };
 
-            console.log('Sending request data:', JSON.stringify(requestData, null, 2));
+            console.log('Making API call...');
 
             let response;
-            if (editData?.id) {
-                // Use the PUT endpoint for update
+
+            if (editData && editData.id) {
                 response = await apiClient.put(`/update/${editData.id}`, requestData);
             } else {
-                // Use POST for create
                 response = await apiClient.post('/create', requestData);
             }
 
-            console.log('Save successful:', response);
-            setSuccessMessage("Event configuration saved successfully!");
-            setShowSuccessMessage(true);
+            console.log('API Response:', response);
 
+            // SUCCESS - Show message
+            const successMessage = editData
+                ? "Event configuration updated successfully!"
+                : "Event configuration created successfully!";
+
+            console.log('Showing success alert:', successMessage);
+            showAlert(successMessage, 'success');
+
+            // SUCCESS - Close modal immediately
+            console.log('Closing modal...');
+            setLoading(false);
+
+            // Add a small delay to ensure the alert shows before closing
             setTimeout(() => {
-                onClose();
-                if (onClose) onClose(true);
-            }, 1500);
+                console.log('Calling onClose(true)...');
+                if (onClose) {
+                    onClose(true);
+                } else {
+                    console.error('onClose is not defined!');
+                }
+            }, 5000);
 
         } catch (error) {
-            console.error('Detailed save error:', {
-                message: error.message,
-                stack: error.stack,
-                requestData: requestData
-            });
-            setErrorMessage(error.message);
-            setShowErrorMessage(true);
-        } finally {
+            console.error('Error in save function:', error);
             setLoading(false);
+            showAlert(error.message || 'An unexpected error occurred while saving', 'error');
         }
     };
-
     const handleClose = () => {
         resetForm();
-        onClose();
+        if (onClose) onClose(false);
     };
 
     return (
@@ -763,7 +788,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
                         {/* Source Mapping Table */}
                         <TableContainer component={Paper} variant="outlined">
-                            <Table sx={{ minWidth: 1200, tableLayout: 'fixed' }} size="small">
+                            <Table sx={{ minWidth: 1400, tableLayout: 'fixed' }} size="small">
                                 <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
                                     <TableRow>
                                         <TableCell sx={{ fontWeight: 'bold', width: '60px' }}>#</TableCell>
@@ -771,6 +796,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         <TableCell sx={{ fontWeight: 'bold', width: '300px' }}>Source Columns</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', width: '200px' }}>Version Type</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', width: '300px' }}>Map Fields</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', width: '200px' }}>Field Type</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', width: '140px' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -817,7 +843,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         getOptionLabel={(option) => option.label}
                                                         value={row.sourceColumns.map(value => {
                                                             const option = sourceColumnsOptions[row.sourceTable]?.find(opt => opt.value === value);
-                                                            return option || { label: value, value };
+                                                            return option || { label: value, value: value };
                                                         })}
                                                         onChange={(event, newValue) =>
                                                             handleCellChange(row.id, 'sourceColumns', newValue.map(item => item.value))
@@ -852,7 +878,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         getOptionLabel={(option) => option.label}
                                                         value={row.versionType.map(value => {
                                                             const option = versionTypeOptions.find(opt => opt.value === value);
-                                                            return option || { label: value, value };
+                                                            return option || { label: value, value: value };
                                                         })}
                                                         onChange={(event, newValue) =>
                                                             handleCellChange(row.id, 'versionType', newValue.map(item => item.value))
@@ -904,7 +930,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         getOptionLabel={(option) => option.label}
                                                         value={row.dataMapping.map(value => {
                                                             const option = dataMappingOptions[row.sourceTable]?.find(opt => opt.value === value);
-                                                            return option || { label: value, value };
+                                                            return option || { label: value, value: value };
                                                         })}
                                                         onChange={(event, newValue) =>
                                                             handleCellChange(row.id, 'dataMapping', newValue.map(item => item.value))
@@ -940,6 +966,52 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         {!isDataMappingEnabled(row.sourceTable) && row.dataMapping.length === 0 && (
                                                             <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
                                                                 Not applicable
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                )}
+                                            </TableCell>
+
+                                            {/* Field Type - Single Select (Only enabled for Transaction) */}
+                                            <TableCell>
+                                                {editingRow === row.id ? (
+                                                    <FormControl fullWidth size="small">
+                                                        <Select
+                                                            value={row.fieldType || ''}
+                                                            onChange={(e) => handleCellChange(row.id, 'fieldType', e.target.value)}
+                                                            displayEmpty
+                                                            disabled={!isFieldTypeEnabled(row.sourceTable)}
+                                                            sx={{
+                                                                '& .MuiInputBase-root.Mui-disabled': {
+                                                                    backgroundColor: '#f5f5f5',
+                                                                }
+                                                            }}
+                                                        >
+                                                            <MenuItem value="">
+                                                                <em>Select Field Type</em>
+                                                            </MenuItem>
+                                                            {fieldTypeOptions.map((option) => (
+                                                                <MenuItem key={option.value} value={option.value}>
+                                                                    {option.label}
+                                                                </MenuItem>
+                                                            ))}
+                                                        </Select>
+                                                    </FormControl>
+                                                ) : (
+                                                    <Box>
+                                                        {row.fieldType ? (
+                                                            <Chip
+                                                                label={row.fieldType}
+                                                                size="small"
+                                                                variant="filled"
+                                                                sx={{
+                                                                    backgroundColor: '#8A2BE2',
+                                                                    color: 'white',
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                                                                {isFieldTypeEnabled(row.sourceTable) ? 'Not selected' : 'Not applicable'}
                                                             </Typography>
                                                         )}
                                                     </Box>
@@ -1082,6 +1154,32 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 />
                                             </TableCell>
 
+                                            {/* Field Type - Single Select (Only enabled for Transaction) */}
+                                            <TableCell>
+                                                <FormControl fullWidth size="small">
+                                                    <Select
+                                                        value={newSource.fieldType || ''}
+                                                        onChange={(e) => setNewSource(prev => ({ ...prev, fieldType: e.target.value }))}
+                                                        displayEmpty
+                                                        disabled={!isFieldTypeEnabled(newSource.sourceTable)}
+                                                        sx={{
+                                                            '& .MuiInputBase-root.Mui-disabled': {
+                                                                backgroundColor: '#f5f5f5',
+                                                            }
+                                                        }}
+                                                    >
+                                                        <MenuItem value="">
+                                                            <em>Select Field Type</em>
+                                                        </MenuItem>
+                                                        {fieldTypeOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </TableCell>
+
                                             {/* Actions for New Row */}
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1136,22 +1234,22 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 </Tooltip>
             </DialogActions>
 
-            <Box>
-                {showSuccessMessage && (
-                    <SuccessAlert
-                        title="Success"
-                        message={successMessage}
-                        onClose={() => setShowSuccessMessage(false)}
-                    />
-                )}
-                {showErrorMessage && (
-                    <ErrorAlert
-                        title="Error"
-                        message={errorMessage}
-                        onClose={() => setShowErrorMessage(false)}
-                    />
-                )}
-            </Box>
+            {/* Alert Snackbar */}
+            <Snackbar
+                open={alert.open}
+                autoHideDuration={6000}
+                onClose={closeAlert}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={closeAlert}
+                    severity={alert.severity}
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                >
+                    {alert.message}
+                </Alert>
+            </Snackbar>
         </Dialog>
     );
 }

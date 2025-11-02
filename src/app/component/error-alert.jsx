@@ -2,14 +2,12 @@ import React from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import { Alert, AlertTitle } from '@mui/material';
 
-function ErrorAlert({ title, message }) {
-  const [open, setOpen] = React.useState(true);
-
+function ErrorAlert({ title, message, open, onClose }) {
   const handleClose = (event, reason) => {
     if (reason === 'clickaway') {
       return;
     }
-    setOpen(false);
+    onClose();  // Call the parent's onClose to hide the alert
   };
 
   // Ensure message is always a string
@@ -19,21 +17,19 @@ function ErrorAlert({ title, message }) {
       : JSON.stringify(message, null, 2); // fallback for objects
 
   return (
-    <div>
-      <Snackbar
-        open={open}
-        autoHideDuration={5000} // 5 seconds
-        onClose={handleClose}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert variant="filled" severity="error" onClose={handleClose}>
-          <AlertTitle>{title}</AlertTitle>
-          <div style={{ whiteSpace: 'pre-wrap' }}>
-            {safeMessage}
-          </div>
-        </Alert>
-      </Snackbar>
-    </div>
+    <Snackbar
+      open={open}  // Controlled by parent
+      autoHideDuration={5000}  // 5 seconds
+      onClose={handleClose}
+      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+    >
+      <Alert variant="filled" severity="error" onClose={handleClose}>
+        <AlertTitle>{title}</AlertTitle>
+        <div style={{ whiteSpace: 'pre-wrap' }}>
+          {safeMessage}
+        </div>
+      </Alert>
+    </Snackbar>
   );
 }
 
