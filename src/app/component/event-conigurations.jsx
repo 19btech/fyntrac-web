@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+"use client"
+import React, { useState, useEffect, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import axios from 'axios';
 import { 
@@ -19,19 +20,29 @@ import ErrorAlert from '../component/error-alert';
 import { styled } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
 import { DeleteOutlineOutlined, Edit, Add } from '@mui/icons-material';
-import EventConfiguration from './event-configuration';
+import dynamic from 'next/dynamic';
 
-function EventConfigurations({ refreshData }) {
+// Dynamically import the EventConfiguration component (modal/dialog)
+const EventConfigurationModal = dynamic(() => import('./event-configuration'), {
+  ssr: false
+});
+
+function EventConfigurationsList({ refreshData }) {
     const { tenant, user } = useTenant();
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/event-configurations';
-    const apiClient = axios.create({
-        baseURL: serviceURL,
-        headers: {
-            'X-Tenant': tenant,
-            'X-User-Id': user.id,
-            Accept: '*/*',
-        },
-    });
+    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+    
+    // FIX: Create apiClient using useMemo with correct baseURL
+    const apiClient = useMemo(() => {
+        if (!user?.id) return null;
+        return axios.create({
+            baseURL: baseURL,
+            headers: {
+                'X-Tenant': tenant,
+                'X-User-Id': user.id,
+                Accept: '*/*',
+            },
+        });
+    }, [user, tenant, baseURL]);
 
     const initialRows = [];
 
@@ -84,16 +95,8 @@ function EventConfigurations({ refreshData }) {
         },
     }));
 
-    const setModelStatus = (param) => {
-        if (param.row.modelStatus === 'ACTIVE') {
-            setIsModelActive(true);
-        } else {
-            setIsModelActive(false);
-        }
-    }
-
     const fetchEventConfiguration = (eventId) => {
-        const fullUrl = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/event-configurations/get/' + eventId;
+        const fullUrl = `${baseURL}/fyntrac/event-configurations/get/${eventId}`;
         console.log('Attempting to fetch from:', fullUrl);
         axios.get(fullUrl, {
             headers: {
@@ -114,8 +117,12 @@ function EventConfigurations({ refreshData }) {
     };
 
     async function updateEventConfigurationStatus(id, isActive) {
+        if (!apiClient) {
+            console.error('API client not ready');
+            throw new Error('API client not ready');
+        }
         try {
-            const response = await apiClient.put(`/update/status/${id}/${isActive}`);
+            const response = await apiClient.put(`/fyntrac/event-configurations/update/status/${id}/${isActive}`);
             return response.data;
         } catch (error) {
             console.error('Error updating status:', error.response?.data || error.message || error);
@@ -124,8 +131,12 @@ function EventConfigurations({ refreshData }) {
     }
 
     async function deleteEventConfiguration(eventId) {
+        if (!apiClient) {
+            console.error('API client not ready');
+            throw new Error('API client not ready');
+        }
         try {
-            const response = await apiClient.delete(`/delete/${eventId}`);
+            const response = await apiClient.delete(`/fyntrac/event-configurations/delete/${eventId}`);
             return response.data;
         } catch (error) {
             console.error('Error updating status:', error.response?.data || error.message || error);
@@ -173,7 +184,7 @@ function EventConfigurations({ refreshData }) {
 
             setSuccessMessage('Event configuration deleted successfully!');
             setShowSuccessMessage(true);
-            refreshGridData(); // Refresh the grid after deletion
+            refreshGridData();
             
             // Close the confirmation dialog
             setDeleteDialogOpen(false);
@@ -197,37 +208,13 @@ function EventConfigurations({ refreshData }) {
     // Function to refresh the grid data
     const refreshGridData = () => {
         fetchModels();
-        setRefreshTrigger(prev => prev + 1); // Force re-render
-    };
-
-    // Function to handle successful save from EventConfiguration (simplified)
-    const handleEventConfigurationSave = (message, responseData) => {
-        console.log('handleEventConfigurationSave called:', message);
-        // Refresh grid data
-        refreshGridData();
-        // Success message will be set in onClose
-    };
-
-    // Function to handle errors from EventConfiguration
-    const handleEventConfigurationError = (error) => {
-        console.error('Save error:', error);
-        setErrorMessage(error);
-        setShowErrorMessage(true);
-        // Don't close modal on error - let user see the error
+        setRefreshTrigger(prev => prev + 1);
     };
 
     // Function to open modal for creating new event configuration
     const handleCreateNew = () => {
         setEditData(null);
         setOpen(true);
-    };
-
-    const getStatusColor = (status) => {
-        if (status === true) {
-            return '#8ac92e';
-        } else {
-            return 'lightgrey';
-        }
     };
 
     const columns = [
@@ -318,7 +305,7 @@ function EventConfigurations({ refreshData }) {
     };
 
     const fetchModels = () => {
-        const fetchTransactionDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/event-configurations/all';
+        const fetchTransactionDataCall = `${baseURL}/fyntrac/event-configurations/all`;
 
         axios.get(fetchTransactionDataCall, {
             headers: {
@@ -337,31 +324,14 @@ function EventConfigurations({ refreshData }) {
     };
 
     // Fetch data when the component mounts or when refreshTrigger changes
-    React.useEffect(() => {
+    useEffect(() => {
         fetchModels();
         setIsDataFetched(true);
     }, [isDataFetched, refreshData, refreshTrigger]);
 
-    const handleAddRow = () => {
-        const newRow = { id: rows.length + 1, name: '', exclusive: '', isGL: '' };
-        setRows([newRow, ...rows]);
-    };
-
-    const handleRowsPerPageChange = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setCurrentPage(0);
-    };
-
-    const handleCellEditCommit = (params) => {
-        const updatedRows = rows.map((row) =>
-            row.id === params.id ? { ...row, [params.field]: params.props.value } : row
-        );
-        setRows(updatedRows);
-    };
-
     return (
         <div>
-        
+   
             <div style={{ height: 'auto', width: '100%' }}>
                 <DataGrid
                     rows={rows}
@@ -377,21 +347,18 @@ function EventConfigurations({ refreshData }) {
                     paginationMode='client'
                     disableSelectionOnClick
                     editMode="row"
-                    onCellEditCommit={handleCellEditCommit}
-                    key={refreshTrigger} // Add key to force re-render
+                    key={refreshTrigger}
                 />
             </div>
 
             {/* Event Configuration Modal */}
-            <EventConfiguration
+            <EventConfigurationModal
                 open={open}
                 onClose={(result) => {
                     console.log('Parent: Modal onClose called with result:', result);
-                    // Always close the modal
                     setOpen(false);
                     setEditData(null);
 
-                    // Refresh data if it was a successful save
                     if (result === true) {
                         console.log('Parent: Refreshing grid data...');
                         refreshGridData();
@@ -452,4 +419,4 @@ function EventConfigurations({ refreshData }) {
     );
 }
 
-export default EventConfigurations;
+export default EventConfigurationsList;

@@ -41,20 +41,13 @@ import FeedOutlinedIcon from '@mui/icons-material/FeedOutlined';
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
 import SettingsInputCompositeOutlinedIcon from '@mui/icons-material/SettingsInputCompositeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
-import localFont from "next/font/local";
 
-// ✅ Load local Inter font correctly
-const inter = localFont({
-  src: [
-    { path: '../../../public/fonts/inter/Inter-Regular.woff2', weight: '400' },
-    { path: '../../../public/fonts/inter/Inter-Bold.woff2', weight: '700' },
-  ],
-  variable: '--font-inter',
-});
+// System font stack - no external dependencies
+const systemFontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif';
 
 const demoTheme = createTheme({
   typography: {
-    fontFamily: `${inter.style.fontFamily}, sans-serif`,
+    fontFamily: systemFontStack,
   },
   palette: {
     primary: { main: "#1976d2" },
@@ -223,7 +216,6 @@ function DashboardLayoutBasic() {
               </Typography>
             </DialogContent>
 
-
             <DialogActions sx={{ justifyContent: 'space-between', pt: 2 }}>
               <Button onClick={() => setOpenDialog(false)} color="inherit" variant="outlined" sx={{ borderRadius: 2, px: 3 }}>
                 Cancel
@@ -233,8 +225,6 @@ function DashboardLayoutBasic() {
               </Button>
             </DialogActions>
           </Dialog>
-
-
         </DashboardLayout>
       </AppProvider>
     </TenantProvider>

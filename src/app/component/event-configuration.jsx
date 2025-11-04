@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+"use client"
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Card,
     Dialog,
@@ -40,30 +41,13 @@ import axios from 'axios';
 export default function EventConfiguration({ open, onClose, editData }) {
     const { tenant, user } = useTenant();
 
-    // Create axios instance with base configuration
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/event-configurations';
-    const apiClient = axios.create({
-        baseURL: serviceURL,
-        headers: {
-            'X-Tenant': tenant,
-            'X-User-Id': user.id,
-            'Content-Type': 'application/json',
-        },
+    // Debug environment variables
+    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+    console.log('🔧 Environment Variables:', {
+        baseURL,
+        tenant,
+        userId: user?.id
     });
-
-    // Add request interceptor for auth headers
-    apiClient.interceptors.request.use(
-        (config) => {
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-            return config;
-        },
-        (error) => {
-            return Promise.reject(error);
-        }
-    );
 
     const [eventData, setEventData] = useState({
         eventId: '',
@@ -95,7 +79,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [alert, setAlert] = useState({
         open: false,
         message: '',
-        severity: 'success', // 'success' or 'error'
+        severity: 'success',
     });
 
     const [attributeList, setAttributeList] = useState([]);
@@ -122,81 +106,67 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     useEffect(() => {
-        // Fetch attribute metadata from backend on component mount
         fetchAttributeMetadata();
         fetchTransactionMetadata();
         fetchMetricsMetadata();
     }, []);
 
     const fetchAttributeMetadata = () => {
-        axios.get(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/attribute/get/all/options', {
+        axios.get(`${baseURL}/attribute/get/all/options`, {
             headers: {
                 'X-Tenant': tenant,
                 Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
             }
         })
-            .then(response => {
-                const metadata = response.data;
-                setAttributeList(metadata);
-            })
-            .catch(error => {
-                console.error('Error fetching attribute metadata:', error);
-            });
+        .then(response => {
+            setAttributeList(response.data);
+        })
+        .catch(error => {
+            console.error('Error fetching attribute metadata:', error);
+        });
     };
 
     const fetchTransactionMetadata = () => {
-        axios.get(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/all/options', {
+        axios.get(`${baseURL}/transaction/get/all/options`, {
             headers: {
                 'X-Tenant': tenant,
                 Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
             }
         })
-            .then(response => {
-                const metadata = response.data;
-                setTransactionList(metadata);
-            })
-            .catch(error => {
-                console.error('Error fetching transaction metadata:', error);
-            });
+        .then(response => {
+            setTransactionList(response.data);
+        })
+        .catch(error => {
+            console.error('Error fetching transaction metadata:', error);
+        });
     };
 
     const fetchMetricsMetadata = () => {
-        axios.get(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/get/all/options', {
+        axios.get(`${baseURL}/aggregation/get/all/options`, {
             headers: {
                 'X-Tenant': tenant,
                 Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
             }
         })
-            .then(response => {
-                const metadata = response.data;
-                console.log('Full API Response:', response);
-                console.log('Metric Data Structure:', metadata);
-
-                // Transform based on actual property names
-                const formattedMetrics = Array.isArray(metadata)
-                    ? metadata.map(item => {
-                        const metricName = item.metricName || item.name || item.label || item.id || JSON.stringify(item);
-                        return {
-                            label: metricName,
-                            value: metricName
-                        };
-                    })
-                    : [];
-
-                setMetricList(formattedMetrics);
-            })
-            .catch(error => {
-                console.error('Error fetching metric metadata:', error);
-                setMetricList([]);
-            });
+        .then(response => {
+            const metadata = response.data;
+            const formattedMetrics = Array.isArray(metadata)
+                ? metadata.map(item => ({
+                    label: item.metricName || item.name || item.label || item.id || JSON.stringify(item),
+                    value: item.metricName || item.name || item.label || item.id || JSON.stringify(item)
+                }))
+                : [];
+            setMetricList(formattedMetrics);
+        })
+        .catch(error => {
+            console.error('Error fetching metric metadata:', error);
+            setMetricList([]);
+        });
     };
 
     // Load edit data when component opens
     useEffect(() => {
-        if (open && editData) {
+        if (open && editData && user) {
             setEventData({
                 eventId: editData.eventId || '',
                 eventName: editData.eventName || '',
@@ -207,54 +177,41 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 triggerSource: editData.triggerSetup?.triggerSource || [],
             });
 
-            // Transform source mappings from editData
             if (editData.sourceMappings) {
-                const transformedMappings = editData.sourceMappings.map((mapping, index) => {
-                    // Transform sourceColumns - extract just the values for storage
-                    const sourceColumns = mapping.sourceColumns?.map(col => {
-                        return typeof col === 'object' ? col.value : col;
-                    }) || [];
-
-                    // Transform versionType - extract just the values for storage
-                    const versionType = mapping.versionType?.map(ver => {
-                        return typeof ver === 'object' ? ver.value : ver;
-                    }) || [];
-
-                    // Transform dataMapping - extract just the values for storage
-                    const dataMapping = mapping.dataMapping?.map(map => {
-                        return typeof map === 'object' ? map.value : map;
-                    }) || [];
-
-                    return {
-                        id: index + 1,
-                        sourceTable: mapping.sourceTable,
-                        sourceColumns: sourceColumns, // Store as array of values
-                        versionType: versionType, // Store as array of values
-                        fieldType: mapping.fieldType || '',
-                        dataMapping: dataMapping, // Store as array of values
-                    };
-                });
+                const transformedMappings = editData.sourceMappings.map((mapping, index) => ({
+                    id: index + 1,
+                    sourceTable: mapping.sourceTable,
+                    sourceColumns: mapping.sourceColumns?.map(col => typeof col === 'object' ? col.value : col) || [],
+                    versionType: mapping.versionType?.map(ver => typeof ver === 'object' ? ver.value : ver) || [],
+                    fieldType: mapping.fieldType || '',
+                    dataMapping: mapping.dataMapping?.map(map => typeof map === 'object' ? map.value : map) || [],
+                }));
 
                 setSourceMappings(transformedMappings);
-
-                // Update available sources with case-insensitive filtering
-                const usedSources = transformedMappings.map(mapping =>
-                    mapping.sourceTable.toLowerCase()
-                );
-                const newAvailableSources = ALL_SOURCES.filter(source =>
-                    !usedSources.includes(source.toLowerCase())
-                );
-
-                setAvailableSources(newAvailableSources);
-
-                console.log('Edit Data Loaded:');
-                console.log('Transformed Mappings:', transformedMappings);
+                const usedSources = transformedMappings.map(mapping => mapping.sourceTable.toLowerCase());
+                setAvailableSources(ALL_SOURCES.filter(source => !usedSources.includes(source.toLowerCase())));
             }
         } else if (open) {
-            // Reset form when opening for new configuration
             resetForm();
         }
-    }, [open, editData]);
+    }, [open, editData, user]);
+
+    // Debug effects
+    useEffect(() => {
+        console.log('🔄 Trigger Source Updated:', {
+            triggerSource: eventData.triggerSource,
+            triggerType: eventData.triggerType,
+            showTriggerSource: showTriggerSource
+        });
+    }, [eventData.triggerSource, eventData.triggerType]);
+
+    useEffect(() => {
+        console.log('🔄 Source Mappings Updated:', sourceMappings);
+    }, [sourceMappings]);
+
+    useEffect(() => {
+        console.log('🔄 New Source Updated:', newSource);
+    }, [newSource]);
 
     const resetForm = () => {
         setEventData({
@@ -280,21 +237,16 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setAlert({ open: false, message: '', severity: 'success' });
     };
 
-    // Show alert function
     const showAlert = (message, severity = 'success') => {
-        setAlert({
-            open: true,
-            message,
-            severity
-        });
+        setAlert({ open: true, message, severity });
     };
 
-    // Close alert function
     const closeAlert = () => {
         setAlert(prev => ({ ...prev, open: false }));
     };
 
     const handleChange = (key, value) => {
+        console.log(`📝 Event Data Change: ${key}`, value);
         setEventData((prev) => ({ ...prev, [key]: value }));
     };
 
@@ -325,50 +277,32 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const triggerSourceOptions = {
-        ON_ATTRIBUTE_CHANGE: sourceColumnsOptions.Attribute,
-        ON_TRANSACTION_POST: dataMappingOptions.Transactions,
+        ON_ATTRIBUTE_CHANGE: sourceColumnsOptions.Attribute || [],
+        ON_TRANSACTION_POST: dataMappingOptions.Transactions || [],
     };
 
     const showTriggerSource = ['ON_ATTRIBUTE_CHANGE', 'ON_TRANSACTION_POST'].includes(eventData.triggerType);
-    const showTriggerCondition = ['ON_MODEL_EXECUTION', 'ON_CONDITION_MATCH'].includes(eventData.triggerType);
 
     // === Helper Functions ===
-    const isVersionTypeEnabled = (sourceTable) => {
-        return sourceTable === 'Attribute';
-    };
-
-    const isFieldTypeEnabled = (sourceTable) => {
-        return sourceTable === 'Transactions';
-    };
-
-    const isDataMappingEnabled = (sourceTable) => {
-        return sourceTable === 'Transactions' || sourceTable === 'Balances';
-    };
+    const isVersionTypeEnabled = (sourceTable) => sourceTable === 'Attribute';
+    const isFieldTypeEnabled = (sourceTable) => sourceTable === 'Transactions';
+    const isDataMappingEnabled = (sourceTable) => sourceTable === 'Transactions' || sourceTable === 'Balances';
 
     const canAddSource = () => {
         if (!eventData.triggerType) return false;
-        if (showTriggerSource && (!eventData.triggerSource || eventData.triggerSource.length === 0)) {
-            return false;
-        }
+        if (showTriggerSource && (!eventData.triggerSource || eventData.triggerSource.length === 0)) return false;
         return availableSources.length > 0;
     };
 
     const getAddSourceTooltip = () => {
-        if (!eventData.triggerType) {
-            return "Please select a Trigger Type first";
-        }
-        if (showTriggerSource && (!eventData.triggerSource || eventData.triggerSource.length === 0)) {
-            return "Please select Trigger Source first";
-        }
-        if (availableSources.length === 0) {
-            return "No more sources available to add";
-        }
+        if (!eventData.triggerType) return "Please select a Trigger Type first";
+        if (showTriggerSource && (!eventData.triggerSource || eventData.triggerSource.length === 0)) return "Please select Trigger Source first";
+        if (availableSources.length === 0) return "No more sources available to add";
         return "Add Source";
     };
 
     const getOptionLabels = (values, options) => {
         return values.map(value => {
-            // If value is a string, find the matching option
             const option = options.find(opt => opt.value === value);
             return option ? option.label : value;
         });
@@ -377,16 +311,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
     // === Source Management Functions ===
     const updateAvailableSources = (oldSourceTable, newSourceTable) => {
         setAvailableSources(prevSources => {
-            let updated = [...prevSources];
-
-            // Remove the new source table if it exists
-            updated = updated.filter(src => src !== newSourceTable);
-
-            // Add back the old source table if it's not the same as new and not already there
+            let updated = [...prevSources].filter(src => src !== newSourceTable);
             if (oldSourceTable && oldSourceTable !== newSourceTable && !updated.includes(oldSourceTable)) {
                 updated.push(oldSourceTable);
             }
-
             return updated.sort();
         });
     };
@@ -418,14 +346,27 @@ export default function EventConfiguration({ open, onClose, editData }) {
             return;
         }
 
+        console.log('➕ Adding New Source:', newSource);
+
         const newRow = {
             id: Date.now(),
             sourceTable: newSource.sourceTable,
-            sourceColumns: newSource.sourceColumns.map(item => item.value),
-            versionType: newSource.versionType.map(item => item.value),
+            sourceColumns: newSource.sourceColumns.map(item => {
+                console.log('📝 Source Column Item:', item);
+                return item.value || item;
+            }),
+            versionType: newSource.versionType.map(item => {
+                console.log('📝 Version Type Item:', item);
+                return item.value || item;
+            }),
             fieldType: newSource.fieldType,
-            dataMapping: newSource.dataMapping.map(item => item.value),
+            dataMapping: newSource.dataMapping.map(item => {
+                console.log('📝 Data Mapping Item:', item);
+                return item.value || item;
+            }),
         };
+
+        console.log('✅ New Row Created:', newRow);
 
         setSourceMappings(prev => [...prev, newRow]);
         setAvailableSources(prev => prev.filter(s => s !== newSource.sourceTable));
@@ -438,29 +379,18 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setIsAddingNew(false);
     };
 
-    const handleEditRow = (row) => {
-        setEditingRow(row.id);
-    };
-
-    const handleSaveRow = (rowId) => {
-        setEditingRow(null);
-    };
-
-    const handleCancelEdit = () => {
-        setEditingRow(null);
-    };
+    const handleEditRow = (row) => setEditingRow(row.id);
+    const handleSaveRow = (rowId) => setEditingRow(null);
+    const handleCancelEdit = () => setEditingRow(null);
 
     const handleCellChange = (rowId, field, value) => {
+        console.log(`✏️ Cell Change: row ${rowId}, field ${field}, value:`, value);
+        
         if (field === 'sourceTable') {
             const rowToUpdate = sourceMappings.find(row => row.id === rowId);
             if (rowToUpdate) {
                 const oldSourceTable = rowToUpdate.sourceTable;
-                const newSourceTable = value;
-
-                // Update available sources
-                updateAvailableSources(oldSourceTable, newSourceTable);
-
-                // Update the row and reset dependent fields
+                updateAvailableSources(oldSourceTable, value);
                 setSourceMappings(prev =>
                     prev.map(row =>
                         row.id === rowId
@@ -470,9 +400,21 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 );
             }
         } else {
+            // For array fields (sourceColumns, versionType, dataMapping), store the actual values
+            let processedValue = value;
+            
+            if (['sourceColumns', 'versionType', 'dataMapping'].includes(field)) {
+                // Extract values from Autocomplete objects
+                processedValue = Array.isArray(value) 
+                    ? value.map(item => item.value || item)
+                    : value;
+            }
+            
+            console.log(`✅ Processed ${field}:`, processedValue);
+            
             setSourceMappings(prev =>
                 prev.map(row =>
-                    row.id === rowId ? { ...row, [field]: value } : row
+                    row.id === rowId ? { ...row, [field]: processedValue } : row
                 )
             );
         }
@@ -488,10 +430,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
     // === Fixed Save Function ===
     const handleSaveConfiguration = async () => {
-        console.log('=== SAVE FUNCTION STARTED ===');
-        console.log('Edit Data:', editData);
-        console.log('Operation Type:', editData ? 'UPDATE' : 'CREATE');
-
+        console.log('🚀 SAVE FUNCTION STARTED');
+        
         if (!eventData.eventId || !eventData.eventName || !eventData.priority) {
             showAlert("Please fill in all required fields: Event ID, Event Name, and Priority", 'error');
             return;
@@ -505,87 +445,132 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setLoading(true);
 
         try {
-            // Transform data for API
+            // DEBUG: Log the current data
+            console.log('📋 Current Event Data:', eventData);
+            console.log('📋 Current Source Mappings:', sourceMappings);
+            console.log('🔍 Trigger Source Data:', {
+                triggerSource: eventData.triggerSource,
+                triggerType: eventData.triggerType,
+                showTriggerSource: showTriggerSource
+            });
+
+            // Helper function to transform array data for API
+            const transformArrayData = (array, defaultValue = []) => {
+                if (!Array.isArray(array)) return defaultValue;
+                
+                return array.map(item => {
+                    if (typeof item === 'object' && item !== null) {
+                        return {
+                            label: item.label || item.value || String(item),
+                            value: item.value || item.label || String(item)
+                        };
+                    }
+                    return {
+                        label: String(item),
+                        value: String(item)
+                    };
+                });
+            };
+
+            // Transform data for API - FIXED data handling
             const requestData = {
                 eventId: eventData.eventId,
                 eventName: eventData.eventName,
                 priority: parseInt(eventData.priority),
-                description: eventData.description,
+                description: eventData.description || "",
                 triggerSetup: {
-                    triggerType: eventData.triggerType,
-                    triggerCondition: eventData.triggerCondition,
-                    triggerSource: eventData.triggerSource.map(item => ({
-                        label: item.label,
-                        value: item.value
-                    }))
+                    triggerType: eventData.triggerType || "",
+                    triggerCondition: eventData.triggerCondition || "",
+                    triggerSource: transformArrayData(eventData.triggerSource)
                 },
-                sourceMappings: sourceMappings.map(mapping => ({
-                    sourceTable: mapping.sourceTable,
-                    sourceColumns: mapping.sourceColumns.map(col => {
-                        const option = sourceColumnsOptions[mapping.sourceTable]?.find(opt => opt.value === col);
-                        return {
-                            label: option?.label || col,
-                            value: col
-                        };
-                    }),
-                    versionType: mapping.versionType.map(ver => {
-                        const option = versionTypeOptions.find(opt => opt.value === ver);
-                        return {
-                            label: option?.label || ver,
-                            value: ver
-                        };
-                    }),
-                    fieldType: mapping.fieldType,
-                    dataMapping: mapping.dataMapping.map(map => {
-                        const option = dataMappingOptions[mapping.sourceTable]?.find(opt => opt.value === map);
-                        return {
-                            label: option?.label || map,
-                            value: map
-                        };
-                    })
-                }))
+                sourceMappings: sourceMappings.map((mapping, index) => {
+                    console.log(`🔍 Processing Source Mapping ${index + 1}:`, mapping);
+                    
+                    const transformedMapping = {
+                        sourceTable: mapping.sourceTable || "",
+                        sourceColumns: transformArrayData(mapping.sourceColumns),
+                        versionType: transformArrayData(mapping.versionType),
+                        fieldType: mapping.fieldType || "",
+                        dataMapping: transformArrayData(mapping.dataMapping)
+                    };
+
+                    console.log(`✅ Transformed Mapping ${index + 1}:`, transformedMapping);
+                    return transformedMapping;
+                })
             };
 
-            console.log('Making API call...');
+            console.log('📤 Sending Request Data:', JSON.stringify(requestData, null, 2));
+            console.log('🔗 Request URL:', `${baseURL}/fyntrac/event-configurations/create`);
 
-            let response;
+            const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+            const headers = {
+                'X-Tenant': tenant,
+                'X-User-Id': user?.id || '',
+                'Content-Type': 'application/json',
+            };
 
-            if (editData && editData.id) {
-                response = await apiClient.put(`/update/${editData.id}`, requestData);
-            } else {
-                response = await apiClient.post('/create', requestData);
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
             }
 
-            console.log('API Response:', response);
+            console.log('📋 Request Headers:', headers);
 
-            // SUCCESS - Show message
+            let response;
+            if (editData && editData.id) {
+                console.log(`🔄 UPDATE Operation for ID: ${editData.id}`);
+                response = await axios.put(
+                    `${baseURL}/fyntrac/event-configurations/update/${editData.id}`,
+                    requestData,
+                    { headers }
+                );
+            } else {
+                console.log('🆕 CREATE Operation');
+                response = await axios.post(
+                    `${baseURL}/fyntrac/event-configurations/create`,
+                    requestData,
+                    { headers }
+                );
+            }
+
+            console.log('✅ SUCCESS - API Response:', response.data);
+
             const successMessage = editData
                 ? "Event configuration updated successfully!"
                 : "Event configuration created successfully!";
 
-            console.log('Showing success alert:', successMessage);
             showAlert(successMessage, 'success');
-
-            // SUCCESS - Close modal immediately
-            console.log('Closing modal...');
             setLoading(false);
 
-            // Add a small delay to ensure the alert shows before closing
             setTimeout(() => {
-                console.log('Calling onClose(true)...');
-                if (onClose) {
-                    onClose(true);
-                } else {
-                    console.error('onClose is not defined!');
-                }
-            }, 5000);
+                if (onClose) onClose(true);
+            }, 1000);
 
         } catch (error) {
-            console.error('Error in save function:', error);
+            console.error('❌ ERROR in save function:');
+            console.error('Error object:', error);
+            console.error('Error response:', error.response);
+            console.error('Error status:', error.response?.status);
+            console.error('Error data:', error.response?.data);
+            
             setLoading(false);
-            showAlert(error.message || 'An unexpected error occurred while saving', 'error');
+            
+            let errorMessage = 'An unexpected error occurred while saving';
+            
+            if (error.response?.status === 500) {
+                errorMessage = 'Server Error (500): Please check backend logs for details';
+                if (error.response?.data) {
+                    errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+                }
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            showAlert(errorMessage, 'error');
         }
     };
+
     const handleClose = () => {
         resetForm();
         if (onClose) onClose(false);
@@ -625,7 +610,6 @@ export default function EventConfiguration({ open, onClose, editData }) {
             >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <img src="fyntrac.png" alt="Logo" style={{ width: '150px', height: 'auto' }} />
-
                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
                         {editData ? 'Edit Event Configuration' : 'Create Event Configuration'}
                     </Typography>
@@ -656,7 +640,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 }}
             >
                 <Box sx={{ p: 3 }}>
-                    {/* === Event Details === */}
+                    {/* Event Details Card */}
                     <Card sx={{ p: 3, mb: 3, backgroundColor: 'white' }}>
                         <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', color: '#333' }}>
                             Event Details
@@ -714,7 +698,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         </Grid>
                     </Card>
 
-                    {/* === Trigger Setup === */}
+                    {/* Trigger Setup Card */}
                     <Card sx={{ p: 3, mb: 3, backgroundColor: 'white' }}>
                         <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', color: '#333' }}>
                             Trigger Setup
@@ -743,9 +727,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     multiple
                                     size="small"
                                     options={triggerSourceOptions[eventData.triggerType] || []}
-                                    getOptionLabel={(option) => option.label}
+                                    getOptionLabel={(option) => option.label || option}
                                     value={eventData.triggerSource}
-                                    onChange={(event, newValue) => handleChange('triggerSource', newValue)}
+                                    onChange={(event, newValue) => {
+                                        console.log('🎯 Trigger Source Changed:', newValue);
+                                        handleChange('triggerSource', newValue);
+                                    }}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
@@ -760,7 +747,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         )}
                     </Card>
 
-                    {/* === Source Mapping Configuration === */}
+                    {/* Source Mapping Configuration Card */}
                     <Card sx={{ p: 3, backgroundColor: 'white' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                             <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
@@ -801,12 +788,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {/* Existing Rows */}
                                     {sourceMappings.map((row, index) => (
                                         <TableRow key={row.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                             <TableCell>{index + 1}</TableCell>
-
-                                            {/* Source Table - Select */}
                                             <TableCell>
                                                 {editingRow === row.id ? (
                                                     <FormControl fullWidth size="small">
@@ -824,16 +808,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         </Select>
                                                     </FormControl>
                                                 ) : (
-                                                    <Chip
-                                                        label={row.sourceTable}
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={{ fontWeight: 'medium' }}
-                                                    />
+                                                    <Chip label={row.sourceTable} size="small" variant="outlined" sx={{ fontWeight: 'medium' }} />
                                                 )}
                                             </TableCell>
-
-                                            {/* Source Columns - MultiSelect */}
                                             <TableCell>
                                                 {editingRow === row.id ? (
                                                     <Autocomplete
@@ -846,7 +823,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                             return option || { label: value, value: value };
                                                         })}
                                                         onChange={(event, newValue) =>
-                                                            handleCellChange(row.id, 'sourceColumns', newValue.map(item => item.value))
+                                                            handleCellChange(row.id, 'sourceColumns', newValue)
                                                         }
                                                         renderInput={(params) => <TextField {...params} placeholder="Select columns" />}
                                                     />
@@ -858,17 +835,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                                 label={label}
                                                                 size="small"
                                                                 variant="filled"
-                                                                sx={{
-                                                                    backgroundColor: '#38B6FF',
-                                                                    color: 'white',
-                                                                }}
+                                                                sx={{ backgroundColor: '#38B6FF', color: 'white' }}
                                                             />
                                                         ))}
                                                     </Box>
                                                 )}
                                             </TableCell>
-
-                                            {/* Version Type - MultiSelect (Only enabled for Attribute) */}
                                             <TableCell>
                                                 {editingRow === row.id ? (
                                                     <Autocomplete
@@ -881,7 +853,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                             return option || { label: value, value: value };
                                                         })}
                                                         onChange={(event, newValue) =>
-                                                            handleCellChange(row.id, 'versionType', newValue.map(item => item.value))
+                                                            handleCellChange(row.id, 'versionType', newValue)
                                                         }
                                                         renderInput={(params) => (
                                                             <TextField
@@ -891,11 +863,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                             />
                                                         )}
                                                         disabled={!isVersionTypeEnabled(row.sourceTable)}
-                                                        sx={{
-                                                            '& .MuiInputBase-root.Mui-disabled': {
-                                                                backgroundColor: '#f5f5f5',
-                                                            }
-                                                        }}
+                                                        sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
                                                     />
                                                 ) : (
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -905,10 +873,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                                 label={label}
                                                                 size="small"
                                                                 variant="filled"
-                                                                sx={{
-                                                                    backgroundColor: '#FCA311',
-                                                                    color: 'white',
-                                                                }}
+                                                                sx={{ backgroundColor: '#FCA311', color: 'white' }}
                                                             />
                                                         ))}
                                                         {!isVersionTypeEnabled(row.sourceTable) && row.versionType.length === 0 && (
@@ -919,8 +884,6 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     </Box>
                                                 )}
                                             </TableCell>
-
-                                            {/* Source Mapping - MultiSelect (Only enabled for Transactions and Balances) */}
                                             <TableCell>
                                                 {editingRow === row.id ? (
                                                     <Autocomplete
@@ -933,7 +896,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                             return option || { label: value, value: value };
                                                         })}
                                                         onChange={(event, newValue) =>
-                                                            handleCellChange(row.id, 'dataMapping', newValue.map(item => item.value))
+                                                            handleCellChange(row.id, 'dataMapping', newValue)
                                                         }
                                                         renderInput={(params) => (
                                                             <TextField
@@ -943,11 +906,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                             />
                                                         )}
                                                         disabled={!isDataMappingEnabled(row.sourceTable)}
-                                                        sx={{
-                                                            '& .MuiInputBase-root.Mui-disabled': {
-                                                                backgroundColor: '#f5f5f5',
-                                                            }
-                                                        }}
+                                                        sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
                                                     />
                                                 ) : (
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -957,10 +916,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                                 label={label}
                                                                 size="small"
                                                                 variant="filled"
-                                                                sx={{
-                                                                    backgroundColor: '#0097B2',
-                                                                    color: 'white',
-                                                                }}
+                                                                sx={{ backgroundColor: '#0097B2', color: 'white' }}
                                                             />
                                                         ))}
                                                         {!isDataMappingEnabled(row.sourceTable) && row.dataMapping.length === 0 && (
@@ -971,8 +927,6 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     </Box>
                                                 )}
                                             </TableCell>
-
-                                            {/* Field Type - Single Select (Only enabled for Transaction) */}
                                             <TableCell>
                                                 {editingRow === row.id ? (
                                                     <FormControl fullWidth size="small">
@@ -981,15 +935,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                             onChange={(e) => handleCellChange(row.id, 'fieldType', e.target.value)}
                                                             displayEmpty
                                                             disabled={!isFieldTypeEnabled(row.sourceTable)}
-                                                            sx={{
-                                                                '& .MuiInputBase-root.Mui-disabled': {
-                                                                    backgroundColor: '#f5f5f5',
-                                                                }
-                                                            }}
+                                                            sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
                                                         >
-                                                            <MenuItem value="">
-                                                                <em>Select Field Type</em>
-                                                            </MenuItem>
+                                                            <MenuItem value=""><em>Select Field Type</em></MenuItem>
                                                             {fieldTypeOptions.map((option) => (
                                                                 <MenuItem key={option.value} value={option.value}>
                                                                     {option.label}
@@ -1000,15 +948,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 ) : (
                                                     <Box>
                                                         {row.fieldType ? (
-                                                            <Chip
-                                                                label={row.fieldType}
-                                                                size="small"
-                                                                variant="filled"
-                                                                sx={{
-                                                                    backgroundColor: '#8A2BE2',
-                                                                    color: 'white',
-                                                                }}
-                                                            />
+                                                            <Chip label={row.fieldType} size="small" variant="filled" sx={{ backgroundColor: '#FCA311', color: 'white' }} />
                                                         ) : (
                                                             <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
                                                                 {isFieldTypeEnabled(row.sourceTable) ? 'Not selected' : 'Not applicable'}
@@ -1017,25 +957,16 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     </Box>
                                                 )}
                                             </TableCell>
-
-                                            {/* Actions */}
                                             <TableCell>
                                                 {editingRow === row.id ? (
                                                     <Box sx={{ display: 'flex', gap: 1 }}>
                                                         <Tooltip title="Save">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleSaveRow(row.id)}
-                                                                sx={{ color: '#2e7d32' }}
-                                                            >
+                                                            <IconButton size="small" onClick={() => handleSaveRow(row.id)} sx={{ color: '#2e7d32' }}>
                                                                 <SaveIcon fontSize="medium" />
                                                             </IconButton>
                                                         </Tooltip>
                                                         <Tooltip title="Cancel">
-                                                            <IconButton
-                                                                size="medium"
-                                                                onClick={handleCancelEdit}
-                                                            >
+                                                            <IconButton size="medium" onClick={handleCancelEdit}>
                                                                 <CancelIcon fontSize="medium" />
                                                             </IconButton>
                                                         </Tooltip>
@@ -1043,18 +974,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 ) : (
                                                     <Box sx={{ display: 'flex', gap: 1 }}>
                                                         <Tooltip title="Edit">
-                                                            <IconButton
-                                                                size="medium"
-                                                                onClick={() => handleEditRow(row)}
-                                                            >
+                                                            <IconButton size="medium" onClick={() => handleEditRow(row)}>
                                                                 <EditOutlinedIcon fontSize="medium" />
                                                             </IconButton>
                                                         </Tooltip>
                                                         <Tooltip title="Delete">
-                                                            <IconButton
-                                                                size="medium"
-                                                                onClick={() => handleDeleteSource(row.id)}
-                                                            >
+                                                            <IconButton size="medium" onClick={() => handleDeleteSource(row.id)}>
                                                                 <DeleteOutlineIcon fontSize="medium" />
                                                             </IconButton>
                                                         </Tooltip>
@@ -1064,12 +989,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         </TableRow>
                                     ))}
 
-                                    {/* Add New Row */}
                                     {isAddingNew && (
                                         <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
                                             <TableCell>{sourceMappings.length + 1}</TableCell>
-
-                                            {/* Source Table - Select */}
                                             <TableCell>
                                                 <FormControl fullWidth size="small">
                                                     <Select
@@ -1084,8 +1006,6 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     </Select>
                                                 </FormControl>
                                             </TableCell>
-
-                                            {/* Source Columns - MultiSelect */}
                                             <TableCell>
                                                 <Autocomplete
                                                     multiple
@@ -1093,14 +1013,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     options={sourceColumnsOptions[newSource.sourceTable] || []}
                                                     getOptionLabel={(option) => option.label}
                                                     value={newSource.sourceColumns}
-                                                    onChange={(event, newValue) =>
-                                                        setNewSource(prev => ({ ...prev, sourceColumns: newValue }))
-                                                    }
+                                                    onChange={(event, newValue) => setNewSource(prev => ({ ...prev, sourceColumns: newValue }))}
                                                     renderInput={(params) => <TextField {...params} placeholder="Select columns" />}
                                                 />
                                             </TableCell>
-
-                                            {/* Version Type - MultiSelect (Only enabled for Attribute) */}
                                             <TableCell>
                                                 <Autocomplete
                                                     multiple
@@ -1108,9 +1024,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     options={versionTypeOptions}
                                                     getOptionLabel={(option) => option.label}
                                                     value={newSource.versionType}
-                                                    onChange={(event, newValue) =>
-                                                        setNewSource(prev => ({ ...prev, versionType: newValue }))
-                                                    }
+                                                    onChange={(event, newValue) => setNewSource(prev => ({ ...prev, versionType: newValue }))}
                                                     renderInput={(params) => (
                                                         <TextField
                                                             {...params}
@@ -1119,15 +1033,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         />
                                                     )}
                                                     disabled={!isVersionTypeEnabled(newSource.sourceTable)}
-                                                    sx={{
-                                                        '& .MuiInputBase-root.Mui-disabled': {
-                                                            backgroundColor: '#f5f5f5',
-                                                        }
-                                                    }}
+                                                    sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
                                                 />
                                             </TableCell>
-
-                                            {/* Source Mapping - MultiSelect (Only enabled for Transactions and Balances) */}
                                             <TableCell>
                                                 <Autocomplete
                                                     multiple
@@ -1135,9 +1043,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     options={dataMappingOptions[newSource.sourceTable] || []}
                                                     getOptionLabel={(option) => option.label}
                                                     value={newSource.dataMapping}
-                                                    onChange={(event, newValue) =>
-                                                        setNewSource(prev => ({ ...prev, dataMapping: newValue }))
-                                                    }
+                                                    onChange={(event, newValue) => setNewSource(prev => ({ ...prev, dataMapping: newValue }))}
                                                     renderInput={(params) => (
                                                         <TextField
                                                             {...params}
@@ -1146,15 +1052,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         />
                                                     )}
                                                     disabled={!isDataMappingEnabled(newSource.sourceTable)}
-                                                    sx={{
-                                                        '& .MuiInputBase-root.Mui-disabled': {
-                                                            backgroundColor: '#f5f5f5',
-                                                        }
-                                                    }}
+                                                    sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
                                                 />
                                             </TableCell>
-
-                                            {/* Field Type - Single Select (Only enabled for Transaction) */}
                                             <TableCell>
                                                 <FormControl fullWidth size="small">
                                                     <Select
@@ -1162,15 +1062,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         onChange={(e) => setNewSource(prev => ({ ...prev, fieldType: e.target.value }))}
                                                         displayEmpty
                                                         disabled={!isFieldTypeEnabled(newSource.sourceTable)}
-                                                        sx={{
-                                                            '& .MuiInputBase-root.Mui-disabled': {
-                                                                backgroundColor: '#f5f5f5',
-                                                            }
-                                                        }}
+                                                        sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
                                                     >
-                                                        <MenuItem value="">
-                                                            <em>Select Field Type</em>
-                                                        </MenuItem>
+                                                        <MenuItem value=""><em>Select Field Type</em></MenuItem>
                                                         {fieldTypeOptions.map((option) => (
                                                             <MenuItem key={option.value} value={option.value}>
                                                                 {option.label}
@@ -1179,23 +1073,15 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     </Select>
                                                 </FormControl>
                                             </TableCell>
-
-                                            {/* Actions for New Row */}
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                                     <Tooltip title="Save">
-                                                        <IconButton
-                                                            size="large"
-                                                            onClick={handleSaveNew}
-                                                        >
+                                                        <IconButton size="large" onClick={handleSaveNew}>
                                                             <SaveIcon fontSize="medium" />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Cancel">
-                                                        <IconButton
-                                                            size="large"
-                                                            onClick={handleCancelNew}
-                                                        >
+                                                        <IconButton size="large" onClick={handleCancelNew}>
                                                             <CancelIcon fontSize="medium" />
                                                         </IconButton>
                                                     </Tooltip>
@@ -1219,13 +1105,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
                             sx={{
                                 bgcolor: '#14213d',
                                 color: 'white',
-                                '&:hover': {
-                                    bgcolor: '#1a2a4a',
-                                },
-                                '&.Mui-disabled': {
-                                    bgcolor: '#e0e0e0',
-                                    color: '#9e9e9e',
-                                },
+                                '&:hover': { bgcolor: '#1a2a4a' },
+                                '&.Mui-disabled': { bgcolor: '#e0e0e0', color: '#9e9e9e' },
                             }}
                         >
                             {loading ? 'Saving...' : 'Save'}
@@ -1241,12 +1122,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 onClose={closeAlert}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-                <Alert
-                    onClose={closeAlert}
-                    severity={alert.severity}
-                    sx={{ width: '100%' }}
-                    variant="filled"
-                >
+                <Alert onClose={closeAlert} severity={alert.severity} sx={{ width: '100%' }} variant="filled">
                     {alert.message}
                 </Alert>
             </Snackbar>
