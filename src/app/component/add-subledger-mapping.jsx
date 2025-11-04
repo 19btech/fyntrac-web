@@ -73,7 +73,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   }, [editData]);
 
   const fetchAccountSubtypes = () => {
-
+    console.log('Tenant...', tenant);
     axios.get(sericeGetSubTypeURL, {
       headers: {
         'X-Tenant': tenant,

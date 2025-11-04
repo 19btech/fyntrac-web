@@ -19,7 +19,7 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Tooltip } from '@mui/material';
 import axios from 'axios';
 import GridHeader from '../component/gridHeader';
-
+import { useTenant } from "../tenant-context";
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -35,7 +35,7 @@ const VisuallyHiddenInput = styled('input')({
 
 
 export default function AccountingPage() {
-
+const { tenant } = useTenant();
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [refreshChartOfAccountKey, setRefreshChartOfAccountKey] = React.useState(0);
   const [refreshSubledgerMapping, setRefreshSubledgerMapping] = React.useState(0);
@@ -69,7 +69,7 @@ export default function AccountingPage() {
 
     axios.post(serviceURL, formData, {
       headers: {
-        'X-Tenant': process.env.NEXT_PUBLIC_TENANT,
+        'X-Tenant': tenant,
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
       }
