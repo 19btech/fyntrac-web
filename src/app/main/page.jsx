@@ -35,12 +35,12 @@ import SettingsSuggestOutlinedIcon from '@mui/icons-material/SettingsSuggestOutl
 import ConstructionOutlinedIcon from '@mui/icons-material/ConstructionOutlined';
 import Diversity3OutlinedIcon from '@mui/icons-material/Diversity3Outlined';
 import BusinessCenterOutlinedIcon from '@mui/icons-material/BusinessCenterOutlined';
-import RuleFolderOutlinedIcon from '@mui/icons-material/RuleFolderOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import FeedOutlinedIcon from '@mui/icons-material/FeedOutlined';
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
 import SettingsInputCompositeOutlinedIcon from '@mui/icons-material/SettingsInputCompositeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 
 // System font stack - no external dependencies
 const systemFontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif';
@@ -137,6 +137,7 @@ function DashboardLayoutBasic() {
           children: [
             { segment: 'reference-data', title: 'Reference Data', icon: <FeedOutlinedIcon /> },
             { segment: 'event-configuration', title: 'Event Configuration', icon: <SettingsInputCompositeOutlinedIcon /> },
+            { segment: 'custom-table', title: 'Custom Table', icon: <TableChartOutlinedIcon /> },
           ],
         },
         { segment: 'team-members', title: 'Team Members', icon: <Diversity3OutlinedIcon /> },

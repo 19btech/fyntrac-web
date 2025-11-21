@@ -14,7 +14,7 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
   const [modelName, setModelName] = useState('');
   const [modelOrderId, setModelOrderId] = useState('');
   const [modelNameError, setModelNameError] = useState(false);
-  const [orderIdError,setOrderIdError] = useState(false);
+  const [orderIdError, setOrderIdError] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -42,7 +42,7 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
       isValid = false;
     } else {
       const regex = /^[A-Za-z][A-Za-z0-9]*$/; // Starts with an alphabet, followed by alphanumeric characters
-      if(!regex.test(modelName)) {
+      if (!regex.test(modelName)) {
         setModelNameError(true);
         setErrorMessage('Input must start with an alphabet and afterwards may contain number(s).');
         isValid = false;
@@ -65,9 +65,9 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
         isValid = false;
         return false;
       }
-        setOrderIdError(false);
-        setErrorMessage('');
-      }
+      setOrderIdError(false);
+      setErrorMessage('');
+    }
 
     if (!isValid) {
       setErrorMessage('Please fill in all required fields correctly.');
@@ -123,78 +123,70 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
 
   const handleFileDrop = (acceptedFiles, modelName, modelOrderId) => {
     const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/upload';
+
     const formData = new FormData();
     formData.append('modelName', modelName);
     formData.append('modelOrderId', modelOrderId);
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      formData.append('files', acceptedFiles[i]);
-      console.log('file', acceptedFiles[i]);
-    }
-    console.log('Model Name:', modelName);
-    console.log('Order Id:', modelOrderId);
-    
+    formData.append('files', acceptedFiles[0]);   // backend expects ONE file
+
     axios.post(serviceURL, formData, {
       headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+        'X-Tenant': tenant
       }
     })
-    .then(response => {
-      // Handle success response if needed
-      console.log('success response', response.data);
-      setSuccessMessage(response.data);
-      setOpenSuccess(true);
-    })
-    .catch(error => {
-      console.error('Upload data:', error.response.data);
-      setModelNameError(true);
-      setErrorMessage(error.response.data);
-      
-      // Handle error if needed
-    });
-
+      .then(response => {
+        console.log('success response', response.data);
+        setSuccessMessage(response.data);
+        setOpenSuccess(true);
+      })
+      .catch(error => {
+        const err = error.response?.data || "Upload failed";
+        console.error('Upload data:', err);
+        setModelNameError(true);
+        setErrorMessage(err);
+      });
   };
+
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
     multiple: false,
     // validator: validateFields,
     accept: {
-      'application/vnd.ms-excel': ['.xls','.xlsx']
+      'application/vnd.ms-excel': ['.xls', '.xlsx']
     },
     maxFiles: filesLimit || Infinity,
   });
 
   return (
     <div>
-        <img src="fyntrac.png" alt="Sample Image" width="100" height="30" />
-        <p>Upload model</p>
-    <Box>
-            <Divider />
-            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <TextField
-                    sx={{ width: 500 }}
-                    label="Model Name"
-                    fullWidth
-                    value={modelName}
-                    onChange={(e) => {setModelName(e.target.value)}}
-                    required
-                    error={modelNameError}
-                    helperText={modelNameError ? errorMessage : ''}
-                />
-                <TextField
-                    sx={{ width: 500 }}
-                    label="Model Order Id"
-                    fullWidth
-                    value={modelOrderId}
-                    onChange={(e) => {setModelOrderId(e.target.value)}}
-                    required
-                    error={orderIdError}
-                    helperText={orderIdError ? errorMessage : ''}
-                />
-            </DialogContent>
-        </Box>
+      <img src="fyntrac.png" alt="Sample Image" width="100" height="30" />
+      <p>Upload model</p>
+      <Box>
+        <Divider />
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TextField
+            sx={{ width: 500 }}
+            label="Model Name"
+            fullWidth
+            value={modelName}
+            onChange={(e) => { setModelName(e.target.value) }}
+            required
+            error={modelNameError}
+            helperText={modelNameError ? errorMessage : ''}
+          />
+          <TextField
+            sx={{ width: 500 }}
+            label="Model Order Id"
+            fullWidth
+            value={modelOrderId}
+            onChange={(e) => { setModelOrderId(e.target.value) }}
+            required
+            error={orderIdError}
+            helperText={orderIdError ? errorMessage : ''}
+          />
+        </DialogContent>
+      </Box>
 
       {/* Show Alert if there's an error message */}
       {errorMessage && (
@@ -203,51 +195,51 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
         </Alert>
       )}
 
-    <Box
-      {...getRootProps()}
-      sx={{
-        border: `2px dashed ${borderColor || '#ccc'}`,
-        borderRadius: '8px',
-        padding: '20px',
-        textAlign: 'center',
-        backgroundColor: isDragActive ? (backgroundColor || '#f5f5f5') : 'transparent',
-        cursor: 'pointer',
-      }}
-    >
-    
-      
-      <input {...getInputProps()} />
-      <CloudUploadIcon sx={{ fontSize: 48, color: iconColor || '#757575', marginBottom: '10px' }} />
-      <Typography variant="body1" sx={{ color: iconColor || '#757575' }}>
-        {uploading ? 'Uploading...' : isDragActive ? 'Drop the files here' : text || 'Drag and drop files here or click to browse'}
-      </Typography>
-      {uploading && (
-        <>
-          {Object.entries(progressMap).map(([fileName, progress]) => (
-            <Box key={fileName} sx={{ marginTop: '10px' }}>
-              <Typography variant="body2">{fileName}</Typography>
-              <LinearProgress variant="determinate" value={progress} />
-            </Box>
-          ))}
-        </>
-      )}
-    </Box>
-
-    <div>
-<Snackbar 
-  open={openSuccess} 
-  autoHideDuration={6000} 
-  onClose={handleSuccessClose}
-  anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
-      <Alert
-        onClose={handleSuccessClose}
-        severity="success"
-        variant="filled"
-        sx={{ width: '100%' }}
+      <Box
+        {...getRootProps()}
+        sx={{
+          border: `2px dashed ${borderColor || '#ccc'}`,
+          borderRadius: '8px',
+          padding: '20px',
+          textAlign: 'center',
+          backgroundColor: isDragActive ? (backgroundColor || '#f5f5f5') : 'transparent',
+          cursor: 'pointer',
+        }}
       >
-        {successMessage}
-      </Alert>
-</Snackbar>
+
+
+        <input {...getInputProps()} />
+        <CloudUploadIcon sx={{ fontSize: 48, color: iconColor || '#757575', marginBottom: '10px' }} />
+        <Typography variant="body1" sx={{ color: iconColor || '#757575' }}>
+          {uploading ? 'Uploading...' : isDragActive ? 'Drop the files here' : text || 'Drag and drop files here or click to browse'}
+        </Typography>
+        {uploading && (
+          <>
+            {Object.entries(progressMap).map(([fileName, progress]) => (
+              <Box key={fileName} sx={{ marginTop: '10px' }}>
+                <Typography variant="body2">{fileName}</Typography>
+                <LinearProgress variant="determinate" value={progress} />
+              </Box>
+            ))}
+          </>
+        )}
+      </Box>
+
+      <div>
+        <Snackbar
+          open={openSuccess}
+          autoHideDuration={6000}
+          onClose={handleSuccessClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+          <Alert
+            onClose={handleSuccessClose}
+            severity="success"
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            {JSON.stringify(successMessage)}
+          </Alert>
+        </Snackbar>
       </div>
 
     </div>

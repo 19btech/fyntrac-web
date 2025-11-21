@@ -204,11 +204,7 @@ const { tenant } = useTenant();
               <FileDownloadOutlinedIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title='Configure model'>
-            <IconButton onClick={() => handleEdit(params.row)} >
-              <TuneOutlined />
-            </IconButton>
-          </Tooltip>
+
           <Tooltip title='Active/Inactive'>
             <IconButton onClick={() => handleActiveModelAction(params)} >
               <Android12Switch checked={params.row.modelStatus === 'ACTIVE'} // Set defaultChecked based on condition

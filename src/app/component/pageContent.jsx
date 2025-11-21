@@ -15,6 +15,7 @@ import RollforwardReportPage from '../reports/rollforward-report/page';
 import InstrumentDiagnosticPage from '../diagnostic/page';
 import PythonModel from './python-model';
 import EventConfigurationMain from '../event-configuration/page';
+import CustomTableMain from '../custom-table/page';
 
 export default function PageContent({ pathname, method }) {
 
@@ -29,8 +30,10 @@ export default function PageContent({ pathname, method }) {
         return <AccountingPage />
       case '/settings/accounting-rules/reference-data':
         return <RulePage />
-            case '/settings/accounting-rules/event-configuration':
+      case '/settings/accounting-rules/event-configuration':
         return <EventConfigurationMain />
+      case '/settings/accounting-rules/custom-table':
+        return <CustomTableMain />
       case '/orders':
         return <GridHeader>Inprogress</GridHeader>;
       case '/model':

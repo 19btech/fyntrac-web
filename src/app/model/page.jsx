@@ -139,7 +139,7 @@ export default function ModelPage() {
       responseType: 'blob' // ✅ required
     })
       .then(response => {
-        console.error('Model execution message sent successfully', response);
+        console.info('Model execution message sent successfully', response);
       })
       .catch(error => {
         console.error('Error Model Execution:', error);
@@ -578,7 +578,7 @@ export default function ModelPage() {
                     <Tabs
                       value={tabValue}
                       onChange={handleChange}
-                      TabIndicatorProps={{
+                      slotProps={{
                         style: { display: "none" },       // ✅ hides the underline indicator
                       }}
                       sx={{

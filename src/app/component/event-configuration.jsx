@@ -60,7 +60,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     });
 
     // === Source management state ===
-    const ALL_SOURCES = ["Attribute", "Transactions", "Balances", "ExecutionState"];
+    const ALL_SOURCES = ["Attribute", "Transactions", "Balances" ];
     const [availableSources, setAvailableSources] = useState([...ALL_SOURCES]);
     const [sourceMappings, setSourceMappings] = useState([]);
     const [editingRow, setEditingRow] = useState(null);
@@ -94,9 +94,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
             { label: 'Transaction Date', value: 'TransactionDate' },
         ],
         Balances: [
-            { label: 'Beginning Balance', value: 'Beginning Balance' },
+            { label: 'Beginning Balance', value: 'BeginningBalance' },
             { label: 'Activity', value: 'Activity' },
-            { label: 'Ending Balance', value: 'Ending Balance' },
+            { label: 'Ending Balance', value: 'EndingBalance' },
         ],
         ExecutionState: [
             { label: 'ExecutionDate', value: 'ExecutionDate' },
