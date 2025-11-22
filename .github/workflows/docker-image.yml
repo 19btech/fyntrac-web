@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/fyntrac/docker/web
+  IMAGE_NAME: fyntrac/docker/web  # Hardcoded to the exact desired image name (no repository prefix)
 
 jobs:
   build-and-push:
