@@ -1,23 +1,26 @@
-# Stage 1: Build the app
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+
+# Install dependencies WITHOUT scripts (avoids esbuild install errors)
+RUN npm ci --ignore-scripts
+
+# Build esbuild manually (multi-arch safe)
+RUN npm rebuild esbuild
+
 COPY . .
 RUN npm run build
 
-# Stage 2: Run the app in production
-FROM node:20-alpine
+
+FROM node:20 AS runner
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
-
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
 
-EXPOSE 3030
-USER node
-CMD ["npm", "run", "start"]
+RUN npm ci --omit=dev --ignore-scripts
+RUN npm rebuild esbuild --omit=dev
 
+CMD ["npm", "start"]
