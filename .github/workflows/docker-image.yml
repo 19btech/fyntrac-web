@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/fyntrac/docker/web
+  IMAGE_NAME: 19btech/fyntrac/docker/web  # Updated to include the correct owner (19btech) and desired path
 
 jobs:
   build-and-push:
