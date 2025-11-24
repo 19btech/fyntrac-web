@@ -20,16 +20,14 @@ import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutline
 import GridHeader from "../component/gridHeader";
 import Grid from "@mui/material/Grid2"; // Import stable Grid2
 import axios from 'axios';
-import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../component/custom-tab-panel';
 import CircularProgress from '@mui/material/CircularProgress';
 import { green } from '@mui/material/colors';
-import Button from '@mui/material/Button';
 import Fab from '@mui/material/Fab';
 import CheckIcon from '@mui/icons-material/Check';
-import SaveIcon from '@mui/icons-material/Save';
 import UpdateIcon from '@mui/icons-material/Update';
 import { useTenant } from "../tenant-context";
+import EnhancedDataGridTabs from "../component/map-tabs";
 
 const InstrumentDiagnosticPage = () => {
   const { tenant } = useTenant();
@@ -47,26 +45,21 @@ const InstrumentDiagnosticPage = () => {
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const [isAttribuesFetched, setIsAttribuesFetched] = React.useState(false);
   // Attribute options
   const [attributeOptions, setAttributeOptions] = useState([]);
-  const [gridHeader, setGridHeader] = useState([]);
   const [reportData, setReportData] = useState([]);
   const [instrumentId, setInstrumentId] = useState('');
   const [models, setModels] = useState([]);
   const [model, setModel] = useState(models.length > 0 ? models[0]._id : "");
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
-  const [transactionActivityHeader, setTransactionActivityHeader] = React.useState([]);
-  const [transactionActivityData, setTransactionActivityData] = React.useState([]);
   const timer = React.useRef < ReturnType < typeof setTimeout >> (undefined);
-  const [tabOrder, setTabOrder] = React.useState(0);
-  const [instrumentAttributeHeader, setInstrumentAttributeHeader] = React.useState([]);
-  const [instrumentAttributeData, setInstrumentAttributeData] = React.useState([]);
-  const [balancesHeader, setBalancesHeader] = React.useState([]);
-  const [balancesData, setBalancesData] = React.useState([]);
-  const [executionStateHeader, setExecutionStateHeader] = React.useState([]);
-  const [executionStateData, setExecutionStateData] = React.useState([]);
+  const [postingDates, setPostingDates] = React.useState([]);
+  const [postingDate, setPostingDate] = React.useState('');
+  const [diagnosticData, setDiagnosticData] = React.useState({});
+
+     
+
   const buttonSx = {
     ...(success && {
       bgcolor: green[500],
@@ -112,13 +105,33 @@ const InstrumentDiagnosticPage = () => {
       });
   };
 
+
+  const fetchAllPostingDates = () => {
+    const fetchPostingDates = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/get/event-postingdates`;
+    axios.get(fetchPostingDates, {
+      headers: {
+        'X-Tenant': tenant,
+        Accept: '*/*',
+        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
+      }
+    })
+      .then(response => {
+        setPostingDates(response.data);
+        console.info('Posting Dates:', response.data);
+      })
+      .catch(error => {
+        console.error('Error fetching posting dates from EventHistory:', error);
+      });
+  };
+
   const downloadDiagnostic = () => {
     const downloadFile = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/download`;
-
+    console.info('postingDate:', postingDate);
     const diagnosticRequest = {
       tenant: tenant,
       instrumentId: instrumentId,
       modelId: model,
+      postingDate: postingDate,
     };
 
     console.log('Download Request:', diagnosticRequest);
@@ -160,12 +173,12 @@ const InstrumentDiagnosticPage = () => {
 
   useEffect(() => {
     fetchAllModels();
+    fetchAllPostingDates();
   }, []); // Empty dependency array means this runs once when the component mounts
 
   useEffect(() => {
     console.log('reporting attributes:', attributeOptions);
     const header = generateGridColumns(attributeOptions);
-    setGridHeader(header);
     console.log('Header:', header);
   }, [attributeOptions]); // This will log the updated attributeOptions whenever it changes
 
@@ -177,10 +190,12 @@ const InstrumentDiagnosticPage = () => {
     setSuccess(false);
     setLoading(true);
 
+    console.info('postingDate:', postingDate);
     const diagnosticRequest = {
       tenant: tenant,
       instrumentId: instrumentId,
-      modelId: model
+      modelId: model,
+      postingDate: postingDate,
     };
 
     console.log('request:', diagnosticRequest);
@@ -196,24 +211,10 @@ const InstrumentDiagnosticPage = () => {
       .then(response => {
         const data = response.data;
 
-        setReportData(data);
+        setDiagnosticData(data.valueMapList);
         setSuccess(true);
         setLoading(false);
 
-        // ✅ Safely handle arrays in the response
-        setTransactionActivityHeader(generateGridColumns(data.transactionActivityHeader) ?? []);
-        setTransactionActivityData(data.transactionActivityData ?? []);
-
-        setInstrumentAttributeHeader(generateGridColumns(data.instrumentAttributeHeader));
-        setInstrumentAttributeData(data.instrumentAttributeData);
-
-        setBalancesHeader(generateGridColumns(data.balancesHeader));
-        setBalancesData(data.balancesData);
-
-        setExecutionStateHeader(generateGridColumns(data.executionStateHeader));
-        setExecutionStateData(data.executionStateData);
-        console.log('Header:', data.transactionActivityHeader);
-        console.log('Rows:', data.transactionActivityData);
         console.log('Full Response:', data);
       })
       .catch(error => {
@@ -348,13 +349,34 @@ const InstrumentDiagnosticPage = () => {
                       id="sort-by-select"
                       value={model}
                       label="Select Model"
-                      size="small" 
+                      size="small"
                       onChange={(e) => setModel(e.target.value)}
                     >
                       {/* Map over the sort options Select Modelto create a menu item for each */}
                       {models.map((model) => (
                         <MenuItem key={model.id} value={model.id}>
                           {model.modelName}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid xs={12} sm={3}>
+                  <FormControl fullWidth sx={{ m: 1, minWidth: 350 }}>
+                    <InputLabel id="sort-by-select-model">Select Posting</InputLabel>
+                    <Select
+                      labelId="sort-by-select-posting-date"
+                      id="sort-by-select-posting-date"
+                      value={postingDate}
+                      label="Select Posting"
+                      size="small"
+                      onChange={(e) => setPostingDate(e.target.value)}
+                    >
+                      {/* Map over the sort options Select Posting Date to create a menu item for each */}
+                      {postingDates.map((pdate) => (
+                        <MenuItem key={pdate.value} value={pdate.value}>
+                          {pdate.label}
                         </MenuItem>
                       ))}
                     </Select>
@@ -401,43 +423,15 @@ const InstrumentDiagnosticPage = () => {
             flex="1" // Third row takes the remaining space
             overflow="auto" // Enable scrolling if content overflows
           >
-            <Box>
-              <Tabs sx={{ width: '90rem' }} value={tabOrder} onChange={handleTabChange} aria-label="Diagnostic Report">
-                <Tab label="Transaction Activity" {...a11yProps(0)} sx={{ textTransform: "none" }} />
-                <Tab label="Instrument Attribute History" {...a11yProps(1)} sx={{ textTransform: "none" }} />
-                <Tab label="Balances" {...a11yProps(2)} sx={{ textTransform: "none" }} />
-                <Tab label="Execution Detail" {...a11yProps(3)} sx={{ textTransform: "none" }} />
-              </Tabs>
-            </Box>
-            <Box>
-              <CustomTabPanel value={tabOrder} index={0}>
-                <CustomDataGrid
-                  columns={transactionActivityHeader ?? []}
-                  rows={transactionActivityData ?? []}
-                />
-              </CustomTabPanel>
 
-              <CustomTabPanel value={tabOrder} index={1}>
-                <CustomDataGrid
-                  columns={instrumentAttributeHeader ?? []}
-                  rows={instrumentAttributeData ?? []}
-                />
-              </CustomTabPanel>
+            <div style={{ padding: '20px' }}>
+              <EnhancedDataGridTabs
+                data={diagnosticData}
+                title="Enterprise Data Manager"
+                // onExport={handleExport}
+              />
+            </div>
 
-              <CustomTabPanel value={tabOrder} index={2}>
-                <CustomDataGrid
-                  columns={balancesHeader ?? []}
-                  rows={balancesData ?? []}
-                />
-              </CustomTabPanel>
-
-              <CustomTabPanel value={tabOrder} index={3}>
-                <CustomDataGrid
-                  columns={executionStateHeader ?? []}
-                  rows={executionStateData ?? []}
-                />
-              </CustomTabPanel>
-            </Box>
           </Box>
         </Box>
       </CustomTabPanel>
