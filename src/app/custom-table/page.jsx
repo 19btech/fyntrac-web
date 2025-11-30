@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
@@ -22,7 +22,7 @@ import dynamic from 'next/dynamic';
 
 // Dynamically import the CustomTableModal component
 const CreateTableDialog = dynamic(() => import('../component/custom-table'), {
-  ssr: false
+    ssr: false
 });
 
 const VisuallyHiddenInput = styled('input')({
@@ -38,18 +38,85 @@ const VisuallyHiddenInput = styled('input')({
 });
 
 export default function CustomTablesMain() {
-    const { tenant } = useTenant();
     const [panelIndex, setPanelIndex] = React.useState(0);
     const [modelRefreshKey, setModelRefreshKey] = React.useState(0);
     const [headerLabel, setHeaderLabel] = React.useState('Custom Tables');
     const [openCustomTableModal, setOpenCustomTableModal] = React.useState(false);
+    const [tableType, setTableType] = React.useState('REFERENCE');
+    const initialRows = [];
+    const [rows, setRows] = useState(initialRows);
+    const { tenant, user } = useTenant();
+    const [isDataFetched, setIsDataFetched] = useState(false);
+    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+    const fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/reference-tables`;
+    const [snackbar, setSnackbar] = React.useState({
+        open: false,
+        message: '',
+        severity: 'success'
+    });
 
-    const handleModelChange = (event, newValue) => {
+    const fetchCustomTables = () => {
+
+        console.log('Attempting to fetch from:', fetchCustomTablesCall);
+        axios.get(fetchCustomTablesCall, {
+            headers: {
+                'X-Tenant': tenant,
+                Accept: '*/*',
+            }
+        })
+            .then(response => {
+                console.log('Custom Tables', response.data.data);
+                setRows(response.data.data);
+            })
+            .catch(error => {
+                console.error('Error fetching custom tables:', error);
+            });
+    };
+
+    // Fetch data when the component mounts or when refreshTrigger changes
+    useEffect(() => {
+        fetchCustomTables();
+        setIsDataFetched(true);
+    }, [isDataFetched]);
+
+    const handleTableTypeChange = (event, newValue) => {
         setPanelIndex(newValue);
+        console.log('Panel index changed:', newValue);
+        if (newValue === 1) {
+            setTableType('OPERATIONAL');
+        } else {
+            setTableType('REFERENCE');
+        }
     };
 
     const handleRefresh = () => {
         setModelRefreshKey(prev => prev + 1);
+    };
+
+    // This function should be passed as onSuccess
+
+
+    const handleSuccess = async (tableData) => {
+        console.log('Table created successfully:', tableData);
+
+        // Show success message
+        setSnackbar({
+            open: true,
+            message: `Table "${tableData.tableName}" created successfully!`,
+            severity: 'success'
+        });
+
+        // Add delay before showing success message
+        await new Promise(resolve => setTimeout(resolve, 5000)); // 1 second delay
+
+        setOpenCustomTableModal(true);
+
+        // You could also refresh your tables list here
+        // fetchTables(); // if you have a function to refresh the table list
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar(prev => ({ ...prev, open: false }));
     };
 
     return (
@@ -98,15 +165,25 @@ export default function CustomTablesMain() {
 
             <Box>
                 <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
-                    <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleModelChange} aria-label="Custom Tables">
-                        <Tab label="Custom Tables" sx={{ textTransform: 'none' }} />
+                    <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleTableTypeChange} aria-label="Custom Tables">
+                        <Tab label="Reference Tables" sx={{ textTransform: 'none' }} />
+                        <Tab label="Operational Tables" sx={{ textTransform: 'none' }} />
                     </Tabs>
                 </Box>
-                <CustomTabPanel value={panelIndex} index={panelIndex}>
-                    <CustomTablesList refreshData={setModelRefreshKey} key={modelRefreshKey} />
+                <CustomTabPanel value={panelIndex} index={0}>
+                    <CustomTablesList refreshData={setModelRefreshKey} tableType={'REFERENCE'} key={modelRefreshKey} referenceTables={ rows }/>
+                </CustomTabPanel>
+                <CustomTabPanel value={panelIndex} index={1}>
+                    <CustomTablesList refreshData={setModelRefreshKey} tableType={'OPERATIONAL'} key={modelRefreshKey} referenceTables={ rows }/>
                 </CustomTabPanel>
             </Box>
-            <CreateTableDialog open={openCustomTableModal} onClose={setOpenCustomTableModal} />
+            {tableType === 'OPERATIONAL' && (
+                <CreateTableDialog open={openCustomTableModal} onSuccess={handleSuccess} onClose={setOpenCustomTableModal} tableType={'OPERATIONAL'} tables={rows}/>
+            )}
+
+            {tableType === 'REFERENCE' && (
+                <CreateTableDialog open={openCustomTableModal} onSuccess={handleSuccess} onClose={setOpenCustomTableModal} tableType={'REFERENCE'} />
+            )}
         </>
     )
 }

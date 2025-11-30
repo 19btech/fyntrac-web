@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import axios from 'axios';
-import { 
-    Typography, 
-    Box, 
-    Switch, 
-    IconButton, 
-    Tooltip, 
+import {
+    Typography,
+    Box,
+    Switch,
+    IconButton,
+    Tooltip,
     Button,
     Dialog,
     DialogTitle,
@@ -25,13 +25,13 @@ import dynamic from 'next/dynamic';
 
 // Dynamically import the CustomTableModal component
 const CreateTableDialog = dynamic(() => import('./custom-table'), {
-  ssr: false
+    ssr: false
 });
 
-function CustomTablesList({ refreshData }) {
+function CustomTablesList({ refreshData, tableType, referenceTables }) {
     const { tenant, user } = useTenant();
     const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
-    
+
     const apiClient = useMemo(() => {
         if (!user?.id) return null;
         return axios.create({
@@ -57,7 +57,7 @@ function CustomTablesList({ refreshData }) {
     const [open, setOpen] = useState(false);
     const [editData, setEditData] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    
+
     // Delete confirmation dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [tableToDelete, setTableToDelete] = useState(null);
@@ -96,7 +96,7 @@ function CustomTablesList({ refreshData }) {
     }));
 
     const fetchCustomTable = (tableId) => {
-        const fullUrl = `${baseURL}/fyntrac/custom-tables/get/${tableId}`;
+        const fullUrl = `${baseURL}/fyntrac/custom-table/get/${tableId}`;
         console.log('Attempting to fetch from:', fullUrl);
         axios.get(fullUrl, {
             headers: {
@@ -121,7 +121,7 @@ function CustomTablesList({ refreshData }) {
             throw new Error('API client not ready');
         }
         try {
-            const response = await apiClient.put(`/fyntrac/custom-tables/update/status/${id}/${isActive}`);
+            const response = await apiClient.put(`/fyntrac/custom-table/update/status/${id}/${isActive}`);
             return response.data;
         } catch (error) {
             console.error('Error updating status:', error.response?.data || error.message || error);
@@ -135,7 +135,7 @@ function CustomTablesList({ refreshData }) {
             throw new Error('API client not ready');
         }
         try {
-            const response = await apiClient.delete(`/fyntrac/custom-tables/delete/${tableId}`);
+            const response = await apiClient.delete(`/fyntrac/custom-table/delete/${tableId}`);
             return response.data;
         } catch (error) {
             console.error('Error deleting table:', error.response?.data || error.message || error);
@@ -184,7 +184,7 @@ function CustomTablesList({ refreshData }) {
             setSuccessMessage('Custom table deleted successfully!');
             setShowSuccessMessage(true);
             refreshGridData();
-            
+
             // Close the confirmation dialog
             setDeleteDialogOpen(false);
             setTableToDelete(null);
@@ -220,15 +220,29 @@ function CustomTablesList({ refreshData }) {
     };
 
     const columns = [
-        { 
-            field: 'tableName', 
-            headerName: 'Table Name', 
-            width: 200, 
+        {
+            field: 'tableName',
+            headerName: 'Table Name',
+            width: 200,
             editable: false,
             renderCell: (params) => (
-                <Typography variant="subtitle2" fontWeight="bold" color="primary">
-                    {params.value}
-                </Typography>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",        // **vertical centering**
+                        height: "100%",
+                        width: "100%"
+                    }}
+                >
+                    <Typography
+                        variant="subtitle2"
+                        fontWeight="bold"
+                        color="primary"
+                        sx={{ lineHeight: 1 }}         // keeps text cleanly centered
+                    >
+                        {params.value}
+                    </Typography>
+                </Box>
             )
         },
         {
@@ -245,15 +259,24 @@ function CustomTablesList({ refreshData }) {
             renderCell: (params) => (
                 <Chip
                     label={params.value}
-                    color={params.value === 'OPERATIONAL' ? 'primary' : 'secondary'}
+                    sx={{
+                        backgroundColor: params.value === 'OPERATIONAL' ? '#14213D' : '#0097B2',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        minWidth: 100,
+                        '& .MuiChip-label': {
+                            px: 1,
+                        }
+                    }}
                     variant="filled"
                     size="small"
                 />
             ),
         },
         {
-            field: 'driverField',
-            headerName: 'Driver Field',
+            field: 'referenceColumn',
+            headerName: 'Reference Field',
             width: 150,
             editable: false,
             renderCell: (params) => (
@@ -281,80 +304,53 @@ function CustomTablesList({ refreshData }) {
         {
             field: 'primaryKeys',
             headerName: 'Primary Keys',
-            width: 150,
+            width: 200,
             editable: false,
             renderCell: (params) => (
-                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',   // ✅ vertical centering
+                        height: '100%',
+                        width: '100%',
+                        gap: 0.5,
+                        flexWrap: 'wrap',
+                    }}
+                >
                     {params.value.slice(0, 2).map((pk, idx) => (
                         <Chip
                             key={idx}
                             label={pk}
                             color="primary"
                             size="small"
+                            sx={{
+                                alignItems: 'center',
+                                lineHeight: 1,       // cleaner vertical alignment inside chip
+                            }}
                         />
                     ))}
+
                     {params.value.length > 2 && (
                         <Chip
                             label={`+${params.value.length - 2}`}
                             size="small"
+                            sx={{ lineHeight: 1 }}
                         />
                     )}
                 </Box>
             ),
-        },
-        {
-            field: 'isActive',
-            headerName: 'Active / Inactive',
-            width: 120,
-            editable: false,
-            renderCell: (params) => (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                    <Tooltip title={params.row.isActive ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}>
-                        <Android12Switch
-                            checked={params.row.isActive}
-                            onChange={(e) => {
-                                e.stopPropagation();
-                                handleCustomTableAction(params.row, !params.row.isActive);
-                            }}
-                            sx={{
-                                '& .MuiSwitch-switchBase.Mui-checked': {
-                                    color: '#1e88e5',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(30, 136, 229, 0.08)',
-                                    },
-                                },
-                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                                    backgroundColor: '#1e88e5',
-                                },
-                                '& .MuiSwitch-switchBase:not(.Mui-checked)': {
-                                    color: '#6d6d6d',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(109, 109, 109, 0.08)',
-                                    },
-                                },
-                                '& .MuiSwitch-switchBase:not(.Mui-checked) + .MuiSwitch-track': {
-                                    backgroundColor: '#6d6d6d',
-                                },
-                            }}
-                        />
-                    </Tooltip>
-                </Box>
-            ),
-        },
+        }
+        ,
         {
             field: 'action',
             headerName: 'Action',
             headerAlign: 'center',
-            width: 150,
+            width: 100,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
                 <div>
-                    <Tooltip title='View Table Data'>
-                        <IconButton onClick={() => handleViewData(params.row.id)} >
-                            <DataArray />
-                        </IconButton>
-                    </Tooltip>
+
                     <Tooltip title='Edit Custom Table'>
                         <IconButton onClick={() => handleEdit(params.row)} >
                             <Edit />
@@ -371,8 +367,12 @@ function CustomTablesList({ refreshData }) {
     ];
 
     const fetchCustomTables = () => {
-        const fetchCustomTablesCall = `${baseURL}/fyntrac/custom-tables/all`;
+        let fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/reference-tables`;
+        if (tableType === 'OPERATIONAL') {
+            fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/operational-tables`;
+        }
 
+        console.log('Attempting to fetch from:', fetchCustomTablesCall);
         axios.get(fetchCustomTablesCall, {
             headers: {
                 'X-Tenant': tenant,
@@ -380,8 +380,8 @@ function CustomTablesList({ refreshData }) {
             }
         })
             .then(response => {
-                console.log('Custom Tables', response.data);
-                setRows(response.data);
+                console.log('Custom Tables', response.data.data);
+                setRows(response.data.data);
             })
             .catch(error => {
                 console.error('Error fetching custom tables:', error);
@@ -390,7 +390,12 @@ function CustomTablesList({ refreshData }) {
 
     // Fetch data when the component mounts or when refreshTrigger changes
     useEffect(() => {
-        fetchCustomTables();
+        if (tableType === 'REFERENCE' && referenceTables.length > 0) {
+            setRows(referenceTables);
+        } else {
+            console.log('tableType', tableType);
+            fetchCustomTables();
+        }
         setIsDataFetched(true);
     }, [isDataFetched, refreshData, refreshTrigger]);
 
@@ -416,7 +421,7 @@ function CustomTablesList({ refreshData }) {
             </div>
 
             {/* Custom Table Modal */}
-            <CreateTableDialog
+            {tableType === 'REFERENCE' && (<CreateTableDialog
                 open={open}
                 onClose={(result) => {
                     console.log('Parent: Modal onClose called with result:', result);
@@ -429,7 +434,26 @@ function CustomTablesList({ refreshData }) {
                     }
                 }}
                 editData={editData}
-            />
+                tableType={'REFERENCE'}
+                tables={rows}
+            />)}
+
+            {tableType === 'OPERATIONAL' && (<CreateTableDialog
+                open={open}
+                onClose={(result) => {
+                    console.log('Parent: Modal onClose called with result:', result);
+                    setOpen(false);
+                    setEditData(null);
+
+                    if (result === true) {
+                        console.log('Parent: Refreshing grid data...');
+                        refreshGridData();
+                    }
+                }}
+                editData={editData}
+                tableType={'OPERATIONAL'}
+                tables={rows}
+            />)}
 
             {/* Delete Confirmation Dialog */}
             <Dialog
@@ -443,7 +467,7 @@ function CustomTablesList({ refreshData }) {
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText id="delete-dialog-description">
-                        Are you sure you want to delete the custom table "{tableToDelete?.tableName}"? 
+                        Are you sure you want to delete the custom table "{tableToDelete?.tableName}"?
                         This action cannot be undone and will also delete all associated data.
                     </DialogContentText>
                 </DialogContent>
@@ -451,9 +475,9 @@ function CustomTablesList({ refreshData }) {
                     <Button onClick={handleCancelDelete} color="primary">
                         Cancel
                     </Button>
-                    <Button 
-                        onClick={handleConfirmDelete} 
-                        color="error" 
+                    <Button
+                        onClick={handleConfirmDelete}
+                        color="error"
                         variant="contained"
                         autoFocus
                     >
