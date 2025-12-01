@@ -20,6 +20,12 @@ COPY package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 
+# Copy everything needed for production
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+
 RUN npm ci --omit=dev --ignore-scripts
 RUN npm rebuild esbuild --omit=dev
 
