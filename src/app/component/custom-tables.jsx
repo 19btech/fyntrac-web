@@ -106,7 +106,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
         })
             .then(response => {
                 const metadata = response.data;
-                console.log('Custom table [TableId]:', tableId, metadata);
+                console.log('Custom table [TableId]:', tableId, metadata.data);
                 setEditData(metadata);
                 setOpen(true);
             })
@@ -433,9 +433,9 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         refreshGridData();
                     }
                 }}
-                editData={editData}
                 tableType={'REFERENCE'}
                 tables={rows}
+                editData={editData}
             />)}
 
             {tableType === 'OPERATIONAL' && (<CreateTableDialog
@@ -450,9 +450,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         refreshGridData();
                     }
                 }}
-                editData={editData}
                 tableType={'OPERATIONAL'}
-                tables={rows}
+                tables={referenceTables}
+                 editData={editData}
+               
             />)}
 
             {/* Delete Confirmation Dialog */}

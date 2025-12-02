@@ -35,6 +35,7 @@ import axios from 'axios';
 import { useTenant } from "../tenant-context";
 import ReferenceColumnAutocomplete from "./reference-column-select";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+
 // Column name validation
 const validateColumnName = (columnName) => {
   if (!columnName?.trim()) return 'Column name is required';
@@ -54,7 +55,10 @@ const validateColumnName = (columnName) => {
   return null;
 };
 
-const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] }) => {
+const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], editData = null }) => {
+  // Debug: Log received props
+
+  const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({ tableName: '', description: '' });
   const [columns, setColumns] = useState([]);
   const [primaryKeys, setPrimaryKeys] = useState([]);
@@ -68,23 +72,158 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
   const [currentTableType, setCurrentTableType] = useState(tableType);
   const [referenceTables, setReferenceTables] = useState(tables);
 
-  // Inject default OPERATIONAL columns
+  // Default operational columns configuration - ALL fields disabled except PK for accountingPeriod
+  const defaultOperationalColumns = [
+    {
+      id: 'op_instrumentId',
+      columnName: 'instrumentId',
+      dataType: 'STRING',
+      nullable: false,
+      editable: false,    // Column name field disabled
+      typeEditable: false, // Data type field disabled
+      nullableEditable: false, // Nullable field disabled
+      deletable: false,    // Delete button disabled
+      canBePrimaryKey: true // Primary Key button disabled
+    },
+    {
+      id: 'op_attributeId',
+      columnName: 'attributeId',
+      dataType: 'STRING',
+      nullable: false,
+      editable: false,
+      typeEditable: false,
+      nullableEditable: false,
+      deletable: false,
+      canBePrimaryKey: true
+    },
+    {
+      id: 'op_postingDate',
+      columnName: 'postingDate',
+      dataType: 'DATE',
+      nullable: false,
+      editable: false,
+      typeEditable: false,
+      nullableEditable: false,
+      deletable: false,
+      canBePrimaryKey: true
+    },
+    {
+      id: 'op_effectiveDate',
+      columnName: 'effectiveDate',
+      dataType: 'DATE',
+      nullable: false,
+      editable: false,
+      typeEditable: false,
+      nullableEditable: false,
+      deletable: false,
+      canBePrimaryKey: true
+    },
+    {
+      id: 'op_accountingPeriod',
+      columnName: 'accountingPeriod',
+      dataType: 'NUMBER',
+      nullable: false,
+      editable: false,        // Column name field disabled
+      typeEditable: false,    // Data type field disabled  
+      nullableEditable: false, // Nullable field disabled
+      deletable: false,       // Delete button disabled
+      canBePrimaryKey: true   // ONLY Primary Key button enabled!
+    },
+  ];
+
+  // Helper function to ensure column IDs
+  const ensureColumnIds = (columnsArray) => {
+    return columnsArray.map((col, index) => ({
+      ...col,
+      id: col.id || `col_${Date.now()}_${index}`
+    }));
+  };
+
+  // Handle editData when component opens or editData changes
   useEffect(() => {
-    if (open && currentTableType === 'OPERATIONAL') {
-      const defaultOperationalColumns = [
-        { id: 'op_instrumentId', columnName: 'instrumentId', dataType: 'STRING', nullable: false, editable: false },
-        { id: 'op_attributeId', columnName: 'attributeId', dataType: 'STRING', nullable: false, editable: false },
-        { id: 'op_postingDate', columnName: 'postingDate', dataType: 'DATE', nullable: false, editable: false },
-        { id: 'op_effectiveDate', columnName: 'effectiveDate', dataType: 'DATE', nullable: false, editable: false },
-      ];
-      setColumns(defaultOperationalColumns);
-      setPrimaryKeys(['instrumentId', 'attributeId']);
-    } else if (!open) {
-      // Reset state when dialog is closed
+    console.log('🔄 useEffect triggered:', { open, editData: !!editData, editData });
+
+    if (editData && open) {
+      console.log('📝 Setting up EDIT mode with data:', editData);
+
+      setIsEditMode(true);
+      const data = editData.data || editData;
+
+      setFormData({
+        tableName: data.tableName || '',
+        description: data.description || ''
+      });
+      setReferenceTables(tables);
+      setReferenceColumn(data.referenceColumn || '');
+      setSelectedReferenceTable(data.referenceTable || null);
+
+      console.log('📝 Form data set:', {
+        tableName: data.tableName,
+        description: data.description,
+        referenceColumn: data.referenceColumn
+      });
+
+      // Convert columns from editData to match component's format
+      const convertedColumns = data.columns?.map((col, index) => {
+        // Check if this is a default operational column
+        const isDefaultOpColumn = tableType === 'OPERATIONAL' &&
+          (['instrumentId', 'attributeId', 'postingDate', 'effectiveDate', 'accountingPeriod']
+            .includes(col.columnName) || (col.columnName === data.referenceColumn));
+        console.log('📝 Form data set:', {
+          tableName: data.tableName,
+          description: data.description,
+          referenceColumn: data.referenceColumn,
+          isDefaultOpColumn: isDefaultOpColumn
+        });
+
+        return {
+          id: `col_${Date.now()}_${index}`,
+          columnName: col.columnName,
+          dataType: col.dataType,
+          nullable: col.nullable,
+          editable: !isDefaultOpColumn, // Default columns are not editable
+          typeEditable: !isDefaultOpColumn, // Default columns data type not editable
+          nullableEditable: !isDefaultOpColumn, // Default columns nullable not editable
+          deletable: !isDefaultOpColumn, // Default columns cannot be deleted
+          // Only accountingPeriod can be primary key for operational tables
+          canBePrimaryKey: col.columnName === 'accountingPeriod'
+        };
+      }) || [];
+
+      console.log('📋 Converted columns:', convertedColumns);
+
+      setColumns(ensureColumnIds(convertedColumns));
+      setPrimaryKeys(data.primaryKeys || []);
+      setReferenceColumn(data.referenceColumn || '');
+      setSelectedReferenceTable(data.referenceTable || null);
+      setCurrentTableType(data.tableType || tableType);
+
+      console.log('✅ Edit mode state set:', {
+        columnsCount: convertedColumns.length,
+        primaryKeys: data.primaryKeys,
+        referenceColumn: data.referenceColumn,
+        tableType: data.tableType,
+        selectedReferenceTable: data.referenceTable
+      });
+    } else if (open && !editData) {
+      console.log('🆕 Setting up CREATE mode');
+      // Reset to create mode
+      setIsEditMode(false);
+      setFormData({ tableName: '', description: '' });
       setColumns([]);
       setPrimaryKeys([]);
+      setReferenceColumn('');
+      setSelectedReferenceTable(null);
+      setCurrentTableType(tableType);
+
+      // Inject default OPERATIONAL columns for create mode
+      if (tableType === 'OPERATIONAL') {
+        setColumns(defaultOperationalColumns);
+      }
     }
-  }, [open, currentTableType]);
+  }, [editData, tableType, open]);
+
+
 
   const headers = {
     'X-Tenant': tenant,
@@ -95,13 +234,23 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
   const addColumn = () => {
     setColumns((prev) => [
       ...prev,
-      { id: `col_${Date.now()}`, columnName: '', dataType: 'STRING', nullable: true, editable: true },
+      {
+        id: `col_${Date.now()}`,
+        columnName: '',
+        dataType: 'STRING',
+        nullable: true,
+        editable: true,      // User-added columns: editable
+        typeEditable: true,  // User-added columns: data type editable
+        nullableEditable: true, // User-added columns: nullable editable
+        deletable: true,     // User-added columns: deletable
+        canBePrimaryKey: true
+      },
     ]);
   };
 
   const handleDeleteColumn = (id) => {
     const col = columns.find((c) => c.id === id);
-    if (col && col.editable === false) return; // Prevent deletion of non-editable columns
+    if (col && col.deletable === false) return; // Prevent deletion of non-deletable columns
     setColumns(columns.filter((c) => c.id !== id));
     if (col && primaryKeys.includes(col.columnName)) {
       setPrimaryKeys(primaryKeys.filter((pk) => pk !== col.columnName));
@@ -116,15 +265,67 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
     });
   };
 
-  const onReferenceColumnSelect = (referenceTable, column) => {
-    setReferenceColumn(referenceTable.referenceColumn);
-    setSelectedReferenceTable(referenceTable.tableName);
-    console.log(selectedReferenceTable, referenceColumn);
-  }
+  const onReferenceColumnSelect = (referenceTable, columnObj) => {
+    console.log('📊 Reference table selected:', referenceTable);
+    console.log('📊 Column object received:', columnObj);
 
+    if (referenceTable) {
+      setSelectedReferenceTable(referenceTable.tableName);
+      setReferenceColumn(columnObj.columnName);
+      // If we have the column object, you can use its properties
+      if (columnObj) {
+        console.log('Column details:', {
+          name: columnObj.columnName,
+          type: columnObj.dataType,
+          nullable: columnObj.nullable,
+          displayOrder: columnObj.displayOrder
+        });
+        setColumns(prevCols => {
+          const ref = {
+            id: `op_${columnObj.columnName}`,
+            columnName: columnObj.columnName,
+            dataType: columnObj.dataType,
+            nullable: columnObj.nullable,
+            editable: false,
+            typeEditable: false,
+            nullableEditable: false,
+            deletable: false,
+            canBePrimaryKey: true // Reference table columns cannot be primary keys
+          };
+
+          const exists = prevCols.some(c => c.id === ref.id);
+
+          // If already exists → return as is
+          if (exists) return prevCols;
+
+          // Add at the top
+          return [ref, ...prevCols];
+        });
+
+        console.log('Columns after adding reference column:', columns);
+
+        // You can use the column object as needed
+        // For example, you might want to set some state based on it
+        // setReferenceColumn(columnObj.columnName);
+      }
+    } else {
+      // Handle clear/removal
+      setSelectedReferenceTable(null);
+    }
+  };
 
   const handleTogglePrimaryKey = (columnName) => {
     if (!columnName) return;
+
+    // Find the column
+    const column = columns.find(col => col.columnName === columnName);
+
+    // Check if this column can be a primary key
+    if (column && column.canBePrimaryKey !== true) {
+      console.log('⛔ Column cannot be set as primary key:', columnName);
+      return;
+    }
+
     setPrimaryKeys((prev) =>
       prev.includes(columnName) ? prev.filter((pk) => pk !== columnName) : [...prev, columnName]
     );
@@ -175,7 +376,19 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
 
     if (primaryKeys.length === 0) newErrors.primaryKeys = 'At least one primary key must be selected.';
 
+    // Validate that all primary keys still exist in columns
+    const existingColumnNames = columns.map(col => col.columnName);
+    const missingPrimaryKeys = primaryKeys.filter(pk => !existingColumnNames.includes(pk));
+    if (missingPrimaryKeys.length > 0) {
+      newErrors.primaryKeys = `Primary key(s) "${missingPrimaryKeys.join(', ')}" no longer exist in columns.`;
+    }
+
+
     if (currentTableType === 'REFERENCE' && !referenceColumn) newErrors.referenceColumn = 'Reference column is required for Reference Tables.';
+
+    if (currentTableType === 'REFERENCE' && referenceColumn && !existingColumnNames.includes(referenceColumn)) {
+      newErrors.referenceColumn = 'Reference column must exist in the table columns.';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -201,20 +414,38 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
         referenceTable: currentTableType === 'OPERATIONAL' ? selectedReferenceTable : ''
       };
 
-      await axios.post(
-        `${baseURL}/fyntrac/custom-table/create-with-physical`,
-        tableData,
-        { headers }
-      );
+      const tableId = editData?.id;
+
+      console.log('🚀 Submitting table:', {
+        isEditMode,
+        tableId,
+        tableData
+      });
+
+      if (isEditMode && tableId) {
+        await axios.put(
+          `${baseURL}/fyntrac/custom-table/${tableId}`,
+          tableData,
+          { headers }
+        );
+      } else {
+        await axios.post(
+          `${baseURL}/fyntrac/custom-table/create-with-physical`,
+          tableData,
+          { headers }
+        );
+      }
 
       await new Promise((res) => setTimeout(res, 1000));
       onSuccess(tableData);
       handleClose();
     } catch (err) {
-      console.error(err);
+      console.error('❌ Error details:', err);
+      console.error('📡 Error response:', err.response?.data);
       setErrors(prev => ({
         ...prev,
-        submit: 'Failed to create table. Please try again.'
+        submit: err.response?.data?.error ||
+          `Failed to ${isEditMode ? 'update' : 'create'} table. Please try again.`
       }));
     } finally {
       setLoading(false);
@@ -230,6 +461,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
     setErrors({});
     setColumnErrors({});
     setLoading(false);
+    setIsEditMode(false);
     onClose();
   };
 
@@ -245,35 +477,13 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
       slotProps={{ sx: { borderRadius: 2, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', height: '90vh', maxHeight: '900px', display: 'flex', flexDirection: 'column' } }}>
 
       <DialogTitle sx={{ flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'start',
-          }}
-        >
-          {/* Top Left: Image */}
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
-              gap: 1,
-              width: 'fit-content' // Ensures the Box doesn't take more space than needed
-            }}
-          >
-            <img
-              src="fyntrac.png"
-              alt="Logo"
-              style={{
-                width: '100px',
-                height: 'auto',  // Maintain aspect ratio
-                maxWidth: '100%' // Ensures responsiveness
-              }}
-            />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, width: 'fit-content' }}>
+            <img src="fyntrac.png" alt="Logo" style={{ width: '100px', height: 'auto', maxWidth: '100%' }} />
             <Box display="flex" alignItems="flex-start" gap={0.5}>
               <Typography variant="h6">
-                Create {currentTableType === 'REFERENCE' ? 'Reference' : 'Operational'} Table
+                {isEditMode ? 'Edit' : 'Create'} {currentTableType === 'REFERENCE' ? 'Reference' : 'Operational'} Table
+                {isEditMode && <Chip label="Edit Mode" size="small" color="primary" sx={{ ml: 1 }} />}
               </Typography>
               <Tooltip
                 title={
@@ -283,33 +493,19 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
                 }
                 arrow
               >
-                <InfoIcon
-                  color="action"
-                  fontSize="small"
-                  sx={{
-                    mt: 0.3, // Fine-tuned vertical alignment
-                    cursor: 'pointer'
-                  }}
-                />
+                <InfoIcon color="action" fontSize="small" sx={{ mt: 0.3, cursor: 'pointer' }} />
               </Tooltip>
             </Box>
           </Box>
           <Tooltip title='Close'>
-            <IconButton
-              onClick={handleClose}
-              edge="end"
-              aria-label="close"
-              sx={{
-                color: 'grey.500',
-                '&:hover': { color: 'black' },
-              }}
-            >
+            <IconButton onClick={handleClose} edge="end" aria-label="close" sx={{ color: 'grey.500', '&:hover': { color: 'black' } }}>
               <HighlightOffOutlinedIcon />
             </IconButton>
           </Tooltip>
         </Box>
       </DialogTitle>
       <Divider />
+
       <DialogContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', gap: 3, p: 3 }}>
         {errors.submit && <Alert severity="error" icon={<ErrorIcon />} sx={{ flexShrink: 0 }}>{errors.submit}</Alert>}
 
@@ -323,6 +519,10 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
             helperText={errors.tableName}
             size="small"
             required
+            disabled={isEditMode}
+            InputProps={{
+              readOnly: isEditMode,
+            }}
           />
           <TextField
             fullWidth
@@ -336,7 +536,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, gap: 1 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ flexShrink: 0 }}>
             <Typography variant="subtitle2" fontWeight={600} display="flex" alignItems="center" gap={1}>
-              Table Columns
+              Table Columns {isEditMode && <Chip label="Edit Mode" size="small" color="primary" />}
               <Tooltip title="Define your table structure. Ensure column names are unique and valid SQL identifiers." arrow>
                 <InfoIcon color="action" fontSize="small" sx={{ fontSize: '1rem' }} />
               </Tooltip>
@@ -376,7 +576,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
                   columns.map((col) => {
                     const hasError = !!columnErrors[col.id];
                     const isPrimaryKey = primaryKeys.includes(col.columnName);
-                    const canBePrimaryKey = col.columnName && !hasError;
+                    // For default columns, PK button is enabled only if canBePrimaryKey is true
+                    const canBePrimaryKey = col.canBePrimaryKey === true;
 
                     return (
                       <TableRow key={col.id} hover>
@@ -390,7 +591,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
                             fullWidth
                             placeholder="e.g. user_id"
                             variant="standard"
-                            disabled={col.editable === false}
+                            disabled={col.editable === false} // Disabled for default columns
                             slotProps={{ disableUnderline: !hasError }}
                           />
                         </TableCell>
@@ -402,7 +603,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
                             size="small"
                             fullWidth
                             variant="standard"
-                            disabled={col.editable === false}
+                            disabled={col.typeEditable === false} // Disabled for default columns
                             slotProps={{ disableUnderline: true }}
                           >
                             <MenuItem value="STRING">STRING</MenuItem>
@@ -415,20 +616,30 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
                           <Chip
                             label={col.nullable ? 'NULL' : 'NOT NULL'}
                             size="small"
-                            onClick={() => col.editable !== false && updateColumnField(col.id, 'nullable', !col.nullable)}
+                            onClick={() => col.nullableEditable !== false && updateColumnField(col.id, 'nullable', !col.nullable)}
                             color={col.nullable ? 'default' : 'primary'}
                             variant={col.nullable ? 'outlined' : 'filled'}
-                            sx={{ cursor: col.editable !== false ? 'pointer' : 'default', width: 80 }}
+                            sx={{
+                              cursor: col.nullableEditable !== false ? 'pointer' : 'default',
+                              width: 80,
+                              opacity: col.nullableEditable === false ? 0.6 : 1
+                            }}
                           />
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title={!canBePrimaryKey ? "Fix column name first" : (isPrimaryKey ? "Remove PK" : "Set PK")}>
+                          <Tooltip title={
+                            !canBePrimaryKey ? "This column cannot be a primary key" :
+                              isPrimaryKey ? "Remove PK" : "Set PK"
+                          }>
                             <span>
                               <IconButton
                                 size="small"
-                                disabled={!canBePrimaryKey || col.editable === false}
+                                disabled={!canBePrimaryKey} // Only enabled for accountingPeriod
                                 onClick={() => handleTogglePrimaryKey(col.columnName)}
                                 color={isPrimaryKey ? 'warning' : 'default'}
+                                sx={{
+                                  opacity: canBePrimaryKey ? 1 : 0.5,
+                                }}
                               >
                                 {isPrimaryKey ? <KeyIcon fontSize="small" /> : <KeyOutlineIcon fontSize="small" />}
                               </IconButton>
@@ -440,7 +651,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
                             size="small"
                             color="error"
                             onClick={() => handleDeleteColumn(col.id)}
-                            disabled={col.editable === false}
+                            disabled={col.deletable === false} // Disabled for default columns
+                            sx={{ opacity: col.deletable === false ? 0.5 : 1 }}
                           >
                             <DeleteOutlineIcon fontSize="small" />
                           </IconButton>
@@ -458,6 +670,11 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2" gutterBottom sx={{ color: 'text.secondary', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
               Selected Primary Keys
+              {currentTableType === 'OPERATIONAL' && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1, fontStyle: 'italic' }}>
+                  (Only accountingPeriod allowed for operational tables)
+                </Typography>
+              )}
             </Typography>
             {primaryKeys.length > 0 ? (
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -476,6 +693,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
             ) : (
               <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                 No primary keys selected. Use the key icon in the table above.
+                {currentTableType === 'OPERATIONAL' && ' (Only accountingPeriod can be selected)'}
               </Typography>
             )}
             {errors.primaryKeys && (
@@ -536,8 +754,9 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [] })
               color: '#E6E6EF', // Prevent text color from changing on hover
             },
           }}
+
         >
-          Create Table
+          {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Table' : 'Create Table')}
         </Button>
       </DialogActions>
     </Dialog>
