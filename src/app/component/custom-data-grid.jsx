@@ -33,9 +33,14 @@ function CustomToolbar() {
 
 // Main DataGrid Component
 export default function CustomDataGrid({ columns, rows }) {
-   const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [currentPage, setCurrentPage] = useState(0);
-   
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const rowsWithId = rows.map((row, index) => ({
+    id: row._id ?? index, // fallback to index if _id not present
+    ...row
+  }));
+
   const initialState = {
     pagination: { paginationModel: { pageSize: rowsPerPage } },
     columns: {
@@ -50,7 +55,7 @@ export default function CustomDataGrid({ columns, rows }) {
   };
 
   return (
-    <div style={{ width: '100%', overflow:'auto' }}>
+    <div style={{ width: '100%', overflow: 'auto' }}>
       {columns.length === 0 || rows.length === 0 ? ( // Check for both columns and rows
         <Box
           display="flex"
@@ -67,16 +72,17 @@ export default function CustomDataGrid({ columns, rows }) {
         <DataGrid
           columns={columns}
           rows={rows}
+          getRowId={(row, index) => row.id ?? index}
           slots={{
             toolbar: CustomToolbar, // Use the custom toolbar
           }}
           initialState={initialState} // Set the initial state
           pageSize={rowsPerPage}
-                      page={currentPage}
-                      onPageChange={(newPage) => setCurrentPage(newPage)}
-                      pageSizeOptions={[5, 10, 20]}
-                      pagination
-                    paginationMode='client'
+          page={currentPage}
+          onPageChange={(newPage) => setCurrentPage(newPage)}
+          pageSizeOptions={[5, 10, 20]}
+          pagination
+          paginationMode='client'
           disableSelectionOnClick // Disable selection on row click
         />
 

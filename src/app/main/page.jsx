@@ -41,7 +41,8 @@ import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
 import SettingsInputCompositeOutlinedIcon from '@mui/icons-material/SettingsInputCompositeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
-
+import DatasetLinkedOutlinedIcon from '@mui/icons-material/DatasetLinkedOutlined';
+import DatasetOutlinedIcon from '@mui/icons-material/DatasetOutlined';
 // System font stack - no external dependencies
 const systemFontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif';
 
@@ -121,6 +122,9 @@ function DashboardLayoutBasic() {
         { segment: 'gle-report', title: 'Journal Entry Report', icon: <AutoGraphOutlinedIcon /> },
         { segment: 'transaction-activity-report', title: 'Activity Report', icon: <TrendingUpOutlinedIcon /> },
         { segment: 'rollforward-report', title: 'Rollforward Report', icon: <TimelineIcon /> },
+        { segment: 'custom-ref-data-report', title: 'Custom Ref Data Report', icon: <DatasetLinkedOutlinedIcon /> },
+        { segment: 'custom-operational-data-report', title: 'Custom Operational Data Report', icon: <DatasetOutlinedIcon /> },
+
       ],
     },
     { kind: 'divider' },

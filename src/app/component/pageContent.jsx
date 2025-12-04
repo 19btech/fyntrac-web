@@ -16,7 +16,8 @@ import InstrumentDiagnosticPage from '../diagnostic/page';
 import PythonModel from './python-model';
 import EventConfigurationMain from '../event-configuration/page';
 import CustomTableMain from '../custom-table/page';
-
+import CustomRefDataReportPage from '../reports/custom-ref-data-report/page';
+import CustomOperationalDataReportPage from '../reports/custom-operational-data-report/page';
 export default function PageContent({ pathname, method }) {
 
   const renderContent = () => {
@@ -48,6 +49,10 @@ export default function PageContent({ pathname, method }) {
         return <TransactionActivityReportPage />
       case '/reports/rollforward-report':
         return <RollforwardReportPage />
+      case '/reports/custom-ref-data-report':
+        return <CustomRefDataReportPage />
+      case '/reports/custom-operational-data-report':
+        return <CustomOperationalDataReportPage />
       case '/diagnostic':
         return <InstrumentDiagnosticPage />
       case '/python-model':
