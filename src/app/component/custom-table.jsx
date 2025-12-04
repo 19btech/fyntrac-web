@@ -71,6 +71,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
   const [currentTableType, setCurrentTableType] = useState(tableType);
   const [referenceTables, setReferenceTables] = useState(tables);
+  const [existingTables, setExistingTables] = useState(['']);
 
   // Default operational columns configuration - ALL fields disabled except PK for accountingPeriod
   const defaultOperationalColumns = [
@@ -117,17 +118,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       nullableEditable: false,
       deletable: false,
       canBePrimaryKey: true
-    },
-    {
-      id: 'op_accountingPeriod',
-      columnName: 'accountingPeriod',
-      dataType: 'NUMBER',
-      nullable: false,
-      editable: false,        // Column name field disabled
-      typeEditable: false,    // Data type field disabled  
-      nullableEditable: false, // Nullable field disabled
-      deletable: false,       // Delete button disabled
-      canBePrimaryKey: true   // ONLY Primary Key button enabled!
     },
   ];
 
@@ -266,8 +256,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   const onReferenceColumnSelect = (referenceTable, columnObj) => {
-    console.log('📊 Reference table selected:', referenceTable);
-    console.log('📊 Column object received:', columnObj);
 
     if (referenceTable) {
       setSelectedReferenceTable(referenceTable.tableName);
@@ -357,45 +345,183 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    let newErrors = {};
+    let isValid = true;
+    console.log('🔍 Starting validation...');
+    console.log('Current form data:', formData);
+    console.log('Existing tables:', existingTables);
+    console.log('Columns:', columns);
+    console.log('Primary keys:', primaryKeys);
+    console.log('Reference column:', referenceColumn);
 
+    /* ---------------------------------------------
+       TABLE NAME VALIDATION
+    ---------------------------------------------- */
     if (!formData.tableName.trim()) {
       newErrors.tableName = 'Table name is required';
-    } else {
+      console.log('❌ Table name empty');
+      isValid = false;
+    } {
+      console.log('✓ Table name not empty:', formData.tableName);
+
       const tableNameError = validateColumnName(formData.tableName);
-      if (tableNameError) newErrors.tableName = tableNameError;
+      if (tableNameError) {
+        newErrors.tableName = tableNameError;
+        console.log('❌ Table name invalid:', tableNameError);
+        isValid = false;
+      } else {
+        console.log('✓ Table name format valid');
+
+        if (existingTables) {
+          // Check if existingTables is the full response object
+          let tablesArray = [];
+
+          if (existingTables && Array.isArray(existingTables)) {
+            // It's an object with data array (your current structure)
+            tablesArray = existingTables;
+            console.log('🔍 Tables array for duplicate check:', tablesArray);
+
+            if (Array.isArray(tablesArray) && tablesArray.length > 0) {
+              // Extract table names from the objects in the array
+              const tableNames = tablesArray.map(item => {
+                if (typeof item === 'string') return item;
+                if (item?.tableName) return item.tableName;
+                if (item?.name) return item.name;
+                return '';
+              }).filter(name => name && name.trim() !== '');
+
+              console.log('📋 Table names extracted:', tableNames);
+
+              const duplicateFound = tableNames
+                .map(t => t.toLowerCase())
+                .includes(formData.tableName.toLowerCase());
+
+              if (duplicateFound) {
+                newErrors.tableName = `Table "${formData.tableName}" already exists.`;
+                console.log('❌ Duplicate table found!');
+                isValid = false;
+              } else {
+                console.log('✓ No duplicate table found');
+              }
+            } else {
+              console.log('⚠ No tables array found or array is empty');
+            }
+          }
+        }
+        else {
+          console.log('⚠ existingTables is null or undefined');
+        }
+      }
     }
 
-    if (columns.length === 0) newErrors.columns = 'At least one column is required';
-    else {
-      const hasInvalidColumns = columns.some(col => !col.columnName.trim() || columnErrors[col.id]);
-      if (hasInvalidColumns) newErrors.columns = 'Some columns have invalid names. Please fix all column errors before submitting.';
-      const names = columns.map((c) => c.columnName?.toLowerCase().trim());
-      if (new Set(names).size !== names.length) newErrors.columns = 'Column names must be unique. Please ensure all column names are distinct.';
+    /* ---------------------------------------------
+       COLUMNS VALIDATION
+    ---------------------------------------------- */
+    if (columns.length === 0) {
+      newErrors.columns = 'At least one column is required';
+      console.log('❌ No columns');
+      isValid = false; // Stop validations
+    } else {
+      console.log(`✓ ${columns.length} column(s)`);
+
+      const hasInvalidColumns = columns.some(
+        col => !col.columnName.trim() || columnErrors[col.id]
+      );
+      if (hasInvalidColumns) {
+        newErrors.columns =
+          'Some columns have invalid names. Please fix all column errors before submitting.';
+        console.log('❌ Invalid columns found');
+        isValid = false;
+      }
+
+      const names = columns.map(c => c.columnName?.toLowerCase().trim());
+      const uniqueNames = new Set(names);
+
+      if (uniqueNames.size !== names.length) {
+        newErrors.columns =
+          'Column names must be unique. Please ensure all column names are distinct.';
+        console.log('❌ Duplicate column names');
+        isValid = false;
+      } else {
+        console.log('✓ Column names are unique');
+      }
     }
 
-    if (primaryKeys.length === 0) newErrors.primaryKeys = 'At least one primary key must be selected.';
+    /* ---------------------------------------------
+       PRIMARY KEYS VALIDATION
+    ---------------------------------------------- */
+    if (primaryKeys.length === 0) {
+      newErrors.primaryKeys = 'At least one primary key must be selected.';
+      console.log('❌ No primary keys');
+      isValid = false;
+    } else {
+      console.log(`✓ ${primaryKeys.length} primary key(s):`, primaryKeys);
 
-    // Validate that all primary keys still exist in columns
-    const existingColumnNames = columns.map(col => col.columnName);
-    const missingPrimaryKeys = primaryKeys.filter(pk => !existingColumnNames.includes(pk));
-    if (missingPrimaryKeys.length > 0) {
-      newErrors.primaryKeys = `Primary key(s) "${missingPrimaryKeys.join(', ')}" no longer exist in columns.`;
+      const existingColumnNames = columns.map(col => col.columnName);
+      const missingPrimaryKeys = primaryKeys.filter(
+        pk => !existingColumnNames.includes(pk)
+      );
+
+      if (missingPrimaryKeys.length > 0) {
+        newErrors.primaryKeys = `Primary key(s) "${missingPrimaryKeys.join(', ')}" no longer exist in columns.`;
+        console.log('❌ Missing primary keys:', missingPrimaryKeys);
+        isValid = false;
+      }
+
     }
 
+    /* ---------------------------------------------
+       REFERENCE COLUMN VALIDATION
+    ---------------------------------------------- */
+    if (currentTableType === 'REFERENCE') {
+      if (!referenceColumn) {
+        newErrors.referenceColumn =
+          'Reference column is required for Reference Tables.';
+        console.log('❌ No reference column');
+        isValid = false;
+      } else {
+        console.log('✓ Reference column:', referenceColumn);
 
-    if (currentTableType === 'REFERENCE' && !referenceColumn) newErrors.referenceColumn = 'Reference column is required for Reference Tables.';
-
-    if (currentTableType === 'REFERENCE' && referenceColumn && !existingColumnNames.includes(referenceColumn)) {
-      newErrors.referenceColumn = 'Reference column must exist in the table columns.';
+        const existingColumnNames = columns.map(col => col.columnName);
+        if (!existingColumnNames.includes(referenceColumn)) {
+          newErrors.referenceColumn =
+            'Reference column must exist in the table columns.';
+          console.log('❌ Reference column not in columns');
+          isValid = false;
+        }
+      }
     }
+
+    /* ---------------------------------------------
+       FINAL RESULT
+    ---------------------------------------------- */
+    console.log('📊 Validation result - newErrors:', newErrors);
+    console.log('📊 Validation result - error count:', Object.keys(newErrors).length);
+    console.log('📊 Validation result - isValid?', Object.keys(newErrors).length === 0);
+    console.log('📊 Validation result - isValid?', isValid);
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return isValid;
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    // Validate first
+    const isValid = validateForm();
+
+    // Check errors state after validation
+    const hasErrors = Object.keys(errors).length > 0;
+
+    console.log('Validation result:', {
+      isValid,
+      errorCount: Object.keys(errors).length,
+      errors: errors
+    });
+
+    // Double-check: if validation failed OR there are existing errors
+    if (!isValid || hasErrors) {
+      console.log('❌ Validation failed, stopping submission');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -414,13 +540,9 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
         referenceTable: currentTableType === 'OPERATIONAL' ? selectedReferenceTable : ''
       };
 
-      const tableId = editData?.id;
+      console.log('✅ Validation passed, submitting:', tableData);
 
-      console.log('🚀 Submitting table:', {
-        isEditMode,
-        tableId,
-        tableData
-      });
+      const tableId = editData?.id;
 
       if (isEditMode && tableId) {
         await axios.put(
@@ -439,6 +561,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       await new Promise((res) => setTimeout(res, 1000));
       onSuccess(tableData);
       handleClose();
+
     } catch (err) {
       console.error('❌ Error details:', err);
       console.error('📡 Error response:', err.response?.data);
@@ -449,6 +572,69 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       }));
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('🔄 useEffect for tables triggered');
+    console.log('Dialog open:', open);
+
+    if (open) {
+      console.log('📞 Calling fetchExistingTables...');
+      fetchExistingTables();
+    }
+  }, [open]); // Only fetch when dialog opens
+
+  const fetchExistingTables = async () => {
+    console.log('🚀 fetchExistingTables called');
+    try {
+      console.log('🌐 Making API call to:', `${baseURL}/fyntrac/custom-table/get/all-tables`);
+      const response = await axios.get(`${baseURL}/fyntrac/custom-table/get/all-tables`, {
+            headers: headers
+        });
+      console.log('📡 Raw API Response:', response);
+      console.log('📡 Response data:', response.data);
+
+      // Handle different API response structures
+      let tableNames = [];
+
+      // Structure 1: { success: true, data: [...] }
+      if (response.data?.success && Array.isArray(response.data?.data)) {
+        console.log('✅ Found structure 1: success=true with data array');
+        tableNames = response.data.data.map(item =>
+          item?.tableName || item?.name || String(item)
+        );
+      }
+      // Structure 2: Direct array response
+      else if (Array.isArray(response.data)) {
+        console.log('✅ Found structure 2: direct array response');
+        tableNames = response.data.map(item =>
+          item?.tableName || item?.name || String(item)
+        );
+      }
+      // Structure 3: { data: [...] } without success field
+      else if (Array.isArray(response.data?.data)) {
+        console.log('✅ Found structure 3: data array without success field');
+        tableNames = response.data.data.map(item =>
+          item?.tableName || item?.name || String(item)
+        );
+      } else {
+        console.warn('⚠️ Unexpected response structure:', response.data);
+      }
+
+      // Clean up: remove empty/null/undefined
+      tableNames = tableNames
+        .filter(name => name && name.trim() !== '')
+        .map(name => name.trim());
+
+      console.log('✅ Processed table names:', tableNames);
+      console.log('✅ Setting existingTables to:', tableNames);
+      setExistingTables(tableNames);
+
+    } catch (error) {
+      console.error('❌ Failed to fetch tables:', error);
+      console.error('❌ Error response:', error.response?.data);
+      setExistingTables([]); // Set to empty array on error
     }
   };
 
@@ -471,6 +657,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     const hasInvalidColumns = columns.some(col => !col.columnName.trim() || columnErrors[col.id]);
     return !hasInvalidColumns;
   };
+
+
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth
@@ -520,7 +708,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
             size="small"
             required
             disabled={isEditMode}
-            InputProps={{
+            slotProps={{
               readOnly: isEditMode,
             }}
           />
