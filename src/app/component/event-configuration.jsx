@@ -321,11 +321,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
     };
 
-const [versionTypeOptions, setVersionTypeOptions] = useState([
-    { label: 'Current', value: 'Current' },
-    { label: 'Prior', value: 'Prior' },
-    { label: 'First', value: 'First' },
-]);
+    const [versionTypeOptions, setVersionTypeOptions] = useState([
+        { label: 'Current', value: 'Current' },
+        { label: 'Prior', value: 'Prior' },
+        { label: 'First', value: 'First' },
+    ]);
 
     const fieldTypeOptions = [
         { label: 'Aggregated', value: 'Aggregated' },
@@ -528,6 +528,16 @@ const [versionTypeOptions, setVersionTypeOptions] = useState([
 
         if (field === 'sourceTable') {
             const rowToUpdate = sourceMappings.find(row => row.id === rowId);
+
+            if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
+                const custTableSourceMapping = {
+                    sourceTable: value,
+                    sourceType: eventData.triggerSource[0].value,
+                }
+
+                console.log('✅ Custom Data Trigger Source Mapping:', custTableSourceMapping);
+            }
+
             if (rowToUpdate) {
                 const oldSourceTable = rowToUpdate.sourceTable;
                 updateAvailableSources(oldSourceTable, value);
@@ -538,11 +548,21 @@ const [versionTypeOptions, setVersionTypeOptions] = useState([
                             : row
                     )
                 );
+
             }
         } else {
             // For array fields (sourceColumns, versionType, dataMapping), store the actual values
             let processedValue = value;
 
+                        if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
+                const custTableSourceMapping = {
+                    sourceTable: value,
+                    sourceType: eventData.triggerSource[0].value,
+                }
+
+                console.log('✅ Custom Data Trigger Source Mapping:', custTableSourceMapping);
+            }
+            
             if (['sourceColumns', 'versionType', 'dataMapping'].includes(field)) {
                 // Extract values from Autocomplete objects
                 processedValue = Array.isArray(value)
@@ -718,14 +738,16 @@ const [versionTypeOptions, setVersionTypeOptions] = useState([
 
     useEffect(() => {
         if (eventData?.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
-            setNewSource({
-                sourceTable: availableSources[0],
-                sourceColumns: [],
-                versionType: [],
-                fieldType: '',
-                dataMapping: [],
-            });
-            setIsAddingNew(true);
+            if (!editData) {
+                setNewSource({
+                    sourceTable: availableSources[0],
+                    sourceColumns: [],
+                    versionType: [],
+                    fieldType: '',
+                    dataMapping: [],
+                });
+                setIsAddingNew(true);
+            }
         }
         else if (eventData?.triggerType === 'ON_TRANSACTION_POST') {
             setAvailableSources([]);
@@ -739,12 +761,22 @@ const [versionTypeOptions, setVersionTypeOptions] = useState([
             });
             setIsAddingNew(true);
         }
-        else if (eventData?.triggerType === 'ON_ATTRIBUTE_CHANGE') {
+        else if (eventData?.triggerType === 'ON_INSTRUMENT_ADD') {
             setAvailableSources([]);
-            setAvailableSources(['Attribute']);
+            setAvailableSources(['Attribute', 'Balances']);
             setVersionTypeOptions([{ label: 'Current', value: 'Current' }]);
 
-            
+
+        }
+        else if (eventData?.triggerType === 'ON_ATTRIBUTE_CHANGE') {
+            setAvailableSources([]);
+            setVersionTypeOptions([
+                { label: 'Current', value: 'Current' },
+                { label: 'Prior', value: 'Prior' },
+                { label: 'First', value: 'First' },
+            ]);
+            setAvailableSources(['Attribute']);
+
         }
         else {
             setAvailableSources([]);
@@ -922,6 +954,12 @@ const [versionTypeOptions, setVersionTypeOptions] = useState([
                                         if (eventData.triggerType === 'ON_TRANSACTION_POST') {
                                             valueToSet = Array.isArray(newValue) ? newValue : [];
                                             setAvailableSources(['Transactions']);
+                                        }
+                                        else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') {
+                                            // For multiple selection, ensure it's always an array
+                                            valueToSet = Array.isArray(newValue) ? newValue : [];
+
+                                            setAvailableSources(['Attribute']);
                                         }
                                         else if (eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER') {
                                             // For multiple selection, ensure it's always an array
