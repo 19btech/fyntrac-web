@@ -88,6 +88,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [customReferenceTables, setCustomReferenceTables] = useState([]);
     const [customOperationalTables, setCustomOperationalTables] = useState([]);
     const [customTableColumns, setCustomTableColumns] = useState([]);
+    const [customTableMappings, setCustomTableMappings] = useState([]);
     const [referenceTables, setReferenceTables] = useState([]);
     const [operationalTables, setOperationalTables] = useState([]);
 
@@ -96,6 +97,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
         Transactions: [
             { label: 'All items are selected', value: 'all' },
             { label: 'Amount', value: 'Amount' },
+            { label: 'Transaction Date', value: 'TransactionDate' },
         ],
         Balances: [
             { label: 'Beginning Balance', value: 'BeginningBalance' },
@@ -111,12 +113,14 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
 
     useEffect(() => {
-        fetchAttributeMetadata();
-        fetchTransactionMetadata();
-        fetchMetricsMetadata();
-        fetchOperationalableMetadata();
-        fetchReferenceTableMetadata();
-    }, []);
+        if(tenant) {
+            fetchAttributeMetadata();
+            fetchTransactionMetadata();
+            fetchMetricsMetadata();
+            fetchOperationalableMetadata();
+            fetchReferenceTableMetadata();
+        }
+    }, [tenant]);
 
     const fetchAttributeMetadata = () => {
         axios.get(`${baseURL}/attribute/get/all/options`, {
@@ -233,6 +237,35 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
 
+    const fetchCustomSourceMapping = useCallback((reference, referenceType) => {
+        let uri = `${baseURL}/fyntrac/custom-table/get/values/reference_table/${reference}`;
+        if (referenceType === 'operational_table') {
+            uri = `${baseURL}/fyntrac/custom-table/get/values/operational_table/${reference}`;
+        }
+
+        axios.get(uri, {
+            headers: {
+                'X-Tenant': tenant,
+                Accept: '*/*',
+            }
+        })
+            .then(response => {
+                const metadata = Array.isArray(response.data?.data)
+                    ? response.data.data
+                    : [];
+
+                console.log('📋 Full Reference Metadata:', metadata);
+                // ✅ 1. Keep FULL response as-is (for column lookup later)
+                setCustomTableMappings(metadata);
+
+                // ✅ 2. Keep ONLY table names in a separate variable
+                console.log('📋 Reference Table Names:', metadata);
+            })
+            .catch(error => {
+                console.error('Error fetching custom source mapping:', error);
+                setCustomTableMappings([]);
+            });
+    }, [baseURL, tenant]);
 
     // Load edit data when component opens
     useEffect(() => {
@@ -283,6 +316,39 @@ export default function EventConfiguration({ open, onClose, editData }) {
         console.log('🔄 New Source Updated:', newSource);
     }, [newSource]);
 
+    useEffect(() => {
+        // 1. Define variables in the outer scope of the effect
+        let selectedSource = null;
+        let determinedTable = null; // <--- Define a variable to hold the table name
+
+        if (eventData.triggerSource && eventData.triggerSource.length > 0) {
+            // 2. Assign value safely
+            selectedSource = eventData.triggerSource[0]?.value;
+
+            console.log('🔄 Trigger Source Changed:', selectedSource);
+
+            if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
+
+                // Determine which table list to use based on selection
+                if (selectedSource === 'reference_table') {
+                    determinedTable = referenceTables[0]; // Assign local variable
+                    // Assuming fetchCustomSourceMapping takes (TableName, SourceType)
+                    fetchCustomSourceMapping(determinedTable, 'reference_table');
+                } else if (selectedSource === 'operational_table') {
+                    determinedTable = operationalTables[0]; // Assign local variable
+                    // Assuming fetchCustomSourceMapping takes (TableName, SourceType)
+                    fetchCustomSourceMapping(determinedTable, 'operational_table');
+                }
+
+                // Update State if needed (using the local variable)
+                if (determinedTable && newSource.sourceTable !== determinedTable) {
+                    setNewSource(prev => ({ ...prev, sourceTable: determinedTable }));
+                }
+            }
+        }
+
+    }, [eventData.triggerSource, eventData.triggerType, referenceTables, operationalTables, newSource.sourceTable, fetchCustomSourceMapping]);
+
     const resetForm = () => {
         setEventData({
             eventId: '',
@@ -305,6 +371,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             dataMapping: [],
         });
         setAlert({ open: false, message: '', severity: 'success' });
+        setCustomTableMappings([]);
     };
 
     const showAlert = (message, severity = 'success') => {
@@ -350,6 +417,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             { label: 'Operational Table', value: 'operational_table' },
         ],
         CustomTableColumns: customTableColumns,
+        CustomTableMappings: customTableMappings,
     };
 
     const triggerSourceOptions = {
@@ -373,6 +441,16 @@ export default function EventConfiguration({ open, onClose, editData }) {
         }));
     };
 
+
+    const getReferenceSourceMapping = (refrence, referenceType) => {
+        return referenceTables.map(table => ({
+            sourceTable: table,
+            sourceColumns: getColumnsByReferenceTableName(table),
+            versionType: versionTypeOptions,
+            fieldType: fieldTypeOptions,
+            dataMapping: dataMappingOptions,
+        }));
+    };
 
     const getColumnsByOperationalTableName = (tableName) => {
         const table = customOperationalTables.find(
@@ -423,7 +501,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     // === Helper Functions ===
     const isVersionTypeEnabled = (sourceTable) => sourceTable === 'Attribute';
     const isFieldTypeEnabled = (sourceTable) => sourceTable === 'Transactions';
-    const isDataMappingEnabled = (sourceTable) => sourceTable === 'Transactions' || sourceTable === 'Balances';
+    const isDataMappingEnabled = (sourceTable) => sourceTable === 'Transactions' || sourceTable === 'Balances' || eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER';
 
     const canAddSource = () => {
         if (!eventData.triggerType) return false;
@@ -536,6 +614,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 }
 
                 console.log('✅ Custom Data Trigger Source Mapping:', custTableSourceMapping);
+
             }
 
             if (rowToUpdate) {
@@ -554,7 +633,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             // For array fields (sourceColumns, versionType, dataMapping), store the actual values
             let processedValue = value;
 
-                        if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
+            if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
                 const custTableSourceMapping = {
                     sourceTable: value,
                     sourceType: eventData.triggerSource[0].value,
@@ -562,7 +641,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
                 console.log('✅ Custom Data Trigger Source Mapping:', custTableSourceMapping);
             }
-            
+
             if (['sourceColumns', 'versionType', 'dataMapping'].includes(field)) {
                 // Extract values from Autocomplete objects
                 processedValue = Array.isArray(value)
@@ -923,7 +1002,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         label="Trigger Type *"
                                     >
                                         <MenuItem value="ON_MODEL_EXECUTION">On Model Execution</MenuItem>
-                                        <MenuItem value="ON_INSTRUMENT_ADD">On Instrument Add</MenuItem>
+                                        <MenuItem value="ON_ATTRIBUTE_ADD">On Attribute Add</MenuItem>
                                         <MenuItem value="ON_TRANSACTION_POST">On Transaction Post</MenuItem>
                                         <MenuItem value="ON_ATTRIBUTE_CHANGE">On Attribute Change</MenuItem>
                                         <MenuItem value="ON_CUSTOM_DATA_TRIGGER">On Custom Data Trigger</MenuItem>
@@ -951,17 +1030,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
                                         // Handle both single and multiple values properly
                                         let valueToSet;
-                                        if (eventData.triggerType === 'ON_TRANSACTION_POST') {
-                                            valueToSet = Array.isArray(newValue) ? newValue : [];
-                                            setAvailableSources(['Transactions']);
-                                        }
-                                        else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') {
-                                            // For multiple selection, ensure it's always an array
-                                            valueToSet = Array.isArray(newValue) ? newValue : [];
-
-                                            setAvailableSources(['Attribute']);
-                                        }
-                                        else if (eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER') {
+                                        if (eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER') {
                                             // For multiple selection, ensure it's always an array
                                             valueToSet = Array.isArray(newValue) ? newValue : [];
 
@@ -1012,26 +1081,25 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     Source Mapping Configuration
                                 </Typography>
                                 <Tooltip title={getAddSourceTooltip()}>
-                                    <span>
-                                        <IconButton
-                                            onClick={handleAddNew}
-                                            disabled={!canAddSource()}
-                                            sx={{
-                                                '&:hover': {
-                                                    backgroundColor: 'darkgrey',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: '#9e9e9e',
-                                                },
-                                            }}
-                                        >
-                                            <AddOutlinedIcon />
-                                        </IconButton>
-                                    </span>
+                                <span>
+                                    <IconButton
+                                        onClick={handleAddNew}
+                                        disabled={!canAddSource()}
+                                        sx={{
+                                            '&:hover': {
+                                                backgroundColor: 'darkgrey',
+                                            },
+                                            '&.Mui-disabled': {
+                                                color: '#9e9e9e',
+                                            },
+                                        }}
+                                    >
+                                        <AddOutlinedIcon />
+                                    </IconButton>
+                                </span>
                                 </Tooltip>
                             </Box>
-                        )
-                        }
+                        )}
 
                         {/* Source Mapping Table */}
                         <TableContainer component={Paper} variant="outlined">
@@ -1278,8 +1346,13 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 <Autocomplete
                                                     multiple
                                                     size="small"
-                                                    options={dataMappingOptions[newSource.sourceTable] || []}
-                                                    getOptionLabel={(option) => option.label}
+                                                    // ✅ CONDITIONAL LOGIC HERE
+                                                    options={
+                                                        eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' 
+                                                            ? customTableMappings 
+                                                            : (dataMappingOptions[newSource.sourceTable] || [])
+                                                    }
+                                                    getOptionLabel={(option) => option.label || option}
                                                     value={newSource.dataMapping}
                                                     onChange={(event, newValue) => setNewSource(prev => ({ ...prev, dataMapping: newValue }))}
                                                     renderInput={(params) => (
