@@ -113,7 +113,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
 
     useEffect(() => {
-        if(tenant) {
+        if (tenant) {
             fetchAttributeMetadata();
             fetchTransactionMetadata();
             fetchMetricsMetadata();
@@ -330,20 +330,21 @@ export default function EventConfiguration({ open, onClose, editData }) {
             if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
 
                 // Determine which table list to use based on selection
-                if (selectedSource === 'reference_table') {
-                    determinedTable = referenceTables[0]; // Assign local variable
-                    // Assuming fetchCustomSourceMapping takes (TableName, SourceType)
-                    fetchCustomSourceMapping(determinedTable, 'reference_table');
-                } else if (selectedSource === 'operational_table') {
+                if (selectedSource === 'operational_table') {
                     determinedTable = operationalTables[0]; // Assign local variable
                     // Assuming fetchCustomSourceMapping takes (TableName, SourceType)
                     fetchCustomSourceMapping(determinedTable, 'operational_table');
-                }
 
-                // Update State if needed (using the local variable)
-                if (determinedTable && newSource.sourceTable !== determinedTable) {
-                    setNewSource(prev => ({ ...prev, sourceTable: determinedTable }));
+
+
+                } else if (selectedSource === 'reference_table') {
+                    setCustomTableMappings([]);
                 }
+            }
+
+            // Update State if needed (using the local variable)
+            if (determinedTable && newSource.sourceTable !== determinedTable) {
+                setNewSource(prev => ({ ...prev, sourceTable: determinedTable }));
             }
         }
 
@@ -1081,22 +1082,22 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     Source Mapping Configuration
                                 </Typography>
                                 <Tooltip title={getAddSourceTooltip()}>
-                                <span>
-                                    <IconButton
-                                        onClick={handleAddNew}
-                                        disabled={!canAddSource()}
-                                        sx={{
-                                            '&:hover': {
-                                                backgroundColor: 'darkgrey',
-                                            },
-                                            '&.Mui-disabled': {
-                                                color: '#9e9e9e',
-                                            },
-                                        }}
-                                    >
-                                        <AddOutlinedIcon />
-                                    </IconButton>
-                                </span>
+                                    <span>
+                                        <IconButton
+                                            onClick={handleAddNew}
+                                            disabled={!canAddSource()}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: 'darkgrey',
+                                                },
+                                                '&.Mui-disabled': {
+                                                    color: '#9e9e9e',
+                                                },
+                                            }}
+                                        >
+                                            <AddOutlinedIcon />
+                                        </IconButton>
+                                    </span>
                                 </Tooltip>
                             </Box>
                         )}
@@ -1348,8 +1349,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     size="small"
                                                     // ✅ CONDITIONAL LOGIC HERE
                                                     options={
-                                                        eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' 
-                                                            ? customTableMappings 
+                                                        eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER'
+                                                            ? customTableMappings
                                                             : (dataMappingOptions[newSource.sourceTable] || [])
                                                     }
                                                     getOptionLabel={(option) => option.label || option}
