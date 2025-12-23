@@ -385,8 +385,22 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
     const handleChange = (key, value) => {
         console.log(`📝 Event Data Change: ${key}`, value);
-        setEventData((prev) => ({ ...prev, [key]: value }));
-        setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
+
+               
+            setEventData((prev) => ({ ...prev, [key]: value }));
+            setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
+
+        if (key === 'triggerType' && value === 'ON_CUSTOM_DATA_TRIGGER') {
+            {
+                if (referenceTables.length > 0)
+                    setAvailableSources(referenceTables);
+                else
+                    setAvailableSources([]);
+                
+            }
+        }
+
+    
     };
 
     const [versionTypeOptions, setVersionTypeOptions] = useState([
@@ -502,7 +516,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     // === Helper Functions ===
     const isVersionTypeEnabled = (sourceTable) => sourceTable === 'Attribute';
     const isFieldTypeEnabled = (sourceTable) => sourceTable === 'Transactions';
-    const isDataMappingEnabled = (sourceTable) => sourceTable === 'Transactions' || sourceTable === 'Balances' || eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER';
+    const isDataMappingEnabled = (sourceTable) => sourceTable === 'Transactions' || sourceTable === 'Balances' || (eventData.triggerSource?.[0]?.value === 'operational_table');
 
     const canAddSource = () => {
         if (!eventData.triggerType) return false;
@@ -1003,7 +1017,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         label="Trigger Type *"
                                     >
                                         <MenuItem value="ON_MODEL_EXECUTION">On Model Execution</MenuItem>
-                                        <MenuItem value="ON_ATTRIBUTE_ADD">On Attribute Add</MenuItem>
+                                        <MenuItem value="ON_INSTRUMENT_ADD">On Instrument Add</MenuItem>
                                         <MenuItem value="ON_TRANSACTION_POST">On Transaction Post</MenuItem>
                                         <MenuItem value="ON_ATTRIBUTE_CHANGE">On Attribute Change</MenuItem>
                                         <MenuItem value="ON_CUSTOM_DATA_TRIGGER">On Custom Data Trigger</MenuItem>
@@ -1034,8 +1048,13 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         if (eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER') {
                                             // For multiple selection, ensure it's always an array
                                             valueToSet = Array.isArray(newValue) ? newValue : [];
-
-                                            setAvailableSources(ALL_SOURCES);
+                                            if (eventData.triggerType === 'ON_TRANSACTION_POST') {
+                                                setAvailableSources(['Transaction']);
+                                            } else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') {
+                                                setAvailableSources(['Attribute']);
+                                            } else {
+                                                setAvailableSources(ALL_SOURCES);
+                                            }
                                         } else {
                                             // For single selection, wrap in array to maintain consistent structure
                                             valueToSet = newValue ? [newValue] : [];
