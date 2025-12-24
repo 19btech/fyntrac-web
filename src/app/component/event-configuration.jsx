@@ -95,9 +95,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const sourceColumnsOptions = {
         Attribute: attributeList,
         Transactions: [
-            { label: 'All items are selected', value: 'all' },
             { label: 'Amount', value: 'Amount' },
-            { label: 'Transaction Date', value: 'TransactionDate' },
         ],
         Balances: [
             { label: 'Beginning Balance', value: 'BeginningBalance' },
