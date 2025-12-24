@@ -44,27 +44,27 @@ export default function ReportDashboard() {
   const categories = [
     {
       name: "Standard Reports",
-      tag: "Daily",
+      tag: "Standard",
       reports: [
-        { name: "Transaction Activity Report", component: TransactionActivityReportPage },
-        { name: "Attribute History Report", component: ComingSoon },
-        { name: "Balance Rollforward Report", component: RollforwardReportPage }
+        { name: "Transaction Activity Report", description:"Shows all transaction movements for each instrument over time.", component: TransactionActivityReportPage },
+        { name: "Attribute History Report", description:"Displays how key instrument attributes changed across posting periods.", component: ComingSoon },
+        { name: "Balance Rollforward Report", description:"Summarizes opening balances, period movements, and closing balances.", component: RollforwardReportPage }
       ]
     },
     {
       name: "Accounting Reports",
-      tag: "Finance",
+      tag: "Accounting",
       reports: [
-        { name: "Journal Entry Report", component: GLEReportPage },
-        { name: "Trial Balance", component: ComingSoon }
+        { name: "Journal Entry Report", description:"Lists all generated accounting entries for the selected period.", component: GLEReportPage },
+        { name: "Trial Balance", description:"Provides account-level debit and credit totals to validate balanced books.", component: ComingSoon }
       ]
     },
     {
       name: "Custom Table Reports",
-      tag: "Admin",
+      tag: "Custom",
       reports: [
-        { name: "Operational Activity Report", component: CustomOperationalDataReportPage },
-        { name: "Reference Meta Data", component: CustomRefDataReportPage }
+        { name: "Operational Activity Report", description:"Presents data extracted from operational custom tables.", component: CustomOperationalDataReportPage },
+        { name: "Reference Meta Data", description:"Shows the structure and stored values of reference-data tables.", component: CustomRefDataReportPage }
       ]
     },
   ];
@@ -87,7 +87,7 @@ export default function ReportDashboard() {
   };
 
   return (
-    <Container maxWidth={false} sx={{ py: 6, px: { xs: 2, md: 6 }, minHeight: '100vh', textAlign: 'left' }}>
+    <Container maxWidth={false} sx={{ py: 1, px: { xs: 2, md: 3 }, minHeight: '100vh', textAlign: 'left' }}>
       
       {categories.map((cat, catIdx) => (
         <Box key={catIdx} sx={{ mb: 6, width: '100%' }}>
@@ -96,7 +96,7 @@ export default function ReportDashboard() {
             <Typography variant="overline" fontWeight="bold" fontSize="0.85rem" color="text.secondary" sx={{ letterSpacing: 1.5, textTransform: 'uppercase' }}>
               {cat.name}
             </Typography>
-            <Box sx={{ height: '1px', bgcolor: 'divider', flexGrow: 1, ml: 2, opacity: 0.6 }} />
+            <Box sx={{ height: '2px', bgcolor: 'divider', flexGrow: 1, ml: 2, opacity: 0.9 }} />
           </Box>
 
           <Grid container spacing={3}>
@@ -140,7 +140,7 @@ export default function ReportDashboard() {
                           {report.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                          View detailed analytics and export data for {report.name.toLowerCase()}.
+                          {report.description}
                         </Typography>
                       </Box>
                       <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', color: 'primary.main' }}>
@@ -183,7 +183,7 @@ export default function ReportDashboard() {
           <Box>
           </Box>
           <IconButton onClick={handleClose} sx={{ bgcolor: 'grey.50', '&:hover': { bgcolor: 'grey.200' } }}>
-            <Close />
+            <Close sx={{size: 'small'}}/>
           </IconButton>
         </DialogTitle>
         

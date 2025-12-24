@@ -16,7 +16,7 @@ function CustomToolbar() {
     <GridToolbarContainer>
       <GridToolbarColumnsButton />
       <GridToolbarDensitySelector
-        slotProps={{ tooltip: { title: 'Change density' } }}
+        slotProps={{ tooltip: { title: 'Change density',  } }}
       />
       <Box sx={{ flexGrow: 1 }} /> {/* Spacer to push the export button to the right */}
       {/* <GridToolbarExport
@@ -43,6 +43,7 @@ export default function CustomDataGrid({ columns, rows }) {
 
   const initialState = {
     pagination: { paginationModel: { pageSize: rowsPerPage } },
+    density: 'compact',
     columns: {
       columnVisibilityModel: {
         // Hide all columns except the first 5
@@ -73,6 +74,7 @@ export default function CustomDataGrid({ columns, rows }) {
           columns={columns}
           rows={rows}
           getRowId={(row, index) => row.id ?? index}
+          
           slots={{
             toolbar: CustomToolbar, // Use the custom toolbar
           }}

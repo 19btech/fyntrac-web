@@ -116,20 +116,20 @@ function DashboardLayoutBasic() {
      { kind: 'divider' },
      { segment: 'report-dashboard', title: 'Reports', icon: <TableChartOutlinedIcon /> },
     { kind: 'divider' },
-    {
-      segment: 'reports',
-      title: 'Reports',
-      icon: <BarChartIcon />,
-      children: [
-        { segment: 'gle-report', title: 'Journal Entry Report', icon: <AutoGraphOutlinedIcon /> },
-        { segment: 'transaction-activity-report', title: 'Activity Report', icon: <TrendingUpOutlinedIcon /> },
-        { segment: 'rollforward-report', title: 'Rollforward Report', icon: <TimelineIcon /> },
-        { segment: 'custom-ref-data-report', title: 'Custom Ref Data Report', icon: <DatasetLinkedOutlinedIcon /> },
-        { segment: 'custom-operational-data-report', title: 'Custom Operational Data Report', icon: <DatasetOutlinedIcon /> },
+    // {
+    //   segment: 'reports',
+    //   title: 'Reports',
+    //   icon: <BarChartIcon />,
+    //   children: [
+    //     { segment: 'gle-report', title: 'Journal Entry Report', icon: <AutoGraphOutlinedIcon /> },
+    //     { segment: 'transaction-activity-report', title: 'Activity Report', icon: <TrendingUpOutlinedIcon /> },
+    //     { segment: 'rollforward-report', title: 'Rollforward Report', icon: <TimelineIcon /> },
+    //     { segment: 'custom-ref-data-report', title: 'Custom Ref Data Report', icon: <DatasetLinkedOutlinedIcon /> },
+    //     { segment: 'custom-operational-data-report', title: 'Custom Operational Data Report', icon: <DatasetOutlinedIcon /> },
 
-      ],
-    },
-    { kind: 'divider' },
+    //   ],
+    // },
+    // { kind: 'divider' },
     {
       segment: 'settings',
       title: 'Settings',
