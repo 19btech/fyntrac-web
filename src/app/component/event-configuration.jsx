@@ -1051,7 +1051,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                             // For multiple selection, ensure it's always an array
                                             valueToSet = Array.isArray(newValue) ? newValue : [];
                                             if (eventData.triggerType === 'ON_TRANSACTION_POST') {
-                                                setAvailableSources(['Transaction']);
+                                                setAvailableSources(['Transactions']);
                                             } else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') {
                                                 setAvailableSources(['Attribute']);
                                             } else {
