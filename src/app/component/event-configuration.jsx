@@ -386,9 +386,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const handleChange = (key, value) => {
         console.log(`📝 Event Data Change: ${key}`, value);
 
-               
-            setEventData((prev) => ({ ...prev, [key]: value }));
-            setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
+
+        setEventData((prev) => ({ ...prev, [key]: value }));
+        setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
 
         if (key === 'triggerType' && value === 'ON_CUSTOM_DATA_TRIGGER') {
             {
@@ -396,11 +396,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
                     setAvailableSources(referenceTables);
                 else
                     setAvailableSources([]);
-                
+
             }
         }
 
-    
+
     };
 
     const [versionTypeOptions, setVersionTypeOptions] = useState([
@@ -1083,8 +1083,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     : !eventData.triggerSource || !Array.isArray(eventData.triggerSource) || eventData.triggerSource.length === 0
                                             }
                                             helperText={
+                                                // First check if there is an error
                                                 (!Array.isArray(eventData.triggerSource) || eventData.triggerSource.length === 0)
-                                                    ? "Trigger Source is required"
+                                                    // If error exists, check type to determine message
+                                                    ? (eventData.triggerType === 'ON_REPLAY' ? "TimeLine Driver is required" : "Trigger Source is required")
+                                                    // If no error, return empty string
                                                     : ""
                                             }
                                         />
