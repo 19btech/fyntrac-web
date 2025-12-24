@@ -18,7 +18,7 @@ import EventConfigurationMain from '../event-configuration/page';
 import CustomTableMain from '../custom-table/page';
 import CustomRefDataReportPage from '../reports/custom-ref-data-report/page';
 import CustomOperationalDataReportPage from '../reports/custom-operational-data-report/page';
-import ReportCard from '../new-reports/page';
+import ReportDashboard from '../report-dashboard/page';
 export default function PageContent({ pathname, method }) {
 
   const renderContent = () => {
@@ -44,8 +44,8 @@ export default function PageContent({ pathname, method }) {
         return <SettingsPage />
       case '/sync':
         return <SyncPage />
-      //  case '/new-reports':
-      //  return <ReportCard />
+      case '/report-dashboard':
+        return <ReportDashboard />
       case '/reports/gle-report':
         return <GLEReportPage />
       case '/reports/transaction-activity-report':

@@ -43,11 +43,10 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import DatasetLinkedOutlinedIcon from '@mui/icons-material/DatasetLinkedOutlined';
 import DatasetOutlinedIcon from '@mui/icons-material/DatasetOutlined';
-import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
 // System font stack - no external dependencies
 const systemFontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif';
 
-const demoTheme = createTheme({
+const fyntracTheme = createTheme({
   typography: {
     fontFamily: systemFontStack,
   },
@@ -115,7 +114,7 @@ function DashboardLayoutBasic() {
     { segment: 'mapping', title: 'Mapping', icon: <AccountBalanceOutlinedIcon /> },
     { segment: 'sync', title: 'Sync', icon: <SyncAltOutlinedIcon /> },
      { kind: 'divider' },
-     { segment: 'new-reports', title: 'Reports', icon: <SummarizeOutlinedIcon /> },
+     { segment: 'report-dashboard', title: 'Reports', icon: <TableChartOutlinedIcon /> },
     { kind: 'divider' },
     {
       segment: 'reports',
@@ -183,11 +182,11 @@ function DashboardLayoutBasic() {
         branding={{ logo: <img src="fyntrac-small.png" alt="Fyntrac" />, title: '' }}
         navigation={NAVIGATION}
         router={customRouter}
-        theme={demoTheme}
+        theme={fyntracTheme}
       >
         <DashboardLayout
           sx={{ background: '#e4e8ee' }}
-          theme={demoTheme}
+          theme={fyntracTheme}
           slots={{ toolbarActions: CustomTopBar }}
         >
           <PageContent pathname={customRouter.pathname} />
