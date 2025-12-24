@@ -440,9 +440,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
         ON_TRANSACTION_POST: dataMappingOptions.Transactions || [],
         ON_CUSTOM_DATA_TRIGGER: dataMappingOptions.CustomDataSource || [],
         ON_CUSTOM_DATA_SOURCE: dataMappingOptions.CustomTableColumns || [],
+        ON_REPLAY: dataMappingOptions.Transactions || [],
     };
 
-    const showTriggerSource = ['ON_ATTRIBUTE_CHANGE', 'ON_TRANSACTION_POST', 'ON_CUSTOM_DATA_TRIGGER'].includes(eventData.triggerType);
+    const showTriggerSource = ['ON_ATTRIBUTE_CHANGE', 'ON_TRANSACTION_POST', 'ON_CUSTOM_DATA_TRIGGER', 'ON_REPLAY'].includes(eventData.triggerType);
 
 
     const getColumnsByReferenceTableName = (tableName) => {
@@ -1021,6 +1022,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         <MenuItem value="ON_TRANSACTION_POST">On Transaction Post</MenuItem>
                                         <MenuItem value="ON_ATTRIBUTE_CHANGE">On Attribute Change</MenuItem>
                                         <MenuItem value="ON_CUSTOM_DATA_TRIGGER">On Custom Data Trigger</MenuItem>
+                                        <MenuItem value="ON_REPLAY">On Replay</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Grid>
@@ -1073,7 +1075,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
-                                            label="Trigger Source"
+                                            label={eventData.triggerType === 'ON_REPLAY' ? "TimeLine Driver" : "Trigger Source"}
                                             required
                                             error={
                                                 eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER'
