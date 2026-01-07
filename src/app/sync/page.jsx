@@ -123,7 +123,7 @@ export default function SyncPage() {
         <Grid size="auto">
           <div className='left'>
             <GridHeader>
-            Sync
+            Ingest
             </GridHeader>
           </div>
         </Grid>

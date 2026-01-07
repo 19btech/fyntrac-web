@@ -42,8 +42,8 @@ export default function ReportDashboard() {
       name: "General Configuration",
       tag: "General",
       reports: [
-        { name: "Tenant Management", description:"Manages tenant-level settings, system preferences and environment-wide configurations.", component: SettingsPage },
-        { name: "User Management", description:"Creates and manages user accounts, roles, and permissions accross the paltform.", component: ComingSoon },
+        { name: "Tenant Management", description:"Manage tenant-level settings, system preferences and environment-wide configurations.", component: SettingsPage },
+        { name: "User Management", description:"Create and manages user accounts, roles, and permissions accross the paltform.", component: ComingSoon },
         { name: "Cron Jobs", description:"Configure and monitor scheduled tasks for automated processes and data sync.", component: ComingSoon }
       ]
     },
