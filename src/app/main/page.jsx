@@ -56,9 +56,9 @@ import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 // ----------------------------------------------------------------------
 // 🔧 CONFIGURATION
 // ----------------------------------------------------------------------
-const DRAWER_WIDTH = 280; // Slightly wider for elegance
-const COLLAPSED_WIDTH = 80;
-const HEADER_HEIGHT = 70; // Slightly taller header
+const DRAWER_WIDTH = 240; // Slightly wider for elegance
+const COLLAPSED_WIDTH = 60;
+const HEADER_HEIGHT = 56; // Slightly taller header
 
 // 🎨 ELEGANT THEME
 const fyntracTheme = createTheme({
@@ -358,7 +358,7 @@ export default function DashboardLayoutModern() {
 
               {/* LOGO */}
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <img src="fyntrac-small.png" alt="Fyntrac" style={{ maxHeight: 36 }} />
+                <img src="fyntrac-small.png" alt="Fyntrac" style={{ maxHeight: 30 }} />
               </Box>
 
               <Box sx={{ flexGrow: 1 }} />
