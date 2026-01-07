@@ -3,40 +3,38 @@ import { createTheme, alpha } from "@mui/material/styles";
 // Professional "Cool" Palette
 const palette = {
   primary: {
-    main: "#4F46E5", 
+    main: "#8C52FF",
     light: "#818cf8",
     dark: "#3730a3",
     contrastText: "#ffffff",
   },
   secondary: {
-    main: "#06b6d4", 
+    main: "#06b6d4",
     light: "#67e8f9",
     dark: "#0e7490",
     contrastText: "#ffffff",
   },
   background: {
-    default: "#F3F4F6",
+    default: "#FFFFFF !important",
     paper: "#FFFFFF",
   },
   text: {
     primary: "#111827",
     secondary: "#6B7280",
   },
-  // 👇 UPDATED SECTION FOR SLEEK HOVER
   action: {
-    // This creates a sleek, light blue/cyan background on hover
-    // equivalent to Tailwind's 'sky-50' or 'blue-50'
-    hover: "#F0F9FF", 
-    
-    // Slightly darker for selected items
-    selected: "#E0F2FE", 
+    hover: "#F0F9FF",
+    selected: "#E0F2FE",
   },
 };
 
 const fyntracTheme = createTheme({
   palette,
+  
+  // Optional: Increases base font size for the whole app
   typography: {
-    fontFamily: "'Inter', 'Plus Jakarta Sans', 'Roboto', sans-serif",
+    fontFamily: "'Inter', 'Plus Jakarta Sans', 'Roboto', 'sans-serif'",
+    // fontSize: 16, 
     h1: { fontWeight: 700 },
     h2: { fontWeight: 700 },
     h3: { fontWeight: 700 },
@@ -48,6 +46,14 @@ const fyntracTheme = createTheme({
       fontWeight: 600,
     },
   },
+  gridHeader: {
+      fontFamily: "'Plus Jakarta Sans', sans-serif", // Specific font family
+      fontSize: "24px !important",   // Specific size
+      fontWeight: 400 ,    // Specific weight (Bold)
+      lineHeight: 1.2,
+      color: "#111827 !important",   // Optional: specific color
+      letterSpacing: "-0.02em" // Optional: makes it look tighter/modern
+    },
   shape: {
     borderRadius: 12,
   },
@@ -55,10 +61,48 @@ const fyntracTheme = createTheme({
     "none",
     "0px 2px 4px -1px rgba(0,0,0,0.06),0px 4px 6px -1px rgba(0,0,0,0.1)",
     "0px 4px 6px -1px rgba(0,0,0,0.1),0px 2px 4px -1px rgba(0,0,0,0.06)",
-    "0px 10px 15px -3px rgba(0,0,0,0.1),0px 4px 6px -2px rgba(0,0,0,0.05)", 
+    "0px 10px 15px -3px rgba(0,0,0,0.1),0px 4px 6px -2px rgba(0,0,0,0.05)",
     ...Array(21).fill("none"),
   ],
   components: {
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          // Default is usually 240px. 
+          // 5% is very small (approx 90px on a large screen), so icons might break.
+          // I recommend a fixed pixel width like "280px" or "300px".
+          width: "320px !important", 
+         //  width: "var(--Toolpad-navigation-width) !important",
+          transition: "width 0.2s ease", // Optional: Smooth transition
+          // If you really want percentage (not recommended for sidebars):
+          // width: "20vw !important", 
+        },
+      },
+    },
+    MuiListItemText: {
+      styleOverrides: {
+        primary: {
+          fontSize: "14px !important", // Increases the text size "Configure"
+          fontWeight: 500,  // Makes it slightly bolder
+          // color: palette.text.primary,
+          color: '#71717A', // Default gray color
+        },
+      },
+    },
+    MuiListItemIcon: {
+      styleOverrides: {
+        root: {
+          minWidth: "48px", // Adds more space between icon and text
+          color: palette.primary.main, // Optional: colors the icons
+          "& .MuiSvgIcon-root": {
+            fontSize: "25px", // Increases the Icon Size
+            iconWeight: 100,
+          },
+        },
+      },
+    },
+    // ----------------------------------------------------
+
     MuiButton: {
       styleOverrides: {
         root: {

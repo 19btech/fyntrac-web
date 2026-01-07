@@ -113,8 +113,8 @@ function DashboardLayoutBasic() {
     { segment: 'model', title: 'Model', icon: <ArticleOutlinedIcon /> },
     { segment: 'mapping', title: 'Mapping', icon: <AccountBalanceOutlinedIcon /> },
     { segment: 'sync', title: 'Sync', icon: <SyncAltOutlinedIcon /> },
-     { kind: 'divider' },
-     { segment: 'report-dashboard', title: 'Reports', icon: <TableChartOutlinedIcon /> },
+    { kind: 'divider' },
+    { segment: 'report-dashboard', title: 'Reports', icon: <TableChartOutlinedIcon /> },
     { kind: 'divider' },
     // {
     //   segment: 'reports',
@@ -183,11 +183,21 @@ function DashboardLayoutBasic() {
         navigation={NAVIGATION}
         router={customRouter}
         theme={fyntracTheme}
+                  sx={{
+            "--Toolpad-navigation-width": "180px",
+            "--Toolpad-header-height": "44px",
+            backgroundColor: "#F6F7F8",
+          }}
       >
         <DashboardLayout
-          sx={{ background: '#e4e8ee' }}
+
           theme={fyntracTheme}
           slots={{ toolbarActions: CustomTopBar }}
+          sx={{
+            "--Toolpad-navigation-width": "180px",
+            "--Toolpad-header-height": "44px",
+            backgroundColor: "#F6F7F8",
+          }}
         >
           <PageContent pathname={customRouter.pathname} />
 

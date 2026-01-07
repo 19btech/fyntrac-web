@@ -36,7 +36,7 @@ export default function BarChartWidget({
       ]}
       series={series}
       // Combine default chart settings with any custom settings passed in
-      {...{ width: 500, height: 300, ...chartSetting }}
+      {...{ width: '1550', height: 350, ...chartSetting }}
     />
   );
 }

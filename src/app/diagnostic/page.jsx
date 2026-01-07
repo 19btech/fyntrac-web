@@ -58,7 +58,7 @@ const InstrumentDiagnosticPage = () => {
   const [postingDate, setPostingDate] = React.useState('');
   const [diagnosticData, setDiagnosticData] = React.useState({});
 
-     
+
 
   const buttonSx = {
     ...(success && {
@@ -322,7 +322,7 @@ const InstrumentDiagnosticPage = () => {
         >
           <Box
             flex="0 0 11%" // First row occupies 30%
-            overflow="auto"
+            overflow="fit-content"
           >
             <Box key={1} justifyContent="center" sx={{
               mb: 1, border: 0, p: 1, borderRadius: 1, flexDirection: 'column',
@@ -342,17 +342,15 @@ const InstrumentDiagnosticPage = () => {
                 </Grid>
 
                 <Grid xs={12} sm={3}>
-                  <FormControl fullWidth sx={{ m: 1, minWidth: 350 }}>
+                  <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
                     <InputLabel id="sort-by-select-model">Select Model</InputLabel>
                     <Select
                       labelId="sort-by-select-model"
                       id="sort-by-select"
                       value={model}
                       label="Select Model"
-                      size="small"
                       onChange={(e) => setModel(e.target.value)}
                     >
-                      {/* Map over the sort options Select Modelto create a menu item for each */}
                       {models.map((model) => (
                         <MenuItem key={model.id} value={model.id}>
                           {model.modelName}
@@ -363,17 +361,16 @@ const InstrumentDiagnosticPage = () => {
                 </Grid>
 
                 <Grid xs={12} sm={3}>
-                  <FormControl fullWidth sx={{ m: 1, minWidth: 350 }}>
+                  <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
                     <InputLabel id="sort-by-select-model">Select Posting</InputLabel>
                     <Select
                       labelId="sort-by-select-posting-date"
                       id="sort-by-select-posting-date"
                       value={postingDate}
                       label="Select Posting"
-                      size="small"
+                      // size="small"  <-- You can remove this as it inherits from FormControl, or keep it.
                       onChange={(e) => setPostingDate(e.target.value)}
                     >
-                      {/* Map over the sort options Select Posting Date to create a menu item for each */}
                       {postingDates.map((pdate) => (
                         <MenuItem key={pdate.value} value={pdate.value}>
                           {pdate.label}
@@ -428,7 +425,7 @@ const InstrumentDiagnosticPage = () => {
               <EnhancedDataGridTabs
                 data={diagnosticData}
                 title="Enterprise Data Manager"
-                // onExport={handleExport}
+              // onExport={handleExport}
               />
             </div>
 
