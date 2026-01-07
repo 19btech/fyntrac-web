@@ -83,6 +83,7 @@ export default function ReportDashboard() {
                 alignItems: 'left', 
                 justifyContent: 'flex-end', // Pushes button to right
                 borderColor: 'divider',
+                paddingRight: 2.5
               }}
             >
 
