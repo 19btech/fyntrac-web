@@ -200,7 +200,7 @@ export default function SyncPage() {
         <DialogContent>
           <FileUploadComponent
             onDrop={handleFileDrop}
-            text="Drag and drop your images here"
+            text="Drag and drop your files here"
             iconColor="#3f51b5"
             borderColor="#3f51b5"
             filesLimit={5}

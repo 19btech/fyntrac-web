@@ -196,7 +196,7 @@ export default function RulePage() {
           <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleTransactionChange} aria-label="Accounting Configuration">
             <Tab label="Transactions" sx={{ textTransform: 'none' }} />
             <Tab label="Attributes" sx={{ textTransform: 'none' }} />
-            <Tab label="Aggregation" sx={{ textTransform: 'none' }} />
+            <Tab label="Balances" sx={{ textTransform: 'none' }} />
 
           </Tabs>
         </Box>

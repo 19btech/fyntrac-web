@@ -31,7 +31,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useTenant, TenantProvider } from "../tenant-context";
 import PageContent from '../component/pageContent';
-
+import fyntracTheme from "../theme/fyntrac-theme";
 // Icons
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
@@ -43,12 +43,7 @@ import StartOutlinedIcon from '@mui/icons-material/StartOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import SyncAltOutlinedIcon from '@mui/icons-material/SyncAltOutlined';
-import SettingsSuggestOutlinedIcon from '@mui/icons-material/SettingsSuggestOutlined';
-import ConstructionOutlinedIcon from '@mui/icons-material/ConstructionOutlined';
-import Diversity3OutlinedIcon from '@mui/icons-material/Diversity3Outlined';
-import FeedOutlinedIcon from '@mui/icons-material/FeedOutlined';
 import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
-import SettingsInputCompositeOutlinedIcon from '@mui/icons-material/SettingsInputCompositeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
@@ -56,57 +51,57 @@ import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 // ----------------------------------------------------------------------
 // 🔧 CONFIGURATION
 // ----------------------------------------------------------------------
-const DRAWER_WIDTH = 240; // Slightly wider for elegance
+const DRAWER_WIDTH = 256; // Slightly wider for elegance
 const COLLAPSED_WIDTH = 60;
 const HEADER_HEIGHT = 56; // Slightly taller header
 
 // 🎨 ELEGANT THEME
-const fyntracTheme = createTheme({
-  typography: { 
-    fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    h6: { fontWeight: 700 },
-    body2: { fontSize: '0.875rem' },
-  },
-  palette: {
-    primary: { main: "#2563EB" }, // Modern Royal Blue
-    secondary: { main: "#dc004e" },
-    text: { primary: "#1E293B", secondary: "#64748B" }, // Slate colors
-    background: { default: "#F8FAFC", paper: "#FFFFFF" }, // Very light slate bg
-  },
-  components: {
-    MuiDrawer: {
-      styleOverrides: {
-        paper: {
-          borderRight: "1px dashed rgba(145, 158, 171, 0.24)", // Subtle dashed border
-          backgroundColor: "#FFFFFF",
-          overflowX: 'hidden',
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Snappy bezier
-        }
-      }
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundColor: "rgba(255, 255, 255, 0.8)", // Semi-transparent
-          backdropFilter: "blur(6px)", // Glassmorphism effect
-          color: "#1E293B",
-          boxShadow: "none",
-          borderBottom: "1px solid rgba(145, 158, 171, 0.12)",
-          zIndex: 1201,
-        }
-      }
-    },
-    MuiListItemButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8, // Rounded list items
-          margin: '4px 8px', // Breathing room
-          transition: 'all 0.2s ease-in-out',
-        }
-      }
-    }
-  }
-});
+// const fyntracTheme = createTheme({
+//   typography: { 
+//     fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+//     h6: { fontWeight: 700 },
+//     body2: { fontSize: '0.875rem' },
+//   },
+//   palette: {
+//     primary: { main: "#2563EB" }, // Modern Royal Blue
+//     secondary: { main: "#dc004e" },
+//     text: { primary: "#1E293B", secondary: "#64748B" }, // Slate colors
+//     background: { default: "#F8FAFC", paper: "#FFFFFF" }, // Very light slate bg
+//   },
+//   components: {
+//     MuiDrawer: {
+//       styleOverrides: {
+//         paper: {
+//           borderRight: "1px dashed rgba(145, 158, 171, 0.24)", // Subtle dashed border
+//           backgroundColor: "#FFFFFF",
+//           overflowX: 'hidden',
+//           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Snappy bezier
+//         }
+//       }
+//     },
+//     MuiAppBar: {
+//       styleOverrides: {
+//         root: {
+//           backgroundColor: "rgba(255, 255, 255, 0.8)", // Semi-transparent
+//           backdropFilter: "blur(6px)", // Glassmorphism effect
+//           color: "#1E293B",
+//           boxShadow: "none",
+//           borderBottom: "1px solid rgba(145, 158, 171, 0.12)",
+//           zIndex: 1201,
+//         }
+//       }
+//     },
+//     MuiListItemButton: {
+//       styleOverrides: {
+//         root: {
+//           borderRadius: 8, // Rounded list items
+//           margin: '4px 8px', // Breathing room
+//           transition: 'all 0.2s ease-in-out',
+//         }
+//       }
+//     }
+//   }
+// });
 
 // ----------------------------------------------------------------------
 // 🧩 HELPER: Recursive Navigation Item
@@ -230,14 +225,14 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
 // ----------------------------------------------------------------------
 function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onLogout }) {
   const NAVIGATION = [
-    { segment: "getstarted", title: "Get Started", icon: <StartOutlinedIcon /> },
-    { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon /> },
-    { segment: "diagnostic", title: "Diagnostic", icon: <TroubleshootIcon /> },
-    { segment: "model", title: "Model", icon: <ArticleOutlinedIcon /> },
-    { segment: "mapping", title: "Mapping", icon: <AccountBalanceOutlinedIcon /> },
-    { segment: "sync", title: "Ingest", icon: <SyncAltOutlinedIcon /> },
-    { segment: "report-dashboard", title: "Reports", icon: <TableChartOutlinedIcon /> },
-    { segment: "settings-dashboard", title: "Settings", icon: <TuneOutlinedIcon /> },
+    { segment: "getstarted", title: "Get Started", icon: <StartOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "diagnostic", title: "Diagnostic", icon: <TroubleshootIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "model", title: "Model", icon: <ArticleOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "mapping", title: "Mapping", icon: <AccountBalanceOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "sync", title: "Ingest", icon: <SyncAltOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "report-dashboard", title: "Reports", icon: <TableChartOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "settings-dashboard", title: "Settings", icon: <TuneOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
     { kind: "divider" },
   ];
 
@@ -274,6 +269,7 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
             title: "Sign Out",
             icon: <LogoutIcon sx={{ color: "#FF5630" }} />, // Alert color for logout
             onClick: onLogout,
+            fontSize: 'fontSize: "14px !important"' ,
           }}
           pathname={pathname}
           onNavigate={onNavigate}
@@ -328,7 +324,7 @@ export default function DashboardLayoutModern() {
   return (
     <TenantProvider>
       <ThemeProvider theme={fyntracTheme}>
-        <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: 'background.default' }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh', }}>
           <CssBaseline />
 
           {/* 1. APPBAR */}

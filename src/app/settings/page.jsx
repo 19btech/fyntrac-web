@@ -359,7 +359,6 @@ export default function SettingsPage() {
       <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
         <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleConfigurationTabChange} aria-label="Accounting Configuration">
           <Tab label="General Settings" sx={{ textTransform: 'none' }} />
-          <Tab label="User Managment" sx={{ textTransform: 'none' }} />
         </Tabs>
       </Box>
 
@@ -386,7 +385,7 @@ export default function SettingsPage() {
                   <Tooltip title="Reset Environment">
                     <RefreshSharpIcon
                       sx={{
-                        fontSize: '40px',
+                        fontSize: '30px',
                         transform: 'scale(1.1)',  // Slightly thicker appearance
                       }}
                     />
@@ -409,20 +408,16 @@ export default function SettingsPage() {
 
               {/* Right Aligned */}
               <Grid size={2}>
-                <Autocomplete
-                  sx={{
-                    "& .MuiInputBase-root": {
-                      height: "40px"
-                    }
-                  }}
-                  disablePortal
-                  id="currency-combo"
-                  options={currencyList}
-                  value={currency}
-                  getOptionLabel={(option) => option}
-                  onChange={(event, newValue) => { setCurrency(newValue || ''); }} // Ensure it's never undefined
-                  renderInput={(params) => <TextField {...params} label="Currency" />}
-                />
+<Autocomplete
+  disablePortal
+  id="currency-combo"
+  size="small" // 👈 This sets height to 40px & centers label automatically
+  options={currencyList}
+  value={currency}
+  getOptionLabel={(option) => option}
+  onChange={(event, newValue) => { setCurrency(newValue || ''); }}
+  renderInput={(params) => <TextField {...params} label="Currency" />}
+/>
 
 
               </Grid>
@@ -523,7 +518,7 @@ export default function SettingsPage() {
               <Grid>
                 <Switch
                   sx={{
-                    fontSize: '40px',
+                    fontSize: '30px',
                     transform: 'scale(1.1)'
                   }}
                   checked={restatementMode} onChange={handleRestatementMode} />
@@ -665,7 +660,7 @@ export default function SettingsPage() {
                   <Tooltip title="Configure Dashboard">
                     <SettingsOutlinedIcon
                       sx={{
-                        fontSize: '40px',
+                        fontSize: '30px',
                         transform: 'scale(1.1)',  // Slightly thicker appearance
                       }}
                     />
