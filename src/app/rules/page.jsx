@@ -18,7 +18,6 @@ import AddAttributeDialog from '../component/add-attribute';
 import AddAccountTypeDialog from '../component/add-account-type';
 import Aggregation from '../component/aggregation'
 import Attribute from '../component/attribute'
-import AccountType from '../component/account-type'
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Tooltip, Divider } from '@mui/material';
 import axios from 'axios';
 import AddAggregationDialog from '../component/add-aggregation';
@@ -198,7 +197,7 @@ export default function RulePage() {
             <Tab label="Transactions" sx={{ textTransform: 'none' }} />
             <Tab label="Attributes" sx={{ textTransform: 'none' }} />
             <Tab label="Aggregation" sx={{ textTransform: 'none' }} />
-            <Tab label="Account Type" sx={{ textTransform: 'none' }} />
+
           </Tabs>
         </Box>
         <CustomTabPanel value={panelIndex} index={0}>
@@ -209,9 +208,6 @@ export default function RulePage() {
         </CustomTabPanel>
         <CustomTabPanel value={panelIndex} index={2}>
           <Aggregation refreshData={setRefreshAggregationKey} key={refreshAggregationKey} />
-        </CustomTabPanel>
-        <CustomTabPanel value={panelIndex} index={3}>
-          <AccountType refreshData={setRefreshAccountTypeKey} key={refreshAccountTypeKey} />
         </CustomTabPanel>
 
 

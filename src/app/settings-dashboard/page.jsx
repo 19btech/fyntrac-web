@@ -80,15 +80,11 @@ export default function ReportDashboard() {
                 mb: 2, // Added margin bottom for spacing
                 pb: 0,
                 display: 'flex', 
-                alignItems: 'center', 
+                alignItems: 'left', 
                 justifyContent: 'flex-end', // Pushes button to right
                 borderColor: 'divider',
               }}
             >
-              {/* Left: Title (Optional - currently empty in your code) */}
-              <Box>
-                 {/* You can add title here if needed later */}
-              </Box>
 
               {/* Right: Back Link Button */}
               <Button
@@ -98,7 +94,7 @@ export default function ReportDashboard() {
                   textTransform: 'none',
                   color: 'text.secondary',
                   fontWeight: 600,
-                  fontSize: '0.875rem',
+                  fontSize: '0.654rem',
                   '&:hover': { 
                     bgcolor: 'transparent',
                     color: 'primary.main',

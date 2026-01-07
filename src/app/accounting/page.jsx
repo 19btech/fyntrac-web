@@ -11,6 +11,7 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import ChartOfAccount from '../component/chart-off-account';
 import SubledgerMapping from '../component/subledger-mapping'
+import AccountType from '../component/account-type'
 import CustomTabPanel from '../component/custom-tab-panel'
 import FileUploadComponent from '../component/file-upload'
 import AddChartofAccount from '../component/add-chart-of-account'
@@ -35,7 +36,7 @@ const VisuallyHiddenInput = styled('input')({
 
 
 export default function AccountingPage() {
-const { tenant } = useTenant();
+  const { tenant } = useTenant();
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [refreshChartOfAccountKey, setRefreshChartOfAccountKey] = React.useState(0);
   const [refreshSubledgerMapping, setRefreshSubledgerMapping] = React.useState(0);
@@ -123,7 +124,7 @@ const { tenant } = useTenant();
         <Grid size="auto">
           <div className='left'>
             <GridHeader>
-              Accounting
+              Journal
             </GridHeader>
           </div>
         </Grid>
@@ -171,15 +172,22 @@ const { tenant } = useTenant();
       <Box>
         <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
           <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleTransactionChange} aria-label="Accounting Configuration">
-            <Tab label="Chart of Account" sx={{ textTransform: 'none' }} />
+            <Tab label="Account Type" sx={{ textTransform: 'none' }} />
             <Tab label="Subledger Mapping" sx={{ textTransform: 'none' }} />
+            <Tab label="Chart of Account" sx={{ textTransform: 'none' }} />
           </Tabs>
         </Box>
+
         <CustomTabPanel value={panelIndex} index={0}>
-          <ChartOfAccount refreshData={setRefreshChartOfAccountKey} key={refreshChartOfAccountKey} />
+          <AccountType refreshData={setRefreshSubledgerMapping} key={refreshSubledgerMapping} />
         </CustomTabPanel>
+
         <CustomTabPanel value={panelIndex} index={1}>
           <SubledgerMapping refreshData={setRefreshSubledgerMapping} key={refreshSubledgerMapping} />
+        </CustomTabPanel>
+
+        <CustomTabPanel value={panelIndex} index={2}>
+          <ChartOfAccount refreshData={setRefreshChartOfAccountKey} key={refreshChartOfAccountKey} />
         </CustomTabPanel>
       </Box>
 
