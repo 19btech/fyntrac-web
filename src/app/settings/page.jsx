@@ -676,62 +676,7 @@ export default function SettingsPage() {
 
           </Paper>
 
-          <Paper key={12} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
-            <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
-              {/* Left Aligned */}
-              <Grid size={8}>
-                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Rewind/Replay Look Back Period</Typography>
-                <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
-                  Specify the number of postings to include in the rewind replay operations.
-                </Typography>
-              </Grid>
-
-              {/* Right Aligned */}
-              <Grid size={2}>
-                <Autocomplete
-                  sx={{
-                    "& .MuiInputBase-root": {
-                      height: "40px"
-                    }
-                  }}
-                  disablePortal
-                  id="currency-combo"
-                  options={replayBoundryList}
-                  value={replayBoundry}
-                  getOptionLabel={(option) => option}
-                  onChange={(event, newValue) => { setReplayBoundry(newValue) }} // newValue will be the selected option object
-                  renderInput={(params) => <TextField {...params} label="Lookback Period" />}
-                />
-
-
-              </Grid>
-              <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Tooltip title="Rewind/Replay lookback period">
-                  <span>
-                    <Link
-                      component="button"
-                      // onClick={handleCurrencySave} // Replace with your actual function
-                      underline="none"
-                      sx={{
-                        marginLeft: 2,
-                        color: '#1a6ab9',
-                        fontWeight: 500,
-                        px: 1,
-                        cursor: 'pointer',
-                        '&:hover': {
-                          color: '#14213d',
-                        },
-                      }}
-                    >
-                      Save
-                    </Link>
-                  </span>
-                </Tooltip>
-              </Grid>
-            </Grid>
-
-          </Paper>
-
+          
           <Paper key={13} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
             <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
               {/* Left Aligned */}

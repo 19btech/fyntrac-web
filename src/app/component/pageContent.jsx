@@ -18,6 +18,7 @@ import EventConfigurationMain from '../event-configuration/page';
 import CustomTableMain from '../custom-table/page';
 import CustomRefDataReportPage from '../reports/custom-ref-data-report/page';
 import CustomOperationalDataReportPage from '../reports/custom-operational-data-report/page';
+import SettingsDashboard from '../settings-dashboard/page';
 import ReportDashboard from '../report-dashboard/page';
 export default function PageContent({ pathname, method }) {
 
@@ -58,6 +59,8 @@ export default function PageContent({ pathname, method }) {
         return <CustomOperationalDataReportPage />
       case '/diagnostic':
         return <InstrumentDiagnosticPage />
+      case '/settings-dashboard':
+        return <SettingsDashboard />
       case '/python-model':
         return <PythonModel setOpenPythonModel={method} />
       default:

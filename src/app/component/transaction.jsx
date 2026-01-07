@@ -95,41 +95,7 @@ function Transaction({ refreshData }) {
 
   return (
     <>
-      <div style={{ height: 600, width: '100%' }}>
-        <Box
-      sx={{
-        height: 400,
-        width: '100%',
-        '& .super-app-theme--header': {
-          backgroundColor: 'rgba(25, 118, 210, 0.08)',
-          fontWeight: 'bold',
-          whiteSpace: 'normal',
-          lineHeight: '1.2',
-          padding: '8px 12px',
-        },
-        '& .MuiDataGrid-columnHeaderTitle': {
-          fontWeight: 'bold',
-          fontSize: '0.875rem',
-          whiteSpace: 'normal',
-          lineHeight: '1.2',
-          overflow: 'visible',
-        },
-        '& .MuiDataGrid-cell': {
-          whiteSpace: 'normal',
-          lineHeight: '1.2',
-          padding: '8px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        '& .MuiDataGrid-virtualScroller': {
-          overflowX: 'auto',
-        },
-        '& .MuiDataGrid-root': {
-          overflow: 'auto',
-        },
-      }}
-    >
+       <div style={{ height: 'auto', width: '100%' }}>
         <DataGrid
                 sx={{
           border: 1,
@@ -161,7 +127,7 @@ function Transaction({ refreshData }) {
           onCellEditCommit={handleCellEditCommit}
           getRowId={(row) => row.id}
         />
-        </Box>
+
       </div>
       <AddTransactionDialog open={open} onClose={() => setOpen(false)} editData={editData} />
     </>
