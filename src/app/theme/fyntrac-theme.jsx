@@ -111,7 +111,6 @@ const fyntracTheme = createTheme({
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          width: "260px !important",
           backgroundColor: "#FFFFFF",
           borderRight: "1px dashed rgba(148, 163, 184, 0.2)", // Subtle dash border
           boxShadow: "none",
