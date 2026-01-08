@@ -13,8 +13,7 @@ function Aggregation({ refreshData }) {
   const { tenant } = useTenant();
   const columns = [
     { field: 'transactionName', headerName: 'Transaction Name', width: 300, editable: false },
-    { field: 'metricName', headerName: 'Metric Name', width: 200, editable: false },
-    { field: 'impect', headerName: 'Impact', width: 200, editable: false },
+    { field: 'metricName', headerName: 'Metric Name', width: 400, editable: false },
     {
       field: 'edit',
       headerName: 'Edit',

@@ -266,7 +266,7 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
           item={{
             segment: "logout",
             title: "Sign Out",
-            icon: <LogoutIcon sx={{ color: "#FF5630" }} />, // Alert color for logout
+            icon: <LogoutIcon />, // Alert color for logout
             onClick: onLogout,
             fontSize: 'fontSize: "14px !important"' ,
           }}

@@ -12,7 +12,7 @@ import {
   Fade,
   Button // Use Button instead of IconButton
 } from '@mui/material';
-import { 
+import {
   ArrowForward,
   AssessmentOutlined,
   ArrowBack, // Standard 'Back' icon
@@ -42,25 +42,26 @@ export default function ReportDashboard() {
       name: "General Configuration",
       tag: "General",
       reports: [
-        { name: "Tenant Management", description:"Manage tenant-level settings, system preferences and environment-wide configurations.", component: SettingsPage },
-        { name: "User Management", description:"Create and manages user accounts, roles, and permissions accross the paltform.", component: ComingSoon },
-        { name: "Cron Jobs", description:"Configure and monitor scheduled tasks for automated processes and data sync.", component: ComingSoon }
-      ]
-    },
-    {
-      name: "Business Configuration",
-      tag: "Business",
-      reports: [
-        { name: "Setup Events", description:"Define business events that aggregate required data from multple input sources.", component: EventConfigurationMain },
-        { name: "Setup Custom Tables", description:"Create and manage custom operational and reference data tables to support business specific needs.", component: CustomTablesMain }
+        { name: "Tenant Management", description: "Manage tenant-level settings, system preferences and environment-wide configurations.", component: SettingsPage },
+        { name: "User Management", description: "Create and manages user accounts, roles, and permissions accross the paltform.", component: ComingSoon },
+        { name: "Cron Jobs", description: "Configure and monitor scheduled tasks for automated processes and data sync.", component: ComingSoon }
       ]
     },
     {
       name: "Reference Data",
       tag: "Reference",
       reports: [
-        { name: "Accounting Rules", description:"Configure transaction logic, aggregate rules, and qualitative and quantitative attributes used in accounting calculations.", component: RulePage },
-        { name: "Journal Mapping", description:"Map calcualted output to account subtypes, charts of accounts, and subledgers for journal posting.", component: AccountingPage }
+        { name: "Accounting Rules", description: "Configure transaction logic, aggregation rules, and qualitative and quantitative attributes used in accounting calculations.", component: RulePage },
+        { name: "Journal Mapping", description: "Map calcualted output to account subtypes, charts of accounts, and subledgers for journal posting.", component: AccountingPage }
+      ]
+    },
+    {
+      name: "Business Configuration",
+      tag: "Business",
+      reports: [
+        { name: "Setup Events", description: "Define business events that aggregate required data from multple input sources.", component: EventConfigurationMain },
+        { name: "Setup Custom Tables", description: "Create and manage custom operational and reference data tables to support business specific needs.", component: CustomTablesMain },
+        { name: "DSL Studio", description: "Built,test and execute custom business logic for financial workflows.", component: ComingSoon }
       ]
     },
   ];
@@ -73,14 +74,14 @@ export default function ReportDashboard() {
       <Container maxWidth={false} sx={{ py: 1, px: { xs: 2, md: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Fade in={true}>
           <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            
+
             {/* Header Area */}
-            <Box 
-              sx={{ 
+            <Box
+              sx={{
                 mb: 2, // Added margin bottom for spacing
                 pb: 0,
-                display: 'flex', 
-                alignItems: 'left', 
+                display: 'flex',
+                alignItems: 'left',
                 justifyContent: 'flex-end', // Pushes button to right
                 borderColor: 'divider',
                 paddingRight: 2.5
@@ -91,19 +92,19 @@ export default function ReportDashboard() {
               <Button
                 onClick={() => setSelectedReport(null)}
                 startIcon={<KeyboardBackspace fontSize="small" />} // Sleek back arrow
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   color: 'text.secondary',
                   fontWeight: 600,
                   fontSize: '0.654rem',
-                  '&:hover': { 
+                  '&:hover': {
                     bgcolor: 'transparent',
                     color: 'primary.main',
-                    textDecoration: 'underline' 
+                    textDecoration: 'underline'
                   }
                 }}
               >
-                Back to Dashboard
+                Back to Settings
               </Button>
             </Box>
 
@@ -123,7 +124,7 @@ export default function ReportDashboard() {
     <Container maxWidth={false} sx={{ py: 1, px: { xs: 2, md: 3 }, minHeight: '100vh', textAlign: 'left' }}>
       {categories.map((cat, catIdx) => (
         <Box key={catIdx} sx={{ mb: 6, width: '100%' }}>
-          
+
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
             <Typography variant="overline" fontWeight="bold" fontSize="0.85rem" color="text.secondary" sx={{ letterSpacing: 1.5, textTransform: 'uppercase' }}>
               {cat.name}
@@ -135,10 +136,10 @@ export default function ReportDashboard() {
             {cat.reports.map((report, idx) => (
               <Grid size={{ xs: 12, md: 6, lg: 4 }} key={idx}>
                 <Fade in={true} timeout={(idx + 1) * 300}>
-                  <Card 
+                  <Card
                     elevation={0}
-                    sx={{ 
-                      height: '100%', 
+                    sx={{
+                      height: '100%',
                       borderRadius: 4,
                       border: '1px solid',
                       borderColor: 'grey.200',
@@ -148,25 +149,25 @@ export default function ReportDashboard() {
                         transform: 'translateY(-4px)',
                         boxShadow: '0 12px 24px -10px rgba(0, 0, 0, 0.1)',
                         borderColor: 'primary.main',
-                        bgcolor: '#eff6ff', 
+                        bgcolor: '#eff6ff',
                       }
                     }}
                   >
-                    <CardActionArea 
-                      onClick={() => setSelectedReport(report)} 
-                      sx={{ 
-                        height: '100%', 
-                        p: 3, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'flex-start', 
+                    <CardActionArea
+                      onClick={() => setSelectedReport(report)}
+                      sx={{
+                        height: '100%',
+                        p: 3,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
                         justifyContent: 'space-between',
                         '& .MuiCardActionArea-focusHighlight': { background: 'transparent' }
                       }}
                     >
                       <Box sx={{ width: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                           <Chip label={cat.tag} size="small" sx={{ bgcolor: 'grey.100', fontWeight: 600, color: 'text.secondary' }} />
+                          <Chip label={cat.tag} size="small" sx={{ bgcolor: 'grey.100', fontWeight: 600, color: 'text.secondary' }} />
                         </Box>
                         <Typography variant="h6" fontWeight="700" gutterBottom sx={{ lineHeight: 1.3 }}>
                           {report.name}

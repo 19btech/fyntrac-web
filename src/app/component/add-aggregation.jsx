@@ -141,7 +141,7 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
                 maxWidth: '100%' // Ensures responsiveness
               }}
             />
-            <Typography variant="h6">Aggregation</Typography>
+            <Typography variant="h6">Balances</Typography>
           </Box>
           <Tooltip title='Close'>
           <IconButton
@@ -181,16 +181,6 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
           onChange={(e) => setMetricName(e.target.value)}
         />
 
-        <Autocomplete
-          sx={{ width: '500px' }}
-          disablePortal
-          id="dataType-combo"
-          options={defaultLevels}
-          value={level}
-          getOptionLabel={(option) => option}
-          onChange={(event, newValue) => { setLevel(newValue) }} // newValue will be the selected option object
-          renderInput={(params) => <TextField {...params} label="Aggregation Level" />}
-        />
       </DialogContent>
       <DialogActions sx={{ justifyContent: "center" }}>
         <Tooltip title='Save'>

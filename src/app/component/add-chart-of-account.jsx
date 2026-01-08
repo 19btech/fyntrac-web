@@ -238,7 +238,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
                 maxWidth: '100%' // Ensures responsiveness
               }}
             />
-            <Typography variant="h6">Charts of Account</Typography>
+            <Typography variant="h6">Charts of Accounts</Typography>
           </Box>
           <Tooltip title='Close'>
             <IconButton

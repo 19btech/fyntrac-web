@@ -138,7 +138,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
                 maxWidth: '100%' // Ensures responsiveness
               }}
             />
-            <Typography variant="h6">Attribute</Typography>
+            <Typography variant="h6">Attributes</Typography>
           </Box>
           <Tooltip title='Close'>
           <IconButton
@@ -185,15 +185,15 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
 
         <FormControlLabel
           control={<Checkbox checked={isReclassable} onChange={(e) => setIsReclassable(e.target.checked)} />}
-          label="Is Reclassable"
+          label="Reclassable"
         />
         <FormControlLabel
           control={<Checkbox checked={isVersionable} onChange={(e) => setIsVersionable(e.target.checked)} />}
-          label="Is Versionable"
+          label="Versionable"
         />
         <FormControlLabel
           control={<Checkbox checked={isNullable} onChange={(e) => setIsNullable(e.target.checked)} />}
-          label="Is Nullable"
+          label="Nullable"
         />
       </DialogContent>
 

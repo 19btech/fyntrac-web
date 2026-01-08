@@ -122,7 +122,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
                 maxWidth: '100%' // Ensures responsiveness
               }}
             />
-            <Typography variant="h6">Aggregation</Typography>
+            <Typography variant="h6">Transactions</Typography>
           </Box>
           <Tooltip title='Close'>
             <IconButton
@@ -149,18 +149,15 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
           value={transactionName}
           onChange={(e) => setTransactionName(e.target.value)}
         />
-        <FormControlLabel
-          control={<Checkbox checked={isReplayable} onChange={(e) => setIsReplayable(e.target.checked)} />}
-          label="Is Replayable"
-        />
+
 
         <FormControlLabel
           control={<Checkbox checked={isExclusive} onChange={(e) => setIsExclusive(e.target.checked)} />}
-          label="Is Exclusive"
+          label="Reportable"
         />
         <FormControlLabel
           control={<Checkbox checked={isGL} onChange={(e) => setIsGL(e.target.checked)} />}
-          label="Is GL"
+          label="Journal"
         />
       </DialogContent>
       <DialogActions sx={{ justifyContent: "center" }}>

@@ -44,6 +44,8 @@ const serviceGetMomActivityDataURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_U
 // UPDATED: A unified card component with better contrast via soft shadows
 const DashboardCard = ({ children, title, action, sx, minHeight }) => {
   const theme = useTheme();
+
+
   return (
     <Card
       elevation={0}
@@ -60,8 +62,8 @@ const DashboardCard = ({ children, title, action, sx, minHeight }) => {
         // Enhanced hover effect for better interactivity contrast
         transition: 'box-shadow 0.3s, transform 0.2s ease-in-out',
         '&:hover': {
-           boxShadow: `0px 12px 24px ${alpha(theme.palette.grey[400], 0.3)}`,
-           transform: 'translateY(-2px)' // Subtle lift
+          boxShadow: `0px 12px 24px ${alpha(theme.palette.grey[400], 0.3)}`,
+          transform: 'translateY(-2px)' // Subtle lift
         },
         ...sx
       }}
@@ -89,16 +91,57 @@ const DashboardCard = ({ children, title, action, sx, minHeight }) => {
 // --- DATA STRUCTURES ---
 const AccountingPeriodRecord = { periodId: 0, period: "", fiscalPeriod: 0, year: 0, status: 0 };
 
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const compactFormatter = (value) =>
+  new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 2,
+  }).format(value);
+
 const columns = [
   { id: 'rank', label: 'Rank', align: 'center', width: 60 },
   { id: 'metricName', label: 'Metric', align: 'left' },
-  { id: 'balance', label: 'Balance', align: 'right' },
+  {
+    id: 'balance',
+    label: 'Balance',
+    align: 'right',
+
+    // ✅ THIS is what makes formatting work
+    format: (value) =>
+      new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number(value) || 0),
+  },
 ];
 
+// Locate this section in your code (around line 118)
 const defaultChartSetting = {
-  yAxis: [{ label: 'Activity', width: 60 }],
+  yAxis: [
+    {
+      label: 'Activity',
+      labelPadding: 30,
+      width: 60,
+      // FIX: Move font settings into tickLabelStyle
+      tickLabelStyle: {
+        fontSize: 12,
+        fontWeight: 500, // This will now work
+      },
+      // Optional: If you wanted to style the word "Activity" instead
+      labelStyle: {
+        fontSize: 14,
+        fontWeight: 600,
+      },
+      valueFormatter: compactFormatter,
+    },
+  ],
   height: 300,
-  margin: { top: 30, bottom: 50, left: 70, right: 20 },
+  margin: { top: 30, bottom: 30, left: 90, right: 70 },
 };
 
 export default function HomePage() {
@@ -120,6 +163,7 @@ export default function HomePage() {
   const [widgetDataList, setWidgetDataList] = React.useState([]);
   const [trendAnalysisData, setTrendAnalysisData] = React.useState([]);
   const [currentOpenAccountingPeriod, setCurrentOpenAccountingPeriod] = React.useState({ ...AccountingPeriodRecord, "period": "__ / __" });
+
 
   // --- HANDLERS ---
   const handleClickOpen = (event) => {
@@ -220,206 +264,221 @@ export default function HomePage() {
       .catch(error => { });
   };
 
+
+
+  const currencyFormatter = (value) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(value);
+
   // --- RENDER ---
   // Added a slight background color to the container so white cards pop out
   return (
     <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh' }}>
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
 
-      {/* 1. Header Row */}
-      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { md: 'flex-end' }, gap: 2 }}>
-        <Box>
+        {/* 2. Key Metrics Row */}
+        <Grid container spacing={2.5} sx={{ mb: 4 }}>
 
-        </Box>
+          {/* A. Accounting Period Widget */}
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+            {/* CHANGED: Increased tint opacity slightly for better contrast (0.04 -> 0.08) */}
+            <DashboardCard sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                  <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', color: 'white', boxShadow: 2 }}>
+                    <CalendarTodayIcon fontSize="small" />
+                  </Avatar>
+                  <Typography variant="subtitle1" fontWeight={700} color="primary.dark">
+                    Accounting Period
+                  </Typography>
+                </Box>
 
-        <TextField
-          label="Reporting Currency"
-          defaultValue="US Dollar"
-          variant="outlined"
-          size="small"
-          slotProps={{ readOnly: true }}
-          sx={{
-            width: { xs: '100%', md: 220 },
-            // Added subtle shadow to the input as well
-            '& .MuiInputBase-root': { 
-                borderRadius: 2, 
-                bgcolor: 'background.paper',
-                boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}`,
-                '& fieldset': { border: 'none' }, // Remove default border to emphasize shadow
-            }
-          }}
-        />
-      </Box>
-
-      {/* 2. Key Metrics Row */}
-      <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        
-        {/* A. Accounting Period Widget */}
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          {/* CHANGED: Increased tint opacity slightly for better contrast (0.04 -> 0.08) */}
-          <DashboardCard sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08) }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', color: 'white', boxShadow: 2 }}>
-                  <CalendarTodayIcon fontSize="small" />
-                </Avatar>
-                <Typography variant="subtitle1" fontWeight={700} color="primary.dark">
-                  Accounting Period
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                  <Typography variant="h4" fontWeight={800} color="primary.main" sx={{ letterSpacing: '-1px' }}>
+                    {currentOpenAccountingPeriod.period}
+                  </Typography>
+                  <IconButton size="small" onClick={handleClickOpen} sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.100' } }}>
+                    <ArrowDropDownIcon color="primary" />
+                  </IconButton>
+                </Box>
               </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                <Typography variant="h4" fontWeight={800} color="primary.main" sx={{ letterSpacing: '-1px' }}>
-                  {currentOpenAccountingPeriod.period}
-                </Typography>
-                <IconButton size="small" onClick={handleClickOpen} sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.100' } }}>
-                  <ArrowDropDownIcon color="primary" />
-                </IconButton>
-              </Box>
-            </Box>
 
-            <Menu
-              open={openPeriodCloseDialog}
-              anchorEl={anchorEl}
-              onClose={handleClose}
-              sx={{ mt: 1 }}
-              slotProps={{ paper: { sx: { borderRadius: 3, boxShadow: 3 } }}}
-            >
-              <Box sx={{ p: 2, display: 'flex', gap: 1 }}>
-                <Autocomplete
-                  options={years}
-                  value={year}
-                  onChange={(e, v) => setYear(v)}
-                  disableClearable
-                  sx={{ width: 100 }}
-                  renderInput={(params) => <TextField {...params} label="Year" size="small" />}
-                />
-                <Autocomplete
-                  options={months}
-                  value={month}
-                  onChange={(e, v) => setMonth(v)}
-                  disableClearable
-                  sx={{ width: 100 }}
-                  renderInput={(params) => <TextField {...params} label="Month" size="small" />}
-                />
-                <Button variant="contained" onClick={handlecloseAccountingPeriod} size="medium" sx={{ borderRadius: 2, fontWeight: 700, boxShadow: 2 }}>
-                  Close
-                </Button>
-              </Box>
-            </Menu>
-          </DashboardCard>
-        </Grid>
-
-        {/* B. Four Metric Widgets */}
-        {widgetDataList.slice(0, 4).map((metric, index) => (
-          <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={index}>
-            <DashboardCard sx={{ p: 0 }}>
-               <Box sx={{ height: '100%', p: 0 }}>
-                  <MetricWidget metric={metric} />
-               </Box>
+              <Menu
+                open={openPeriodCloseDialog}
+                anchorEl={anchorEl}
+                onClose={handleClose}
+                sx={{ mt: 1 }}
+                slotProps={{ paper: { sx: { borderRadius: 3, boxShadow: 3 } } }}
+              >
+                <Box sx={{ p: 2, display: 'flex', gap: 1 }}>
+                  <Autocomplete
+                    options={years}
+                    value={year}
+                    onChange={(e, v) => setYear(v)}
+                    disableClearable
+                    sx={{ width: 100 }}
+                    renderInput={(params) => <TextField {...params} label="Year" size="small" />}
+                  />
+                  <Autocomplete
+                    options={months}
+                    value={month}
+                    onChange={(e, v) => setMonth(v)}
+                    disableClearable
+                    sx={{ width: 100 }}
+                    renderInput={(params) => <TextField {...params} label="Month" size="small" />}
+                  />
+                  <Button variant="contained" onClick={handlecloseAccountingPeriod} size="medium" sx={{ borderRadius: 2, fontWeight: 700, boxShadow: 2 }}>
+                    Close
+                  </Button>
+                </Box>
+              </Menu>
             </DashboardCard>
           </Grid>
-        ))}
-      </Grid>
 
-      {/* 3. Charts & Tables Row */}
-      <Grid container spacing={2.5} sx={{ mb: 4 }}>
-        
-        {/* Trend Analysis */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <DashboardCard title={`${trendAnalysisData.metricName || 'Metric'} Trend Analysis`} minHeight={440}>
-            {trendAnalysisData?.accountingPeriods?.length > 0 && trendAnalysisData?.endingBalances?.length > 0 ? (
-              <Box sx={{ width: '100%', height: 340, mt: 2 }}>
-                <LineChart
-                  xAxis={[{
-                    data: trendAnalysisData.accountingPeriods,
-                    scaleType: 'point',
-                    label: 'Accounting Period',
-                    tickLabelStyle: { fontSize: 12, fontWeight: 500 },
-                    labelStyle: { fontSize: 13, fontWeight: 600, transform: 'translateY(5px)' }
-                  }]}
-                  yAxis={[{ 
-                    label: 'Ending Balance ($)',
-                    labelStyle: { fontSize: 13, fontWeight: 600, transform: 'translateX(-5px)' },
-                    tickLabelStyle: { fontSize: 12, fontWeight: 500 }
-                  }]}
-                  series={[{
-                    data: trendAnalysisData.endingBalances,
-                    label: 'Balance Trend',
-                    showMark: false, // Cleaner look without dots on every point
-                    color: theme.palette.primary.main,
-                    area: true, 
-                    // Add gradient fill for elegance
-                    areaStyle: { 
-                        fill: `url(#trendGradient)`,
-                        opacity: 0.3
-                    }
-                  }]}
-                  margin={{ left: 70, right: 20, top: 20, bottom: 50 }}
-                  sx={{
-                    // Add gradient definition
-                    '& .MuiAreaElement-root': {
-                        fill: 'url(#trendGradient)',
-                    },
-                  }}
-                >
-                    <defs>
-                        <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0.05}/>
-                        </linearGradient>
-                    </defs>
-                </LineChart>
-              </Box>
-            ) : (
-              <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.grey[200], 0.3), borderRadius: 2 }}>
-                <Typography color="text.secondary" fontWeight={500}>
-                  {isDataFetched ? 'No trend data available' : 'Loading data...'}
-                </Typography>
-              </Box>
-            )}
-          </DashboardCard>
+          {/* B. Four Metric Widgets */}
+          {widgetDataList.slice(0, 4).map((metric, index) => (
+            <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={index}>
+              <DashboardCard sx={{ p: 0 }}>
+                <Box sx={{ height: '100%', p: 0 }}>
+                  <MetricWidget metric={metric} />
+                </Box>
+              </DashboardCard>
+            </Grid>
+          ))}
         </Grid>
 
-        {/* Top 5 Metrics */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <DashboardCard title="Top 5 Metrics" minHeight={440} action={<IconButton size="small" sx={{color: 'text.secondary'}}><MoreVertIcon fontSize="small"/></IconButton>}>
-             <Box sx={{ height: 340, overflow: 'auto', mt: 1 }}>
+        {/* 3. Charts & Tables Row */}
+        <Grid container spacing={2.5} sx={{ mb: 4 }}>
+
+          {/* Trend Analysis */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            <DashboardCard title={`${trendAnalysisData.metricName || 'Metric'} Trend Analysis`} minHeight={440}>
+              {trendAnalysisData?.accountingPeriods?.length > 0 && trendAnalysisData?.endingBalances?.length > 0 ? (
+                <Box sx={{ width: '100%', height: 340, mt: 5 }}>
+                  <LineChart
+                    xAxis={[
+                      {
+                        data: trendAnalysisData.accountingPeriods,
+                        scaleType: 'point',
+                        label: 'Accounting Period',
+                        labelPadding: 30,
+                        tickLabelStyle: {
+                          fontSize: 12,
+                          fontWeight: 500,
+                          angle: -30,
+                          textAnchor: 'end',
+                        },
+                        labelStyle: {
+                          fontSize: 13,
+                          fontWeight: 600,
+                        },
+                      },
+                    ]}
+                    yAxis={[
+                      {
+                        label: 'Ending Balance ($)',
+                        labelPadding: 30,
+                        tickLabelStyle: {
+                          fontSize: 12,
+                          fontWeight: 500,
+                          scaleType: 'linear',
+                        },
+                        valueFormatter: compactFormatter, // ✅ KEY FIX
+                        labelStyle: {
+                          fontSize: 13,
+                          fontWeight: 600,
+
+                        },
+
+
+                      },
+                    ]}
+                    series={[
+                      {
+                        data: trendAnalysisData.endingBalances,
+                        label: 'Balance Trend',
+                        showMark: false,
+                        color: theme.palette.primary.main,
+                        area: true,
+                        valueFormatter: currencyFormatter, // ✅ Tooltip full value
+                        areaStyle: {
+                          fill: `url(#trendGradient)`,
+                          opacity: 0.3,
+                        },
+                      },
+                    ]}
+                    margin={{
+                      left: 30,
+                      right: 30,
+                      top: 30,
+                      bottom: 30,
+                    }}
+                    sx={{
+                      '& .MuiAreaElement-root': {
+                        fill: 'url(#trendGradient)',
+                      },
+                    }}
+                  >
+                    <defs>
+                      <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                  </LineChart>
+                </Box>
+              ) : (
+                <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.grey[200], 0.3), borderRadius: 2 }}>
+                  <Typography color="text.secondary" fontWeight={500}>
+                    {isDataFetched ? 'No trend data available' : 'Loading data...'}
+                  </Typography>
+                </Box>
+              )}
+            </DashboardCard>
+          </Grid>
+
+          {/* Top 5 Metrics */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <DashboardCard title="Top 5 Metrics" minHeight={440} action={<IconButton size="small" sx={{ color: 'text.secondary' }}></IconButton>}>
+              <Box sx={{ height: 340, overflow: 'auto', mt: 1 }}>
                 <DynamicTable
                   columns={columns}
                   rows={rankedMetrics}
                   rowKey="rank"
                 />
-             </Box>
-          </DashboardCard>
-        </Grid>
-      </Grid>
-
-      {/* 4. Bottom Row: Month over Month */}
-      <Grid container spacing={2.5}>
-        <Grid size={12}>
-          <DashboardCard title="Month Over Month Activity" minHeight={450}>
-            {momData.length > 0 ? (
-               <Box sx={{ width: '100%', height: 380, mt: 2 }}>
-                <BarChartWidget
-                  dataset={momData}
-                  xAxis={[{ dataKey: 'accountingPeriodId', scaleType: 'band', tickLabelStyle: { fontWeight: 600 } }]}
-                  series={momMetricSeries}
-                  chartSetting={{ ...defaultChartSetting, height: 380 }}
-                />
-               </Box>
-            ) : (
-              <Box sx={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.grey[200], 0.3), borderRadius: 2 }}>
-                 <Typography color="text.secondary" fontWeight={500}>
-                   {isDataFetched ? 'No activity data available' : 'Loading...'}
-                 </Typography>
               </Box>
-            )}
-          </DashboardCard>
+            </DashboardCard>
+          </Grid>
         </Grid>
-      </Grid>
 
-    </Container>
+        {/* 4. Bottom Row: Month over Month */}
+        <Grid container spacing={2.5}>
+          <Grid size={12}>
+            <DashboardCard title="Month Over Month Activity" minHeight={450}>
+              {momData.length > 0 ? (
+                <Box sx={{ width: '100%', height: 380, mt: 2 }}>
+                  <BarChartWidget
+                    dataset={momData}
+                    xAxis={[{ dataKey: 'accountingPeriodId', scaleType: 'band', tickLabelStyle: { fontWeight: 600 } }]}
+                    series={momMetricSeries}
+                    chartSetting={{ ...defaultChartSetting, height: 380 }}
+                  />
+                </Box>
+              ) : (
+                <Box sx={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.grey[200], 0.3), borderRadius: 2 }}>
+                  <Typography color="text.secondary" fontWeight={500}>
+                    {isDataFetched ? 'No activity data available' : 'Loading...'}
+                  </Typography>
+                </Box>
+              )}
+            </DashboardCard>
+          </Grid>
+        </Grid>
+
+      </Container>
     </Box>
   )
 }

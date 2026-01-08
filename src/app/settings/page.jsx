@@ -358,7 +358,7 @@ export default function SettingsPage() {
 
       <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
         <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleConfigurationTabChange} aria-label="Accounting Configuration">
-          <Tab label="General Settings" sx={{ textTransform: 'none' }} />
+          <Tab label="Tenant Management" sx={{ textTransform: 'none' }} />
         </Tabs>
       </Box>
 
@@ -400,7 +400,7 @@ export default function SettingsPage() {
             <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
               {/* Left Aligned */}
               <Grid size={8}>
-                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Home Currencty</Typography>
+                <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Home Currency</Typography>
                 <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
                   Choose default currency of your environment.
                 </Typography>
@@ -408,21 +408,21 @@ export default function SettingsPage() {
 
               {/* Right Aligned */}
               <Grid size={2}>
-<Autocomplete
-  disablePortal
-  id="currency-combo"
-  size="small" // 👈 This sets height to 40px & centers label automatically
-  options={currencyList}
-  value={currency}
-  getOptionLabel={(option) => option}
-  onChange={(event, newValue) => { setCurrency(newValue || ''); }}
-  renderInput={(params) => <TextField {...params} label="Currency" />}
-/>
+                <Autocomplete
+                  disablePortal
+                  id="currency-combo"
+                  size="small" // 👈 This sets height to 40px & centers label automatically
+                  options={currencyList}
+                  value={currency}
+                  getOptionLabel={(option) => option}
+                  onChange={(event, newValue) => { setCurrency(newValue || ''); }}
+                  renderInput={(params) => <TextField {...params} label="Currency" />}
+                />
 
 
               </Grid>
               <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Tooltip title="Currency">
+                <Tooltip title="Set Currency">
                   <span>
                     <Link
                       component="button"
@@ -432,6 +432,7 @@ export default function SettingsPage() {
                         marginLeft: 2,
                         color: '#1a6ab9',
                         fontWeight: 500,
+                        fontSize: '0.9rem',
                         px: 1,
                         cursor: 'pointer',
                         '&:hover': {
@@ -487,6 +488,7 @@ export default function SettingsPage() {
                         marginLeft: 2,
                         color: '#1a6ab9',
                         fontWeight: 500,
+                        fontSize: '0.9rem',
                         px: 1,
                         cursor: isFiscalPeriodButtonDisabled ? 'not-allowed' : 'pointer',
                         pointerEvents: isFiscalPeriodButtonDisabled ? 'none' : 'auto',
@@ -567,6 +569,7 @@ export default function SettingsPage() {
                         marginLeft: 2,
                         color: '#1a6ab9',
                         fontWeight: 500,
+                        fontSize: '0.9rem',
                         px: 1,
                         cursor: 'pointer',
                         '&:hover': {
@@ -589,7 +592,7 @@ export default function SettingsPage() {
               <Grid size={8}>
                 <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Delete Entries</Typography>
                 <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
-                  This action will delete all transactions, balances, GL for selected date.
+                  This action will delete all activity data for selected date.
                 </Typography>
               </Grid>
 
@@ -611,7 +614,7 @@ export default function SettingsPage() {
               </Grid>
 
               <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Tooltip title="Generate Accounting Periods" arrow>
+                <Tooltip title="Delete entries" arrow>
                   <span>
                     <Link
                       component="button" // behaves like a button
@@ -622,6 +625,7 @@ export default function SettingsPage() {
                         // bgcolor: '#c7c8d7',
                         px: 2,
                         color: '#1a6ab9',
+                        fontSize: '0.9rem',
                         cursor: isFiscalPeriodButtonDisabled ? 'not-allowed' : 'pointer',
                         pointerEvents: isFiscalPeriodButtonDisabled ? 'none' : 'auto',
                         '&:hover': {
@@ -645,7 +649,7 @@ export default function SettingsPage() {
               <Grid>
                 <Typography sx={{ fontSize: '0.9rem', textAlign: 'left' }}>Configure Dashboard</Typography>
                 <Typography sx={{ fontSize: '0.7rem', textAlign: 'left', color: '#1a6ab9' }}>
-                  update dashboard settings.
+                  Update dashboard settings.
                 </Typography>
               </Grid>
 
@@ -671,7 +675,7 @@ export default function SettingsPage() {
 
           </Paper>
 
-          
+
           <Paper key={13} elevation={0} sx={{ padding: '10px', marginBottom: '5px' }}>
             <Grid container sx={{ height: '70px' }} alignItems="center" justifyContent="space-between">
               {/* Left Aligned */}
@@ -702,7 +706,7 @@ export default function SettingsPage() {
 
               </Grid>
               <Grid size={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Tooltip title="Reporting Period">
+                <Tooltip title="Set Reporting Period">
                   <span>
                     <Link
                       component="button"
@@ -712,6 +716,7 @@ export default function SettingsPage() {
                         marginLeft: 2,
                         color: '#1a6ab9',
                         fontWeight: 500,
+                        fontSize: '0.9rem',
                         px: 1,
                         cursor: 'pointer',
                         '&:hover': {

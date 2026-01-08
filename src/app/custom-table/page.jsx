@@ -42,7 +42,7 @@ const VisuallyHiddenInput = styled('input')({
 export default function CustomTablesMain() {
     const [panelIndex, setPanelIndex] = React.useState(0);
     const [modelRefreshKey, setModelRefreshKey] = React.useState(0);
-    const [headerLabel, setHeaderLabel] = React.useState('Custom Tables');
+    const [headerLabel, setHeaderLabel] = React.useState('Setup Custom Tables');
     const [openCustomTableModal, setOpenCustomTableModal] = React.useState(false);
     const [tableType, setTableType] = React.useState('REFERENCE');
     const initialRows = [];
@@ -238,7 +238,7 @@ export default function CustomTablesMain() {
                     <DialogContent>
                         <FileUploadComponent
                             onDrop={handleFileDrop}
-                            text="Drag and drop your images here"
+                            text="Drag and drop your files here"
                             iconColor="#3f51b5"
                             borderColor="#3f51b5"
                             filesLimit={5}

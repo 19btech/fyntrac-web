@@ -37,7 +37,7 @@ export default function EventConfigurationMain() {
     const { tenant } = useTenant();
     const [panelIndex, setPanelIndex] = React.useState(0); // Initialize with the first tab index
     const [modelRefreshKey, setModelRefreshKey] = React.useState(0); // Example state for refresh key
-    const [headerLabel, setHeaderLabel] = React.useState('Event Configuration');
+    const [headerLabel, setHeaderLabel] = React.useState('Setup Events');
     const [open, setOpen] = React.useState(false);
     const [openEventConfiguration, setOpenEventConfiguration] = React.useState(false);
 

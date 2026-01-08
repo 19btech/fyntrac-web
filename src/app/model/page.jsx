@@ -61,7 +61,7 @@ export default function ModelPage() {
   const [modelRefreshKey, setModelRefreshKey] = React.useState(0); // Example state for refresh key
   const [openExecuteModel, setOpenExecuteModel] = React.useState(false);
   const [openPythonModel, setOpenPythonModel] = React.useState(false);
-  const [headerLabel, setHeaderLabel] = React.useState('Model');
+  const [headerLabel, setHeaderLabel] = React.useState('Model Management');
   const [open, setOpen] = React.useState(true);
   const [activityDataOpen, setActivityDataOpen] = React.useState(true);
   const [refDataOpen, setRefDataOpen] = React.useState(true);
@@ -625,7 +625,7 @@ export default function ModelPage() {
             <Grid size="grow">
               <div className='right'>
                 <Stack direction="row" spacing={1}>
-                  <Tooltip title="Python model page" arrow>
+                  {/* <Tooltip title="Python model page" arrow>
                     <IconButton aria-label="Python model" onClick={openPythonModelScreen} sx={{
                       '&:hover': {
                         backgroundColor: 'darkgrey',
@@ -633,7 +633,7 @@ export default function ModelPage() {
                     }}>
                       <PythonIcon />
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip> */}
 
                   <Tooltip title="Refresh page" arrow>
                     <IconButton aria-label="refresh" onClick={handleRefresh} sx={{
@@ -644,8 +644,8 @@ export default function ModelPage() {
                       <CachedRoundedIcon />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Upload Rule File" arrow>
-                    <IconButton aria-label="upload rule file" onClick={handleOpenFileUpload} sx={{
+                  <Tooltip title="Upload Model" arrow>
+                    <IconButton aria-label="Upload Model" onClick={handleOpenFileUpload} sx={{
                       '&:hover': {
                         backgroundColor: 'darkgrey',
                       },
@@ -673,7 +673,7 @@ export default function ModelPage() {
           <Box>
             <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
               <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleModelChange} aria-label="Loaded Models">
-                <Tab label="Loaded Models" sx={{ textTransform: 'none' }} />
+                <Tab label="Models" sx={{ textTransform: 'none' }} />
               </Tabs>
             </Box>
             <CustomTabPanel value={panelIndex} index={panelIndex}>

@@ -11,6 +11,7 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import ChartOfAccount from '../component/chart-off-account';
 import SubledgerMapping from '../component/subledger-mapping'
+import AddAccountTypeDialog from '../component/add-account-type'
 import AccountType from '../component/account-type'
 import CustomTabPanel from '../component/custom-tab-panel'
 import FileUploadComponent from '../component/file-upload'
@@ -40,8 +41,10 @@ export default function AccountingPage() {
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [refreshChartOfAccountKey, setRefreshChartOfAccountKey] = React.useState(0);
   const [refreshSubledgerMapping, setRefreshSubledgerMapping] = React.useState(0);
+    const [refreshAccountTypeKey, setRefreshAccountTypeKey] = React.useState(0);
   const [isAddChartOfAccountDialogOpen, setIsAddChartOfAccountDialogOpen] = React.useState(false);
   const [isAddSubledgerMappingDialogOpen, setIsAddSubledgerMappingDialogOpen] = React.useState(false);
+  const [isAddAccountTypeDialogOpen, setIsAddAccountTypeDialogOpen] = React.useState(false);
 
   const handleRefresh = () => {
     localStorage.removeItem('attributeMetadata');
@@ -102,11 +105,13 @@ export default function AccountingPage() {
   };
 
   const handleAdd = () => {
-    if (panelIndex === 0) {
-      setIsAddChartOfAccountDialogOpen(true);
-    } else if (panelIndex === 1) {
+    if(panelIndex ===  0){
+      setIsAddAccountTypeDialogOpen(true);
+    }else if (panelIndex === 1) {
       setIsAddSubledgerMappingDialogOpen(true);
-    }
+    }else if (panelIndex === 2) {
+      setIsAddChartOfAccountDialogOpen(true);
+    } 
   }
 
   const handleAddChartOfAccountCloseDialog = () => {
@@ -117,6 +122,9 @@ export default function AccountingPage() {
     setIsAddSubledgerMappingDialogOpen(false);
   };
 
+    const handleAddAccountTypeCloseDialog = () => {
+    setIsAddAccountTypeDialogOpen(false);
+  };
   return (
     <>
 
@@ -124,7 +132,7 @@ export default function AccountingPage() {
         <Grid size="auto">
           <div className='left'>
             <GridHeader>
-              Journal
+              Journal Mapping
             </GridHeader>
           </div>
         </Grid>
@@ -174,12 +182,12 @@ export default function AccountingPage() {
           <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleTransactionChange} aria-label="Accounting Configuration">
             <Tab label="Account Type" sx={{ textTransform: 'none' }} />
             <Tab label="Subledger Mapping" sx={{ textTransform: 'none' }} />
-            <Tab label="Chart of Account" sx={{ textTransform: 'none' }} />
+            <Tab label="Chart of Accounts" sx={{ textTransform: 'none' }} />
           </Tabs>
         </Box>
 
         <CustomTabPanel value={panelIndex} index={0}>
-          <AccountType refreshData={setRefreshSubledgerMapping} key={refreshSubledgerMapping} />
+          <AccountType refreshData={setRefreshAccountTypeKey} key={refreshAccountTypeKey} />
         </CustomTabPanel>
 
         <CustomTabPanel value={panelIndex} index={1}>
@@ -198,7 +206,7 @@ export default function AccountingPage() {
           <DialogContent>
             <FileUploadComponent
               onDrop={handleFileDrop}
-              text="Drag and drop your images here"
+              text="Drag and drop your files here"
               iconColor="#3f51b5"
               borderColor="#3f51b5"
               filesLimit={5}
@@ -215,6 +223,7 @@ export default function AccountingPage() {
       <>
         <AddChartofAccount open={isAddChartOfAccountDialogOpen} onClose={handleAddChartOfAccountCloseDialog} />
         <AddSubledgerMapping open={isAddSubledgerMappingDialogOpen} onClose={handleAddSubledgerMappingCloseDialog} />
+        <AddAccountTypeDialog open={isAddAccountTypeDialogOpen} onClose={handleAddAccountTypeCloseDialog} />
       </>
     </>
   )

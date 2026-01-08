@@ -181,10 +181,10 @@ const ExecuteModel = ({ open, onClose }) => {
                         onChange={handleChange}
                         error={error}
                         helperText={error ? "Invalid date format. Use dd/mm/yyyy." : ""}
-                        placeholder="MM/dd/yyyy"
+                        placeholder="mm/dd/yyyy"
                     />
                     <Typography style={{ align: 'left', alignContent: 'left', fontSize: '12px', color: 'gray' }}>
-                        Execution date of Mode in 'MM/dd/yyyy' format.
+                        Execution date in 'mm/dd/yyyy' format.
                     </Typography>
                 </Box>
                 <Divider sx={{ marginTop: 3, marginBottom: 2 }} />

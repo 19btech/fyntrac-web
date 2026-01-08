@@ -23,17 +23,10 @@ function Transaction({ refreshData }) {
 
   const columns = [
     { field: 'name', headerName: 'Transaction Name', width: 400 },
-    {
-      field: 'isReplayable',
-      headerName: 'Is Replayable',
-      width: 150,
-      renderCell: (params) => (
-        <input type="checkbox" checked={params.value} readOnly />
-      ),
-    },
+
     {
       field: 'exclusive',
-      headerName: 'Exclusive',
+      headerName: 'Reportable',
       width: 150,
       renderCell: (params) => (
         <input type="checkbox" checked={params.value} readOnly />

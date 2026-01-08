@@ -590,8 +590,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     try {
       console.log('🌐 Making API call to:', `${baseURL}/fyntrac/custom-table/get/all-tables`);
       const response = await axios.get(`${baseURL}/fyntrac/custom-table/get/all-tables`, {
-            headers: headers
-        });
+        headers: headers
+      });
       console.log('📡 Raw API Response:', response);
       console.log('📡 Response data:', response.data);
 
@@ -676,8 +676,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
               <Tooltip
                 title={
                   currentTableType === 'REFERENCE'
-                    ? 'Reference tables store lookup data and require a reference column'
-                    : 'Operational tables store transactional data and can link to reference tables'
+                    ? 'A user-defined table for static or slowly changing data used as reference inputs in calculations.'
+                    : 'A user-defined activity table designed to record dynamic, period-by-period operational data.'
                 }
                 arrow
               >
@@ -725,9 +725,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
           <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ flexShrink: 0 }}>
             <Typography variant="subtitle2" fontWeight={600} display="flex" alignItems="center" gap={1}>
               Table Columns {isEditMode && <Chip label="Edit Mode" size="small" color="primary" />}
-              <Tooltip title="Define your table structure. Ensure column names are unique and valid SQL identifiers." arrow>
-                <InfoIcon color="action" fontSize="small" sx={{ fontSize: '1rem' }} />
-              </Tooltip>
+              
             </Typography>
             <Button
               size="small"
@@ -858,11 +856,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2" gutterBottom sx={{ color: 'text.secondary', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
               Selected Primary Keys
-              {currentTableType === 'OPERATIONAL' && (
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 1, fontStyle: 'italic' }}>
-                  (Only accountingPeriod allowed for operational tables)
-                </Typography>
-              )}
+
             </Typography>
             {primaryKeys.length > 0 ? (
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -880,8 +874,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
               </Box>
             ) : (
               <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                No primary keys selected. Use the key icon in the table above.
-                {currentTableType === 'OPERATIONAL' && ' (Only accountingPeriod can be selected)'}
+                This table needs a primary key. Select one using the key icon above.
+                
               </Typography>
             )}
             {errors.primaryKeys && (
@@ -899,7 +893,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                 value={referenceColumn}
                 onChange={(e) => setReferenceColumn(e.target.value)}
                 error={!!errors.referenceColumn}
-                helperText={errors.referenceColumn || "Select the column used for lookups"}
+                helperText={errors.referenceColumn || "Select the reference column used for lookups"}
                 size="small"
                 fullWidth
                 required
@@ -930,21 +924,31 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
 
       <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider', justifyContent: 'center' }}>
         <Button
+          // 1. Use your main form submit function, not the column update function
           onClick={handleSubmit}
+
+          // 2. Standard Primary style for a main action button
           variant="contained"
-          disabled={!canSubmit()}
-          startIcon={loading && <CircularProgress size={18} />}
+          color="primary"
+
+          // 3. Disable based on form validity or loading state
+          disabled={!canSubmit() || loading}
+
+          // 4. Custom Styling (Lighter shade on disable)
           sx={{
             minWidth: 120,
-            bgcolor: '#14213d',
-            color: 'white',
-            '&:hover': {
-              color: '#E6E6EF', // Prevent text color from changing on hover
-            },
+            // Fix: Override the default grey disabled style
+            '&.Mui-disabled': {
+              // This is the lighter version of your primary color
+              bgcolor: 'rgba(20, 33, 61, 0.5)',
+              color: '#ffffff'
+            }
           }}
-
         >
-          {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Table' : 'Create Table')}
+          {loading
+            ? (isEditMode ? 'Updating...' : 'Creating...')
+            : (isEditMode ? 'Update Table' : 'Create Table')
+          }
         </Button>
       </DialogActions>
     </Dialog>

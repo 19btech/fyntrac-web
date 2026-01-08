@@ -27,6 +27,11 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 export default function DynamicTable({ columns, rows, rowKey }) {
   return (
     <TableContainer component={Paper}>
