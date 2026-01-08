@@ -914,7 +914,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <img src="fyntrac.png" alt="Logo" style={{ width: '150px', height: 'auto' }} />
                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
-                        {editData ? 'Edit Event Configuration' : 'Create Event Configuration'}
+                        {editData ? 'Edit Event' : 'Create Event'}
                     </Typography>
                 </Box>
 

@@ -240,7 +240,7 @@ function EventConfigurationsList({ refreshData }) {
         {
             field: 'isActive',
             headerName: 'Active / Inactive',
-            width: 120,
+            width: 150,
             editable: false,
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>

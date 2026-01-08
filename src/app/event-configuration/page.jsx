@@ -118,22 +118,24 @@ export default function EventConfigurationMain() {
                                     <CachedRoundedIcon />
                                 </IconButton>
                             </Tooltip>
+                            <Tooltip title="Add Event">
+                                <IconButton
+                                    aria-label="add"
+                                    onClick={() => setOpenEventConfiguration(true)}   // ✅ Correct
+                                    sx={{
+                                        '&:hover': {
+                                            backgroundColor: 'darkgrey',
+                                        },
+                                    }}
+                                >
 
-                            <IconButton
-                                aria-label="add"
-                                onClick={() => setOpenEventConfiguration(true)}   // ✅ Correct
-                                sx={{
-                                    '&:hover': {
-                                        backgroundColor: 'darkgrey',
-                                    },
-                                }}
-                            >
-                                <AddOutlinedIcon />
-                            </IconButton>
+                                    <AddOutlinedIcon />
+                                </IconButton>
+                            </Tooltip>
                         </Stack>
                     </div>
                 </Grid>
-            </Grid>
+            </Grid >
 
 
             <Divider />
@@ -145,7 +147,7 @@ export default function EventConfigurationMain() {
                     </Tabs>
                 </Box>
                 <CustomTabPanel value={panelIndex} index={panelIndex}>
-                    <EventConfigurations refreshData={setModelRefreshKey} key={modelRefreshKey}> </EventConfigurations> 
+                    <EventConfigurations refreshData={setModelRefreshKey} key={modelRefreshKey}> </EventConfigurations>
                 </CustomTabPanel>
             </Box>
             <EventConfiguration open={openEventConfiguration} onClose={setOpenEventConfiguration} />

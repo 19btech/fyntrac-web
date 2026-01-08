@@ -192,17 +192,20 @@ export default function CustomTablesMain() {
                                 </IconButton>
                             </Tooltip>
 
-                            <IconButton
-                                aria-label="add"
-                                onClick={() => setOpenCustomTableModal(true)}
-                                sx={{
-                                    '&:hover': {
-                                        backgroundColor: 'darkgrey',
-                                    },
-                                }}
-                            >
-                                <AddOutlinedIcon />
-                            </IconButton>
+                            <Tooltip title="Add Table">
+                                <IconButton
+                                    aria-label="add"
+                                    onClick={() => setOpenCustomTableModal(true)}
+                                    sx={{
+                                        '&:hover': {
+                                            backgroundColor: 'darkgrey',
+                                        },
+                                    }}
+                                >
+
+                                    <AddOutlinedIcon />
+                                </IconButton>
+                            </Tooltip>
                         </Stack>
                     </div>
                 </Grid>

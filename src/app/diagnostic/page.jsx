@@ -292,7 +292,7 @@ const InstrumentDiagnosticPage = () => {
 
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Download report data" arrow>
+              <Tooltip title="Download Diagnostic" arrow>
                 <IconButton
                   onClick={downloadDiagnostic}
                   aria-label="Download file"
@@ -362,7 +362,7 @@ const InstrumentDiagnosticPage = () => {
 
                 <Grid xs={12} sm={3}>
                   <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
-                    <InputLabel id="sort-by-select-model">Select Posting</InputLabel>
+                    <InputLabel id="sort-by-select-model">Select Date</InputLabel>
                     <Select
                       labelId="sort-by-select-posting-date"
                       id="sort-by-select-posting-date"
