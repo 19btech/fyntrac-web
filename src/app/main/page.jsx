@@ -229,7 +229,6 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
     { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
     { segment: "diagnostic", title: "Diagnostic", icon: <TroubleshootIcon /> , fontSize: 'fontSize: "14px !important"' },
     { segment: "model", title: "Model", icon: <ArticleOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "mapping", title: "Mapping", icon: <AccountBalanceOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
     { segment: "sync", title: "Ingest", icon: <SyncAltOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
     { segment: "report-dashboard", title: "Reports", icon: <TableChartOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
     { segment: "settings-dashboard", title: "Settings", icon: <TuneOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
