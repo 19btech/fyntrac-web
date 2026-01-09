@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -18,160 +18,176 @@ import {
   Tooltip,
   useTheme,
   alpha,
-  Divider
+  Container
 } from '@mui/material';
 
 // Icons
 import RefreshIcon from '@mui/icons-material/Refresh';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import SyncIcon from '@mui/icons-material/Sync';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import TableViewIcon from '@mui/icons-material/TableView';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useTenant } from "../tenant-context";
+import axios from 'axios';
 
-// --- MOCK DATA ---
-const recentUploadData = {
-  id: '1766561048165',
-  jobName: 'transactionActivityUploadJob',
-  startTime: '2025-12-24 12:54:08',
-  endTime: '2025-12-24 12:54:22',
-  status: 'COMPLETED',
-  details: [
-    { tableName: 'TransactionActivity', populated: '1,233', failed: '12' },
-    { tableName: 'InstrumentAttributeHistory', populated: '848', failed: '2' },
-  ]
+// --- HELPERS ---
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return '-';
+  return new Date(isoString).toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
 };
 
-const historicalData = [
-  {
-    id: '1766559021004',
-    jobName: 'dailyReconciliationJob',
-    startTime: '2025-12-23 09:15:00',
-    endTime: '2025-12-23 09:18:45',
-    status: 'COMPLETED'
-  },
-  {
-    id: '1766548100232',
-    jobName: 'portfolioDataSync',
-    startTime: '2025-12-22 18:30:10',
-    endTime: '2025-12-22 18:30:15',
-    status: 'FAILED'
-  },
-  {
-    id: '1766492109981',
-    jobName: 'initialMigrationLoad',
-    startTime: '2025-12-20 08:00:00',
-    endTime: '2025-12-20 08:45:22',
-    status: 'COMPLETED'
-  }
-];
-
-// --- COMPONENTS ---
-
-// 1. Status Chip Helper
 const StatusChip = ({ status }) => {
   const isSuccess = status === 'COMPLETED';
+  const isError = status === 'FAILED';
+  
+  let bg = alpha('#22c55e', 0.1);
+  let color = '#166534';
+  let border = alpha('#22c55e', 0.2);
+
+  if (isError) {
+    bg = alpha('#ef4444', 0.1);
+    color = '#991b1b';
+    border = alpha('#ef4444', 0.2);
+  } else if (!isSuccess && !isError) {
+    bg = alpha('#3b82f6', 0.1);
+    color = '#1e40af';
+    border = alpha('#3b82f6', 0.2);
+  }
+
   return (
     <Chip
-      label={status}
+      label={status || 'UNKNOWN'}
       size="small"
       sx={{
         fontWeight: 700,
         fontSize: '0.7rem',
         borderRadius: 1,
         height: 24,
-        bgcolor: isSuccess ? alpha('#22c55e', 0.1) : alpha('#ef4444', 0.1),
-        color: isSuccess ? '#166534' : '#991b1b',
-        border: `1px solid ${isSuccess ? alpha('#22c55e', 0.2) : alpha('#ef4444', 0.2)}`
+        bgcolor: bg,
+        color: color,
+        border: `1px solid ${border}`
       }}
     />
   );
 };
 
-// 2. Collapsible Row Component
+// --- COMPONENTS ---
+
+// 1. Collapsible Row (Updated with Center Alignment)
 function Row({ row, isExpandedDefault = false }) {
   const [open, setOpen] = useState(isExpandedDefault);
   const theme = useTheme();
 
+  const hasDetails = row.details && row.details.length > 0;
+
   return (
     <>
-      <TableRow sx={{ '& > *': { borderBottom: 'unset' }, '&:hover': { bgcolor: 'action.hover' } }}>
+      <TableRow 
+        sx={{ 
+          '& > *': { borderBottom: 'unset' }, 
+          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+          transition: 'background-color 0.2s'
+        }}
+      >
         <TableCell width={60}>
           <IconButton
             aria-label="expand row"
             size="small"
             onClick={() => setOpen(!open)}
+            sx={{ 
+              bgcolor: open ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+              color: open ? 'primary.main' : 'action.active'
+            }}
           >
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
+        
+        {/* ID & Name: Keep Left Aligned */}
         <TableCell component="th" scope="row" sx={{ fontWeight: 600, color: 'text.primary' }}>
-          {row.id}
+          {row.uploadId}
         </TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{row.jobName}</TableCell>
-        <TableCell sx={{ color: 'text.secondary' }}>{row.startTime}</TableCell>
-        <TableCell sx={{ color: 'text.secondary' }}>{row.endTime}</TableCell>
-        <TableCell>
-          <StatusChip status={row.status} />
-        </TableCell>
-        <TableCell align="right">
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-            <Tooltip title="View Logs">
-              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
-                <VisibilityOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Download Report">
-              <IconButton size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
-                <DownloadOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
+        
+        {/* CHANGED: Center Aligned Date */}
+        <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.starting)}</TableCell>
+        
+        {/* CHANGED: Center Aligned Date */}
+        <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.endTime)}</TableCell>
+        
+        {/* CHANGED: Center Aligned Status */}
+        <TableCell align="center">
+          <StatusChip status={row.activityStatus} />
         </TableCell>
       </TableRow>
-      
+
       {/* Expanded Detail View */}
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
           <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ margin: 3, ml: 8 }}>
-              {row.details ? (
-                <>
-                  <Typography variant="subtitle2" gutterBottom component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.primary' }}>
-                    <TableViewIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                    Populated Tables & Records
+            <Box sx={{ margin: 3, ml: 9, p: 2, bgcolor: alpha(theme.palette.grey[50], 0.5), borderRadius: 2, border: `1px dashed ${theme.palette.divider}` }}>
+              
+              {hasDetails ? (
+                 <>
+                  <Typography variant="subtitle2" gutterBottom component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main', fontWeight: 700 }}>
+                    <TableViewIcon fontSize="small" />
+                    Processing Details
                   </Typography>
-                  <Card variant="outlined" sx={{ mt: 2, overflow: 'hidden', borderRadius: 2 }}>
-                    <Table size="small" aria-label="details">
-                      <TableHead sx={{ bgcolor: 'action.hover' }}>
+                   <Card variant="outlined" sx={{ mt: 2, overflow: 'hidden', borderRadius: 2, boxShadow: 0 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 600 }}>Table Name</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }}>Records Populated</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }}>Records Failed</TableCell>
+                          {/* Inner table numeric values usually look better Right or Center aligned */}
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Read</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Written</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Skipped</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>Duration</TableCell>
+                          <TableCell align="left" sx={{ fontWeight: 600 }}>Error</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {row.details.map((detailRow) => (
-                          <TableRow key={detailRow.tableName}>
+                        {row.details.map((detail, index) => (
+                          <TableRow key={index}>
                             <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
-                              {detailRow.tableName}
+                                {detail.tableName}
                             </TableCell>
-                            <TableCell>{detailRow.populated}</TableCell>
-                            <TableCell>{detailRow.failed}</TableCell>
+                            <TableCell align="center">{detail.recordsRead}</TableCell>
+                            <TableCell align="center">{detail.recordsWritten}</TableCell>
+                            <TableCell align="center">{detail.recordsSkipped}</TableCell>
+                            <TableCell align="center" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                                {formatDateTime(detail.starting).split(',')[1]} - {formatDateTime(detail.endTime).split(',')[1]}
+                            </TableCell>
+                            
+                            <TableCell align="left" sx={{ fontSize: '0.75rem', maxWidth: 200, wordWrap: 'break-word' }}>
+                                {detail.errorMessage ? (
+                                    <Typography variant="caption" color="error.main" fontWeight={600}>
+                                        {detail.errorMessage}
+                                    </Typography>
+                                ) : (
+                                    <Typography variant="caption" color="text.disabled">-</Typography>
+                                )}
+                            </TableCell>
+
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </Card>
-                </>
+                 </>
               ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ py: 2, fontStyle: 'italic' }}>
-                  No detailed records available for this job.
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', py: 1 }}>
+                    No detailed records available.
                 </Typography>
               )}
+
             </Box>
           </Collapse>
         </TableCell>
@@ -180,152 +196,195 @@ function Row({ row, isExpandedDefault = false }) {
   );
 }
 
-// 3. Reusable Section Card
-const SectionCard = ({ title, children, action }) => {
+// 2. Fyntrac Styled Card
+const FyntracCard = ({ title, children, action, sx }) => {
   const theme = useTheme();
   return (
     <Card
       elevation={0}
       sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 3,
-        boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}`,
-        overflow: 'hidden'
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 3, 
+        boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}, 0px 0px 2px ${alpha(theme.palette.grey[400], 0.2)}`,
+        bgcolor: 'background.paper',
+        transition: 'box-shadow 0.3s, transform 0.2s ease-in-out',
+        '&:hover': {
+          boxShadow: `0px 12px 24px ${alpha(theme.palette.grey[400], 0.3)}`,
+          transform: 'translateY(-2px)' 
+        },
+        ...sx
       }}
     >
-      <Box 
-        sx={{ 
-          px: 3, 
-          py: 2, 
-          borderBottom: '1px solid', 
-          borderColor: 'divider',
-          bgcolor: alpha(theme.palette.grey[50], 0.5),
+      <Box
+        sx={{
+          px: 3,
+          py: 2.5,
+          borderBottom: '1px solid',
+          borderColor: alpha(theme.palette.divider, 0.5), 
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}
       >
-        <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+        <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 700, color: 'text.primary' }}>
           {title}
         </Typography>
         {action}
       </Box>
-      {children}
+      <Box sx={{ p: 0 }}>
+        {children}
+      </Box>
     </Card>
   );
 };
 
-// --- MAIN PAGE COMPONENT ---
+// --- MAIN PAGE ---
 export default function IngestPage() {
   const theme = useTheme();
+  const [isDataFetched, setIsDataFetched] = useState(false);
+  const [recentUpload, setRecentUpload] = useState(null);
+  const [historicalUpload, setHistoricalUpload] = useState([]);
+  
+  const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+  const { tenant, user } = useTenant();
+  const fetchUploadActivityCall = `${baseURL}/activitylog/get/recent/loads`;
+
+  const headers = {
+    'X-Tenant': tenant,
+    'X-User-Id': user?.id || '',
+    Accept: '*/*',
+  };
+
+  const fetchUploadActivitiyLogs = () => {
+    axios.get(fetchUploadActivityCall, { headers: headers })
+      .then(response => {
+        const logs = response.data || []; 
+        if (logs.length > 0) {
+          setRecentUpload(logs[0]); 
+          setHistoricalUpload(logs.slice(1)); 
+        } else {
+          setRecentUpload(null); 
+          setHistoricalUpload([]);
+        }
+        setIsDataFetched(true);
+      })
+      .catch(error => {      
+        console.error('Error fetching logs:', error);
+      });
+  };
+
+  useEffect(() => {
+    if(tenant) {
+        fetchUploadActivitiyLogs();
+    }
+  }, [tenant]);
 
   return (
-    <Box sx={{ p: 2,  margin: '0 auto' }}>
+    <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
       
-      {/* 1. Header Section */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 4 }}>
-        <Box alignContent={'left'}>
-          <Typography variant="h5" fontWeight={800} color="text.primary">
-            Injest
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Manage your data imports and view synchronization history.
-          </Typography>
-        </Box>
-        
-        {/* Actions Toolbar */}
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Refresh">
-            <IconButton sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          
-          <Tooltip title="Upload Data File">
-            <IconButton sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) } }}>
-              <UploadFileIcon />
-            </IconButton>
-          </Tooltip>
+      <Container maxWidth={false} sx={{ py: 1, px: 2 }}>
 
-          <Tooltip title="Sync">
-            <IconButton sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) } }}>
-              <SyncIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Box>
-
-      {/* 2. Recent Upload Section */}
-      <Box sx={{ mb: 4 }}>
-        <SectionCard 
-          title="Recent Upload" 
-          action={
-            <Box sx={{ display: 'flex', gap: 1 }}>
-               <IconButton size="small"><RefreshIcon fontSize="small" /></IconButton>
-               <IconButton size="small"><KeyboardArrowUpIcon fontSize="small" /></IconButton>
-            </Box>
-          }
-        >
-          <TableContainer>
-            <Table aria-label="recent upload table">
-              <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.5) }}>
-                <TableRow>
-                  <TableCell />
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Id</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <Row row={recentUploadData} isExpandedDefault={true} />
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </SectionCard>
-      </Box>
-
-      {/* 3. Historical Loads Section */}
-      <Box>
-        <SectionCard 
-          title="Historical Loads" 
-          action={
-             <IconButton size="small"><ExpandMoreIcon fontSize="small" /></IconButton>
-          }
-        >
-          <TableContainer>
-            <Table aria-label="historical loads table">
-              <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.5) }}>
-                <TableRow>
-                  <TableCell width={60} />
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Id</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {historicalData.map((row) => (
-                  <Row key={row.id} row={row} />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          
-          {/* Footer Link */}
-          <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.grey[100], 0.5), borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'center' }}>
-            <Button size="small" sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
-                View all history
-            </Button>
+        {/* 1. Header Section */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 4 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
+              Ingest
+            </Typography>
           </Box>
-        </SectionCard>
-      </Box>
 
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Refresh">
+              <IconButton onClick={fetchUploadActivitiyLogs} sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}>
+                <RefreshIcon color="action" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+
+        {/* 2. Recent Upload Section */}
+        <Box sx={{ mb: 4 }}>
+          <FyntracCard
+            title="Recent Upload"
+            action={
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                 <Chip label="Latest" size="small" color="primary" sx={{ fontWeight: 600, height: 24 }} />
+              </Box>
+            }
+          >
+            <TableContainer>
+              <Table aria-label="recent upload table">
+                <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.5) }}>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Id</TableCell>
+                    <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
+                    
+                    {/* CHANGED: align="center" for Header */}
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentUpload ? (
+                       <Row row={recentUpload} isExpandedDefault={true} />
+                  ) : (
+                      <TableRow>
+                          <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary', fontStyle: 'italic' }}>
+                              {isDataFetched ? 'No recent upload found.' : 'Loading...'}
+                          </TableCell>
+                      </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </FyntracCard>
+        </Box>
+
+        {/* 3. Historical Loads Section */}
+        <Box>
+          <FyntracCard
+            title="Historical Loads"
+            action={
+              <IconButton size="small"><RefreshIcon fontSize="small" /></IconButton>
+            }
+          >
+            <TableContainer>
+              <Table aria-label="historical loads table">
+                <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.5) }}>
+                  <TableRow>
+                    <TableCell width={60} />
+                    <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Id</TableCell>
+                    <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
+                    
+                     {/* CHANGED: align="center" for Header */}
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {historicalUpload.length > 0 ? (
+                      historicalUpload.map((row) => (
+                          <Row key={row.uploadId} row={row} />
+                      ))
+                  ) : (
+                      <TableRow>
+                          <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                              {isDataFetched ? 'No historical data available.' : 'Loading...'}
+                          </TableCell>
+                      </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+          </FyntracCard>
+        </Box>
+
+      </Container>
     </Box>
   );
 }
