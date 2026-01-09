@@ -368,8 +368,8 @@ export default function HomePage() {
                         tickLabelStyle: {
                           fontSize: 12,
                           fontWeight: 500,
-                          angle: -30,
-                          textAnchor: 'end',
+                         // angle: -30,
+                         //  textAnchor: 'end',
                         },
                         labelStyle: {
                           fontSize: 13,
@@ -411,7 +411,7 @@ export default function HomePage() {
                       },
                     ]}
                     margin={{
-                      left: 30,
+                      left: 20,
                       right: 30,
                       top: 30,
                       bottom: 30,
@@ -462,9 +462,29 @@ export default function HomePage() {
                 <Box sx={{ width: '100%', height: 380, mt: 2 }}>
                   <BarChartWidget
                     dataset={momData}
-                    xAxis={[{ dataKey: 'accountingPeriodId', scaleType: 'band', tickLabelStyle: { fontWeight: 600 } }]}
+                    xAxis={[{
+                      label: 'Accounting Period',
+                      dataKey: 'accountingPeriodId',
+                      scaleType: 'band',
+                      tickLabelStyle: {
+                        fontSize: 12,
+                        fontWeight: 500, // This will now work
+                      },
+                      // Optional: If you wanted to style the word "Activity" instead
+                      labelStyle: {
+                        fontSize: 14,
+                        fontWeight: 600,
+                      },
+                     
+
+                    }]}
                     series={momMetricSeries}
-                    chartSetting={{ ...defaultChartSetting, height: 380 }}
+                    chartSetting={{
+                      ...defaultChartSetting,
+                      height: 380,
+                      // ✅ FIX: Override the margin here. Increase bottom to ~70px.
+                      margin: { top: 30, right: 70, left: 80, bottom: 30 }
+                    }}
                   />
                 </Box>
               ) : (
