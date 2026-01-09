@@ -80,12 +80,15 @@ const StatusChip = ({ status }) => {
 
 // --- COMPONENTS ---
 
-// 1. Collapsible Row (Updated with Center Alignment)
+// 1. Collapsible Row (Updated with Conditional Error Column)
 function Row({ row, isExpandedDefault = false }) {
   const [open, setOpen] = useState(isExpandedDefault);
   const theme = useTheme();
 
   const hasDetails = row.details && row.details.length > 0;
+  
+  // ✅ Check if ANY detail row has an error message
+  const hasErrors = hasDetails && row.details.some(d => d.errorMessage);
 
   return (
     <>
@@ -110,19 +113,15 @@ function Row({ row, isExpandedDefault = false }) {
           </IconButton>
         </TableCell>
         
-        {/* ID & Name: Keep Left Aligned */}
         <TableCell component="th" scope="row" sx={{ fontWeight: 600, color: 'text.primary' }}>
           {row.uploadId}
         </TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{row.jobName}</TableCell>
         
-        {/* CHANGED: Center Aligned Date */}
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.starting)}</TableCell>
         
-        {/* CHANGED: Center Aligned Date */}
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.endTime)}</TableCell>
         
-        {/* CHANGED: Center Aligned Status */}
         <TableCell align="center">
           <StatusChip status={row.activityStatus} />
         </TableCell>
@@ -145,12 +144,15 @@ function Row({ row, isExpandedDefault = false }) {
                       <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 600 }}>Table Name</TableCell>
-                          {/* Inner table numeric values usually look better Right or Center aligned */}
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Read</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Written</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Skipped</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Duration</TableCell>
-                          <TableCell align="left" sx={{ fontWeight: 600 }}>Error</TableCell>
+                          
+                          {/* ✅ CONDITIONAL HEADER: Only show if errors exist */}
+                          {hasErrors && (
+                            <TableCell align="left" sx={{ fontWeight: 600 }}>Error</TableCell>
+                          )}
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -166,15 +168,18 @@ function Row({ row, isExpandedDefault = false }) {
                                 {formatDateTime(detail.starting).split(',')[1]} - {formatDateTime(detail.endTime).split(',')[1]}
                             </TableCell>
                             
-                            <TableCell align="left" sx={{ fontSize: '0.75rem', maxWidth: 200, wordWrap: 'break-word' }}>
-                                {detail.errorMessage ? (
-                                    <Typography variant="caption" color="error.main" fontWeight={600}>
-                                        {detail.errorMessage}
-                                    </Typography>
-                                ) : (
-                                    <Typography variant="caption" color="text.disabled">-</Typography>
-                                )}
-                            </TableCell>
+                            {/* ✅ CONDITIONAL BODY CELL: Only show if errors exist in the set */}
+                            {hasErrors && (
+                                <TableCell align="left" sx={{ fontSize: '0.75rem', maxWidth: 200, wordWrap: 'break-word' }}>
+                                    {detail.errorMessage ? (
+                                        <Typography variant="caption" color="error.main" fontWeight={600}>
+                                            {detail.errorMessage}
+                                        </Typography>
+                                    ) : (
+                                        <Typography variant="caption" color="text.disabled">-</Typography>
+                                    )}
+                                </TableCell>
+                            )}
 
                           </TableRow>
                         ))}
@@ -321,7 +326,6 @@ export default function IngestPage() {
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Id</TableCell>
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
                     
-                    {/* CHANGED: align="center" for Header */}
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
@@ -359,7 +363,6 @@ export default function IngestPage() {
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Id</TableCell>
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
                     
-                     {/* CHANGED: align="center" for Header */}
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
