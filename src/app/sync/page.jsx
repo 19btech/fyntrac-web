@@ -481,7 +481,7 @@ export default function IngestPage() {
           <FileUploadComponent
             onDrop={handleFileDrop}
             showActivitySelector={true}
-            headerMessage={"Select an activity type and upload your activity file."}
+            headerMessage={"Select an activity type and upload activity files for secure validation, ingestion, and processing."}
             text="Drag and drop your files here"
             iconColor="#3f51b5"
             borderColor="#3f51b5"
