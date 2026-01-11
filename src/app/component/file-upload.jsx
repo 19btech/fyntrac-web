@@ -20,7 +20,6 @@ import {
   Stack,
   Fade,
   Avatar,
-  Divider
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
@@ -39,18 +38,20 @@ const ACTIVITY_TYPES = {
   CUSTOM: "Custom Activity",
 };
 
-export default function FileUploadComponent({ onDrop }) {
+export default function FileUploadComponent({ 
+  onDrop,
+  showActivitySelector = false,
+  headerMessage = "Upload activity files for secure validation, ingestion, and processing"
+}) {
   const theme = useTheme();
   const { tenant, user } = useTenant();
 
   /* -------------------- STATE -------------------- */
   const [activityType, setActivityType] = useState(ACTIVITY_TYPES.STANDARD);
-  
-  // Ref helps avoid stale closure issues inside async functions
   const activityTypeRef = useRef(activityType);
 
   const [files, setFiles] = useState([]);
-  const [status, setStatus] = useState("idle"); // idle | uploading | success | error
+  const [status, setStatus] = useState("idle");
   const [uploadProgress, setUploadProgress] = useState({});
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
@@ -69,14 +70,15 @@ export default function FileUploadComponent({ onDrop }) {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    // 1. Handle Invalid Files immediately
     if (fileRejections.length > 0) {
       setErrorMessage("Invalid file type or size. Please check your files.");
       return;
     }
 
-    // 2. Determine URL
-    const currentActivityType = activityTypeRef.current;
+    const currentActivityType = showActivitySelector 
+      ? activityTypeRef.current 
+      : ACTIVITY_TYPES.STANDARD;
+
     const targetUrl =
       currentActivityType === ACTIVITY_TYPES.CUSTOM
         ? customURL
@@ -84,7 +86,6 @@ export default function FileUploadComponent({ onDrop }) {
 
     console.log("🚀 Starting upload to:", targetUrl);
 
-    // 3. Prepare Files
     const newFiles = acceptedFiles.map((file) =>
       Object.assign(file, { preview: URL.createObjectURL(file) })
     );
@@ -96,7 +97,6 @@ export default function FileUploadComponent({ onDrop }) {
     newFiles.forEach((file) => formData.append("files", file));
 
     try {
-      // 4. Send Request
       const response = await axios.post(targetUrl, formData, {
         headers: {
           "X-Tenant": tenant || "",
@@ -112,12 +112,9 @@ export default function FileUploadComponent({ onDrop }) {
       });
 
       console.log("✅ Upload success:", response.data);
-      
-      // 5. Success State
       setStatus("success");
       setSuccessMessage("Upload Successful!");
 
-      // 6. DELAY CLOSING
       setTimeout(() => {
         setSuccessMessage(null);
         setStatus("idle");
@@ -131,32 +128,21 @@ export default function FileUploadComponent({ onDrop }) {
 
     } catch (err) {
       console.error("❌ Upload failed:", err);
-
       let displayMessage = "An unexpected error occurred.";
 
       if (err.response) {
-        // --- The server responded with a status code (e.g. 500, 400, 403) ---
         const { data, status } = err.response;
-
         if (typeof data === "string") {
-          // Case A: Server returned an HTML Error Page (common for 500s)
-          // We strip the HTML tags to show just the text text
           const cleanText = data.replace(/<[^>]*>/g, "").trim();
-          // Take the first line or a max of 100 chars to avoid showing a massive stack trace
           displayMessage = cleanText.split("\n")[0].substring(0, 150) || `Server Error (${status})`;
         } else if (data && typeof data === "object") {
-          // Case B: Server returned JSON (Standard Spring Boot error)
-          // Look for common fields: 'message', 'error', 'detail'
           displayMessage = data.message || data.error || `Server Error (${status})`;
         } else {
-           // Case C: Empty response body
            displayMessage = `Server Error (${status})`;
         }
       } else if (err.request) {
-        // --- The request was made but no response was received ---
         displayMessage = "Network error. Please check your internet connection.";
       } else {
-        // --- Something happened in setting up the request ---
         displayMessage = err.message;
       }
 
@@ -165,7 +151,6 @@ export default function FileUploadComponent({ onDrop }) {
     }
   };
   
-  /* -------------------- DROPZONE HOOK -------------------- */
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
     disabled: status === "uploading" || status === "success",
@@ -176,9 +161,7 @@ export default function FileUploadComponent({ onDrop }) {
     },
   });
 
-  /* -------------------- RENDER -------------------- */
-  
-  // SUCCESS VIEW
+  /* -------------------- RENDER SUCCESS -------------------- */
   if (status === "success") {
     return (
       <Paper
@@ -221,11 +204,7 @@ export default function FileUploadComponent({ onDrop }) {
                 sx={{ mt: 4, width: '100%', maxWidth: 200, borderRadius: 2, height: 6 }} 
                 color="success" 
             />
-            <Typography
-              variant="caption"
-              color="text.disabled"
-              sx={{ mt: 1.5, display: "block", fontWeight: 500 }}
-            >
+            <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: "block", fontWeight: 500 }}>
               Closing window in 5 seconds...
             </Typography>
           </Box>
@@ -234,7 +213,7 @@ export default function FileUploadComponent({ onDrop }) {
     );
   }
 
-  // STANDARD UPLOAD VIEW
+  /* -------------------- RENDER UPLOAD -------------------- */
   return (
     <Paper 
         elevation={0} 
@@ -250,27 +229,25 @@ export default function FileUploadComponent({ onDrop }) {
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
             <Box>
                 <Typography variant="body2" color="text.secondary">
-                Select an activity type and upload your activity file.
+                  {headerMessage}
                 </Typography>
             </Box>
 
-            <FormControl size="small" sx={{ minWidth: 240 }}>
-                <InputLabel>Activity Type</InputLabel>
-                <Select
-                    value={activityType}
-                    label="Activity Type"
-                    disabled={status !== "idle"}
-                    onChange={(e) => setActivityType(e.target.value)}
-                    sx={{ bgcolor: 'background.paper' }}
-                >
-                <MenuItem value={ACTIVITY_TYPES.STANDARD}>
-                    Standard Activity
-                </MenuItem>
-                <MenuItem value={ACTIVITY_TYPES.CUSTOM}>
-                    Custom Activity
-                </MenuItem>
-                </Select>
-            </FormControl>
+            {showActivitySelector && (
+                <FormControl size="small" sx={{ minWidth: 240 }}>
+                    <InputLabel>Activity Type</InputLabel>
+                    <Select
+                        value={activityType}
+                        label="Activity Type"
+                        disabled={status !== "idle"}
+                        onChange={(e) => setActivityType(e.target.value)}
+                        sx={{ bgcolor: 'background.paper' }}
+                    >
+                    <MenuItem value={ACTIVITY_TYPES.STANDARD}>Standard Activity</MenuItem>
+                    <MenuItem value={ACTIVITY_TYPES.CUSTOM}>Custom Activity</MenuItem>
+                    </Select>
+                </FormControl>
+            )}
         </Stack>
       </Box>
 
@@ -278,13 +255,8 @@ export default function FileUploadComponent({ onDrop }) {
       <Box sx={{ p: 4 }}>
         <Stack spacing={3}>
             
-            {/* ERROR MESSAGE */}
             {errorMessage && (
-            <Alert 
-                severity="error" 
-                variant="outlined"
-                sx={{ borderRadius: 2 }}
-            >
+            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2 }}>
                 {errorMessage}
             </Alert>
             )}
@@ -376,7 +348,10 @@ export default function FileUploadComponent({ onDrop }) {
                                 {file.name}
                             </Typography>
                         }
-                        secondaryTypographyProps={{ component: "div" }} // ✅ FIX HYDRATION ERROR
+                        
+                        // ✅ FIX: Use 'div' instead of 'p' to prevent hydration error
+                        slotProps={{ secondary: { component: "div" } }}
+
                         secondary={
                         status === "uploading" ? (
                             <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>

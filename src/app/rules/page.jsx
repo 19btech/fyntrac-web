@@ -15,7 +15,6 @@ import CustomTabPanel from '../component/custom-tab-panel'
 import FileUploadComponent from '../component/file-upload'
 import AddTransactionDialog from '../component/add-transaction'
 import AddAttributeDialog from '../component/add-attribute';
-import AddAccountTypeDialog from '../component/add-account-type';
 import Aggregation from '../component/aggregation'
 import Attribute from '../component/attribute'
 import { Dialog, DialogContent, DialogTitle, Tooltip, Divider, Typography } from '@mui/material';
@@ -152,12 +151,12 @@ export default function RulePage() {
           <div className='right'>
             <Stack direction="row" spacing={1}>
 
-              <IconButton aria-label="upload rule file" onClick={handleOpenFileUpload} sx={{
+              <IconButton aria-label="Upload Activity Files" onClick={handleOpenFileUpload} sx={{
                 '&:hover': {
                   backgroundColor: 'darkgrey',
                 },
               }}>
-                <Tooltip title="Upload File">
+                <Tooltip title="Upload Activity Files">
                   <FileUploadOutlinedIcon />
                 </Tooltip>
               </IconButton>
