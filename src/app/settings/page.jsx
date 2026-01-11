@@ -25,31 +25,25 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 export default function SettingsPage() {
   const { tenant } = useTenant();
-  const [value, setValue] = React.useState(0);
-  const [showSuccessMessage, setShowSuccessMessage] = React.useState(false);
-  const [successMessage, setSuccessMessage] = React.useState('');
-  const [showErrorMessage, setShowErrorMessage] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState('');
   const [fiscalPeriodStaringDate, setFiscalPeriodStaringDate] = React.useState(null);
   const [open, setOpen] = React.useState(false);
   const [settings, setSettings] = React.useState({});
   const [isDataFetched, setIsDataFetched] = React.useState(false);
   const [restatementMode, setRestatementMode] = React.useState(false);
-  const [showRestatementDaialog, setShowRestatementDaialog] = React.useState(false);
-  const [showReopenAccountingPeriodDialog, setShowReopenAccountingPeriodDialog] = React.useState(false);
   const [showSchemaRefreshDialog, setShowSchemaRefreshDialog] = React.useState(false);
   const [isFiscalPeriodButtonDisabled, setIsFiscalPeriodButtonDisabled] = React.useState(true);
   const [panelIndex, setPanelIndex] = React.useState(0);
   const [isDashboardConfigurationDialogOpen, setIsDashboardConfigurationDialogOpen] = React.useState(false);
-  const [dashboardConfiguration, setDashboardConfiguration] = React.useState(false);
   const [currency, setCurrency] = useState('USD');
-  const [currencyList, setCurrencyList] = useState();
-
-  const [replayBoundry, setReplayBoundry] = useState('3');
-  const replayBoundryList = ['3', '4',
-    '5',
-    '6',
-    '7', '8', '9', '10', '11', '12'];
+  const [currencyList, setCurrencyList] = useState([]); // Initialize as empty array
+  const [errorMessage, setErrorMessage] = React.useState('');
+  const [showRestatementDaialog, setShowRestatementDaialog] = React.useState(false);
+  const [showReopenAccountingPeriodDialog, setShowReopenAccountingPeriodDialog] = React.useState(false);
+  const [value, setValue] = React.useState(0);
+  const [dashboardConfiguration, setDashboardConfiguration] = React.useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState('');
+  const [showErrorMessage, setShowErrorMessage] = React.useState(false);
 
   const [reportingPeriod, setReportingPeriod] = useState('6');
   const reportingPeriodList = [
@@ -62,16 +56,6 @@ export default function SettingsPage() {
     'Sep-2022',
     'Aug-2022'];
 
-  const rows = [
-    { left: 'Item 1 Left', right: 'Item 1 Right' },
-    { left: 'Item 2 Left', right: 'Item 2 Right' },
-    { left: 'Item 3 Left', right: 'Item 3 Right' },
-    { left: 'Item 4 Left', right: 'Item 4 Right' },
-    { left: 'Item 5 Left', right: 'Item 5 Right' },
-    { left: 'Item 6 Left', right: 'Item 6 Right' },
-    { left: 'Item 7 Left', right: 'Item 7 Right' },
-  ];
-  const [editData, setEditData] = useState(null);
   const saveFiscalPeriodServiceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/fiscal-priod/save';
   const handleFiscalPeriodChange = (date) => {
     setFiscalPeriodStaringDate(date);
@@ -411,11 +395,18 @@ export default function SettingsPage() {
                 <Autocomplete
                   disablePortal
                   id="currency-combo"
-                  size="small" // 👈 This sets height to 40px & centers label automatically
-                  options={currencyList}
-                  value={currency}
-                  getOptionLabel={(option) => option}
-                  onChange={(event, newValue) => { setCurrency(newValue || ''); }}
+                  size="small"
+                  // FIX 1: Ensure options is always an array
+                  options={currencyList || []}
+
+                  // FIX 2: Ensure value is never undefined. Use null for "no value".
+                  value={currency || null}
+
+                  getOptionLabel={(option) => option || ""}
+
+                  // FIX 3: Ensure newValue isn't undefined coming from the handler
+                  onChange={(event, newValue) => { setCurrency(newValue || null); }}
+
                   renderInput={(params) => <TextField {...params} label="Currency" />}
                 />
 

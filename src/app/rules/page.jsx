@@ -18,12 +18,12 @@ import AddAttributeDialog from '../component/add-attribute';
 import AddAccountTypeDialog from '../component/add-account-type';
 import Aggregation from '../component/aggregation'
 import Attribute from '../component/attribute'
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Tooltip, Divider } from '@mui/material';
+import { Dialog, DialogContent, DialogTitle, Tooltip, Divider, Typography } from '@mui/material';
 import axios from 'axios';
 import AddAggregationDialog from '../component/add-aggregation';
 import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
-
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
   clipPath: 'inset(50%)',
@@ -48,8 +48,7 @@ export default function RulePage() {
   const [isAddAttributeDialogOpen, setIsAddAttributeDialogOpen] = React.useState(false);
   const [isAddAggregationDialogOpen, setIsAddAggregationDialogOpen] = React.useState(false);
   const [isAddAccountTypeDialogOpen, setIsAddAccountTypeDialogOpen] = React.useState(false);
-  const handleRefresh = () => {
-    if (panelIndex === 0) {
+  const handleRefresh = () => {    if (panelIndex === 0) {
       setTransactionRefreshKey(prevKey => prevKey + 1);
     } else if (panelIndex === 1) {
       setRefreshAttributeKey(prevKey => prevKey + 1);
@@ -216,7 +215,50 @@ export default function RulePage() {
 
       <>
         <Dialog open={openFileUpload} onClose={handleCloseFileUpload}>
-          <DialogTitle>Upload Files</DialogTitle>
+                    <DialogTitle>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'start',
+              }}
+            >
+              {/* Top Left: Image */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+                  gap: 1,
+                  width: 'fit-content' // Ensures the Box doesn't take more space than needed
+                }}
+              >
+                <img
+                  src="fyntrac.png"
+                  alt="Logo"
+                  style={{
+                    width: '100px',
+                    height: 'auto',  // Maintain aspect ratio
+                    maxWidth: '100%' // Ensures responsiveness
+                  }}
+                />
+                <Typography variant="h6">Activity Upload</Typography>
+              </Box>
+              <Tooltip title='Close'>
+                <IconButton
+                  onClick={handleCloseFileUpload}
+                  edge="end"
+                  aria-label="close"
+                  sx={{
+                    color: 'grey.500',
+                    '&:hover': { color: 'black' },
+                  }}
+                >
+                  <HighlightOffOutlinedIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </DialogTitle>
           <DialogContent>
             <FileUploadComponent
               onDrop={handleFileDrop}
@@ -226,11 +268,7 @@ export default function RulePage() {
               filesLimit={5}
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseFileUpload} color="primary">
-              Cancel
-            </Button>
-          </DialogActions>
+
         </Dialog>
 
       </>
@@ -238,7 +276,7 @@ export default function RulePage() {
         <AddTransactionDialog open={isAddTransactionDialogOpen} onClose={handleAddTransactionCloseDialog} />
         <AddAttributeDialog open={isAddAttributeDialogOpen} onClose={handleAddAttributeCloseDialog} />
         <AddAggregationDialog open={isAddAggregationDialogOpen} onClose={handleAddAggregationCloseDialog} />
-        <AddAccountTypeDialog open={isAddAccountTypeDialogOpen} onClose={handleAddAccountTypeCloseDialog} />
+        
       </>
     </>
   )

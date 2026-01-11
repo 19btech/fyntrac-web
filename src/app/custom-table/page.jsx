@@ -64,6 +64,7 @@ export default function CustomTablesMain() {
         Accept: '*/*',
         'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
     };
+
     const fetchCustomTables = () => {
 
         console.log('Attempting to fetch from:', fetchCustomTablesCall);
@@ -125,28 +126,6 @@ export default function CustomTablesMain() {
         setSnackbar(prev => ({ ...prev, open: false }));
     };
 
-    const handleFileDrop = (acceptedFiles) => {
-
-        const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/fyntrac/custom-table/data-upload';
-        const formData = new FormData();
-        for (let i = 0; i < acceptedFiles.length; i++) {
-            formData.append('files', acceptedFiles[i]);
-        }
-
-        axios.post(serviceURL, formData, {
-            headers: headers
-        })
-            .then(response => {
-                // Handle success response if needed
-            })
-            .catch(error => {
-                console.error('Upload error:', error);
-                // Handle error if needed
-            });
-
-        // You can handle the uploaded files here
-        handleCloseFileUpload(); // Close the dialog after handling the files
-    };
 
 
     const handleCloseFileUpload = () => {
@@ -172,16 +151,7 @@ export default function CustomTablesMain() {
                     <div className='right'>
                         <Stack direction="row" spacing={1}>
 
-                            <IconButton aria-label="upload rule file" onClick={handleOpenFileUpload} sx={{
-                                '&:hover': {
-                                    backgroundColor: 'darkgrey',
-                                },
-                            }}>
-                                <Tooltip title="Upload File">
-                                    <FileUploadOutlinedIcon />
-                                </Tooltip>
-                            </IconButton>
-
+                    
                             <Tooltip title="Refresh page" arrow>
                                 <IconButton aria-label="refresh" onClick={handleRefresh} sx={{
                                     '&:hover': {
@@ -235,26 +205,7 @@ export default function CustomTablesMain() {
                 <CreateTableDialog open={openCustomTableModal} onSuccess={handleSuccess} onClose={setOpenCustomTableModal} tableType={'REFERENCE'} />
             )}
 
-            <>
-                <Dialog open={openFileUpload} onClose={handleCloseFileUpload}>
-                    <DialogTitle>Upload Files</DialogTitle>
-                    <DialogContent>
-                        <FileUploadComponent
-                            onDrop={handleFileDrop}
-                            text="Drag and drop your files here"
-                            iconColor="#3f51b5"
-                            borderColor="#3f51b5"
-                            filesLimit={5}
-                        />
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleCloseFileUpload} color="primary">
-                            Cancel
-                        </Button>
-                    </DialogActions>
-                </Dialog>
 
-            </>
         </>
 
 

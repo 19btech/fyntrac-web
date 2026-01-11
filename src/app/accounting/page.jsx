@@ -18,10 +18,11 @@ import FileUploadComponent from '../component/file-upload'
 import AddChartofAccount from '../component/add-chart-of-account'
 import AddSubledgerMapping from '../component/add-subledger-mapping';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Tooltip } from '@mui/material';
+import { Button, Dialog, Typography, DialogContent, DialogTitle, Divider, Tooltip } from '@mui/material';
 import axios from 'axios';
 import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -41,7 +42,7 @@ export default function AccountingPage() {
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [refreshChartOfAccountKey, setRefreshChartOfAccountKey] = React.useState(0);
   const [refreshSubledgerMapping, setRefreshSubledgerMapping] = React.useState(0);
-    const [refreshAccountTypeKey, setRefreshAccountTypeKey] = React.useState(0);
+  const [refreshAccountTypeKey, setRefreshAccountTypeKey] = React.useState(0);
   const [isAddChartOfAccountDialogOpen, setIsAddChartOfAccountDialogOpen] = React.useState(false);
   const [isAddSubledgerMappingDialogOpen, setIsAddSubledgerMappingDialogOpen] = React.useState(false);
   const [isAddAccountTypeDialogOpen, setIsAddAccountTypeDialogOpen] = React.useState(false);
@@ -105,13 +106,13 @@ export default function AccountingPage() {
   };
 
   const handleAdd = () => {
-    if(panelIndex ===  0){
+    if (panelIndex === 0) {
       setIsAddAccountTypeDialogOpen(true);
-    }else if (panelIndex === 1) {
+    } else if (panelIndex === 1) {
       setIsAddSubledgerMappingDialogOpen(true);
-    }else if (panelIndex === 2) {
+    } else if (panelIndex === 2) {
       setIsAddChartOfAccountDialogOpen(true);
-    } 
+    }
   }
 
   const handleAddChartOfAccountCloseDialog = () => {
@@ -122,7 +123,7 @@ export default function AccountingPage() {
     setIsAddSubledgerMappingDialogOpen(false);
   };
 
-    const handleAddAccountTypeCloseDialog = () => {
+  const handleAddAccountTypeCloseDialog = () => {
     setIsAddAccountTypeDialogOpen(false);
   };
   return (
@@ -202,7 +203,50 @@ export default function AccountingPage() {
 
       <>
         <Dialog open={openFileUpload} onClose={handleCloseFileUpload}>
-          <DialogTitle>Upload Files</DialogTitle>
+          <DialogTitle>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'start',
+              }}
+            >
+              {/* Top Left: Image */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+                  gap: 1,
+                  width: 'fit-content' // Ensures the Box doesn't take more space than needed
+                }}
+              >
+                <img
+                  src="fyntrac.png"
+                  alt="Logo"
+                  style={{
+                    width: '100px',
+                    height: 'auto',  // Maintain aspect ratio
+                    maxWidth: '100%' // Ensures responsiveness
+                  }}
+                />
+                <Typography variant="h6">Activity Upload</Typography>
+              </Box>
+              <Tooltip title='Close'>
+                <IconButton
+                  onClick={handleCloseFileUpload}
+                  edge="end"
+                  aria-label="close"
+                  sx={{
+                    color: 'grey.500',
+                    '&:hover': { color: 'black' },
+                  }}
+                >
+                  <HighlightOffOutlinedIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </DialogTitle>
           <DialogContent>
             <FileUploadComponent
               onDrop={handleFileDrop}
@@ -212,11 +256,7 @@ export default function AccountingPage() {
               filesLimit={5}
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseFileUpload} color="primary">
-              Cancel
-            </Button>
-          </DialogActions>
+
         </Dialog>
 
       </>
