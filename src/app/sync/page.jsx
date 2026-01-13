@@ -479,7 +479,7 @@ export default function IngestPage() {
         </DialogTitle>
         <DialogContent>
           <FileUploadComponent
-            onDrop={handleFileDrop}
+            onDrop={handleCloseFileUpload}
             showActivitySelector={true}
             headerMessage={"Select an activity type and upload activity files for secure validation, ingestion, and processing."}
             text="Drag and drop your files here"

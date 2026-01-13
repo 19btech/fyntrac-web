@@ -23,7 +23,6 @@ import {
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
-  InsertDriveFile as FileIcon,
   Delete as DeleteIcon,
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
@@ -38,7 +37,7 @@ const ACTIVITY_TYPES = {
   CUSTOM: "Custom Activity",
 };
 
-export default function FileUploadComponent({ 
+export default function FileUploadComponent({
   onDrop,
   showActivitySelector = false,
   headerMessage = "Upload activity files for secure validation, ingestion, and processing"
@@ -46,7 +45,6 @@ export default function FileUploadComponent({
   const theme = useTheme();
   const { tenant, user } = useTenant();
 
-  /* -------------------- STATE -------------------- */
   const [activityType, setActivityType] = useState(ACTIVITY_TYPES.STANDARD);
   const activityTypeRef = useRef(activityType);
 
@@ -56,35 +54,38 @@ export default function FileUploadComponent({
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  /* -------------------- SYNC REF -------------------- */
+  // ✅ Lock to prevent double-loading
+  const uploadLock = useRef(false);
+
   useEffect(() => {
     activityTypeRef.current = activityType;
   }, [activityType]);
 
-  /* -------------------- ENDPOINTS -------------------- */
   const standardURL = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/accounting/rule/upload`;
   const customURL = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/fyntrac/custom-table/data-upload`;
 
-  /* -------------------- DROP HANDLER -------------------- */
   const handleDrop = async (acceptedFiles, fileRejections) => {
+    // 🔒 Prevent double upload
+    if (uploadLock.current) return;
+    uploadLock.current = true;
+
     setErrorMessage(null);
     setSuccessMessage(null);
 
     if (fileRejections.length > 0) {
       setErrorMessage("Invalid file type or size. Please check your files.");
+      uploadLock.current = false;
       return;
     }
 
-    const currentActivityType = showActivitySelector 
-      ? activityTypeRef.current 
+    const currentActivityType = showActivitySelector
+      ? activityTypeRef.current
       : ACTIVITY_TYPES.STANDARD;
 
     const targetUrl =
       currentActivityType === ACTIVITY_TYPES.CUSTOM
         ? customURL
         : standardURL;
-
-    console.log("🚀 Starting upload to:", targetUrl);
 
     const newFiles = acceptedFiles.map((file) =>
       Object.assign(file, { preview: URL.createObjectURL(file) })
@@ -111,7 +112,6 @@ export default function FileUploadComponent({
         },
       });
 
-      console.log("✅ Upload success:", response.data);
       setStatus("success");
       setSuccessMessage("Upload Successful!");
 
@@ -120,14 +120,11 @@ export default function FileUploadComponent({
         setStatus("idle");
         setFiles([]);
         setUploadProgress({});
-        
-        if (onDrop) {
-            onDrop(newFiles, targetUrl, currentActivityType, response.data);
-        }
+        uploadLock.current = false; 
+        onDrop()// 🔓 Release lock
       }, 5000);
 
     } catch (err) {
-      console.error("❌ Upload failed:", err);
       let displayMessage = "An unexpected error occurred.";
 
       if (err.response) {
@@ -138,7 +135,7 @@ export default function FileUploadComponent({
         } else if (data && typeof data === "object") {
           displayMessage = data.message || data.error || `Server Error (${status})`;
         } else {
-           displayMessage = `Server Error (${status})`;
+          displayMessage = `Server Error (${status})`;
         }
       } else if (err.request) {
         displayMessage = "Network error. Please check your internet connection.";
@@ -148,12 +145,14 @@ export default function FileUploadComponent({
 
       setStatus("error");
       setErrorMessage(displayMessage);
+      uploadLock.current = false; // 🔓 Release lock
     }
   };
-  
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop: handleDrop,
     disabled: status === "uploading" || status === "success",
+    noClick: false, // ✅ enable click
     accept: {
       "text/csv": [".csv"],
       "application/vnd.ms-excel": [".xls", ".xlsx"],
@@ -182,17 +181,17 @@ export default function FileUploadComponent({
       >
         <Fade in={true} timeout={600}>
           <Box>
-            <Avatar 
-                sx={{ 
-                    bgcolor: alpha(theme.palette.success.main, 0.15), 
-                    color: "success.main", 
-                    width: 80, 
-                    height: 80, 
-                    mb: 3,
-                    mx: 'auto'
-                }}
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.success.main, 0.15),
+                color: "success.main",
+                width: 80,
+                height: 80,
+                mb: 3,
+                mx: 'auto'
+              }}
             >
-                <SuccessIcon sx={{ fontSize: 48 }} />
+              <SuccessIcon sx={{ fontSize: 48 }} />
             </Avatar>
             <Typography variant="h5" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>
               Upload Successful
@@ -200,9 +199,9 @@ export default function FileUploadComponent({
             <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
               Your files have been successfully processed and added to the queue.
             </Typography>
-            <LinearProgress 
-                sx={{ mt: 4, width: '100%', maxWidth: 200, borderRadius: 2, height: 6 }} 
-                color="success" 
+            <LinearProgress
+              sx={{ mt: 4, width: '100%', maxWidth: 200, borderRadius: 2, height: 6 }}
+              color="success"
             />
             <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: "block", fontWeight: 500 }}>
               Closing window in 5 seconds...
@@ -215,182 +214,179 @@ export default function FileUploadComponent({
 
   /* -------------------- RENDER UPLOAD -------------------- */
   return (
-    <Paper 
-        elevation={0} 
-        variant="outlined" 
-        sx={{ 
-            borderRadius: 4, 
-            borderColor: 'divider',
-            overflow: 'hidden' 
-        }}
+    <Paper
+      elevation={0}
+      variant="outlined"
+      sx={{
+        borderRadius: 4,
+        borderColor: 'divider',
+        overflow: 'hidden'
+      }}
     >
       {/* HEADER SECTION */}
       <Box sx={{ p: 3, bgcolor: alpha(theme.palette.primary.main, 0.02), borderBottom: '1px solid', borderColor: 'divider' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
-            <Box>
-                <Typography variant="body2" color="text.secondary">
-                  {headerMessage}
-                </Typography>
-            </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              {headerMessage}
+            </Typography>
+          </Box>
 
-            {showActivitySelector && (
-                <FormControl size="small" sx={{ minWidth: 240 }}>
-                    <InputLabel>Activity Type</InputLabel>
-                    <Select
-                        value={activityType}
-                        label="Activity Type"
-                        disabled={status !== "idle"}
-                        onChange={(e) => setActivityType(e.target.value)}
-                        sx={{ bgcolor: 'background.paper' }}
-                    >
-                    <MenuItem value={ACTIVITY_TYPES.STANDARD}>Standard Activity</MenuItem>
-                    <MenuItem value={ACTIVITY_TYPES.CUSTOM}>Custom Activity</MenuItem>
-                    </Select>
-                </FormControl>
-            )}
+          {showActivitySelector && (
+            <FormControl size="small" sx={{ minWidth: 240 }}>
+              <InputLabel>Activity Type</InputLabel>
+              <Select
+                value={activityType}
+                label="Activity Type"
+                disabled={status !== "idle"}
+                onChange={(e) => setActivityType(e.target.value)}
+                sx={{ bgcolor: 'background.paper' }}
+              >
+                <MenuItem value={ACTIVITY_TYPES.STANDARD}>Standard Activity</MenuItem>
+                <MenuItem value={ACTIVITY_TYPES.CUSTOM}>Custom Activity</MenuItem>
+              </Select>
+            </FormControl>
+          )}
         </Stack>
       </Box>
 
       {/* CONTENT SECTION */}
       <Box sx={{ p: 4 }}>
         <Stack spacing={3}>
-            
-            {errorMessage && (
-            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2 }}>
-                {errorMessage}
-            </Alert>
-            )}
 
-            {/* DROPZONE */}
-            <Box
+          {errorMessage && (
+            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+
+          {/* DROPZONE */}
+          <Box
             {...getRootProps()}
             sx={{
-                p: 5,
-                border: "2px dashed",
-                borderColor: isDragActive
+              p: 5,
+              border: "2px dashed",
+              borderColor: isDragActive
                 ? theme.palette.primary.main
                 : alpha(theme.palette.text.secondary, 0.2),
-                borderRadius: 3,
-                textAlign: "center",
-                cursor: status === "idle" ? "pointer" : "default",
-                bgcolor: isDragActive
+              borderRadius: 3,
+              textAlign: "center",
+              cursor: status === "idle" ? "pointer" : "default",
+              bgcolor: isDragActive
                 ? alpha(theme.palette.primary.main, 0.04)
                 : alpha(theme.palette.background.default, 0.5),
-                transition: "all 0.3s ease",
-                opacity: status === "uploading" ? 0.6 : 1,
-                "&:hover": {
-                    borderColor: status === "idle" ? theme.palette.primary.main : undefined,
-                    bgcolor: status === "idle" ? alpha(theme.palette.primary.main, 0.02) : undefined
-                }
+              transition: "all 0.3s ease",
+              opacity: status === "uploading" ? 0.6 : 1,
+              "&:hover": {
+                borderColor: status === "idle" ? theme.palette.primary.main : undefined,
+                bgcolor: status === "idle" ? alpha(theme.palette.primary.main, 0.02) : undefined
+              }
             }}
-            >
+          >
             <input {...getInputProps()} />
-            
-            <Avatar 
-                sx={{ 
-                    width: 64, 
-                    height: 64, 
-                    bgcolor: isDragActive ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.text.secondary, 0.05),
-                    color: isDragActive ? "primary.main" : "text.secondary",
-                    mx: 'auto',
-                    mb: 2,
-                    transition: 'all 0.3s ease'
-                }}
+
+            <Avatar
+              sx={{
+                width: 64,
+                height: 64,
+                bgcolor: isDragActive ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.text.secondary, 0.05),
+                color: isDragActive ? "primary.main" : "text.secondary",
+                mx: 'auto',
+                mb: 2,
+                transition: 'all 0.3s ease'
+              }}
             >
-                <CloudUploadIcon sx={{ fontSize: 32 }} />
+              <CloudUploadIcon sx={{ fontSize: 32 }} />
             </Avatar>
-            
+
             <Typography variant="h6" gutterBottom fontWeight={600} color={isDragActive ? "primary.main" : "text.primary"}>
-                {isDragActive ? "Drop files here" : "Click or drag files to upload"}
+              {isDragActive ? "Drop files here" : "Click or drag files to upload"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-                Supported formats: CSV, Excel (.xls, .xlsx), ZIP
+              Supported formats: CSV, Excel (.xls, .xlsx), ZIP
             </Typography>
-            </Box>
+          </Box>
 
-            {/* FILE LIST */}
-            {files.length > 0 && (
+          {/* FILE LIST */}
+          {files.length > 0 && (
             <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1.5, ml: 1, fontWeight: 600, color: 'text.secondary' }}>
-                    Files Queue ({files.length})
-                </Typography>
-                <List disablePadding>
+              <Typography variant="subtitle2" sx={{ mb: 1.5, ml: 1, fontWeight: 600, color: 'text.secondary' }}>
+                Files Queue ({files.length})
+              </Typography>
+              <List disablePadding>
                 {files.map((file) => (
-                    <ListItem 
-                        key={file.name}
-                        sx={{
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 2,
-                            mb: 1.5,
-                            bgcolor: 'background.paper',
-                            transition: 'all 0.2s',
-                            '&:hover': {
-                                borderColor: status === 'idle' ? 'primary.main' : 'divider',
-                                bgcolor: alpha(theme.palette.background.paper, 0.8)
-                            }
-                        }}
-                    >
+                  <ListItem
+                    key={file.name}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      mb: 1.5,
+                      bgcolor: 'background.paper',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: status === 'idle' ? 'primary.main' : 'divider',
+                        bgcolor: alpha(theme.palette.background.paper, 0.8)
+                      }
+                    }}
+                  >
                     <ListItemIcon>
-                        <Avatar 
-                            variant="rounded" 
-                            sx={{ 
-                                bgcolor: status === "error" ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.primary.main, 0.1), 
-                                color: status === "error" ? "error.main" : "primary.main"
-                            }}
-                        >
-                            {status === "error" ? <ErrorIcon /> : <DescriptionIcon />}
-                        </Avatar>
+                      <Avatar
+                        variant="rounded"
+                        sx={{
+                          bgcolor: status === "error" ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
+                          color: status === "error" ? "error.main" : "primary.main"
+                        }}
+                      >
+                        {status === "error" ? <ErrorIcon /> : <DescriptionIcon />}
+                      </Avatar>
                     </ListItemIcon>
                     <ListItemText
-                        primary={
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                                {file.name}
-                            </Typography>
-                        }
-                        
-                        // ✅ FIX: Use 'div' instead of 'p' to prevent hydration error
-                        slotProps={{ secondary: { component: "div" } }}
-
-                        secondary={
+                      primary={
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {file.name}
+                        </Typography>
+                      }
+                      slotProps={{ secondary: { component: "div" } }}
+                      secondary={
                         status === "uploading" ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                                <Box sx={{ width: '100%', mr: 2 }}>
-                                    <LinearProgress 
-                                        variant="determinate" 
-                                        value={uploadProgress[file.name] || 0} 
-                                        sx={{ height: 6, borderRadius: 3 }}
-                                    />
-                                </Box>
-                                <Box sx={{ minWidth: 35 }}>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                                        {`${uploadProgress[file.name] || 0}%`}
-                                    </Typography>
-                                </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                            <Box sx={{ width: '100%', mr: 2 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={uploadProgress[file.name] || 0}
+                                sx={{ height: 6, borderRadius: 3 }}
+                              />
                             </Box>
+                            <Box sx={{ minWidth: 35 }}>
+                              <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                {`${uploadProgress[file.name] || 0}%`}
+                              </Typography>
+                            </Box>
+                          </Box>
                         ) : (
-                            <Typography variant="caption" color="text.secondary">
-                                {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </Typography>
                         )
-                        }
+                      }
                     />
                     {status === "idle" && (
-                        <IconButton
+                      <IconButton
                         size="small"
                         onClick={() =>
-                            setFiles((prev) => prev.filter((f) => f.name !== file.name))
+                          setFiles((prev) => prev.filter((f) => f.name !== file.name))
                         }
                         sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
-                        >
+                      >
                         <DeleteIcon fontSize="small" />
-                        </IconButton>
+                      </IconButton>
                     )}
-                    </ListItem>
+                  </ListItem>
                 ))}
-                </List>
+              </List>
             </Box>
-            )}
+          )}
         </Stack>
       </Box>
     </Paper>

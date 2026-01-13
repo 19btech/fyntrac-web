@@ -249,7 +249,7 @@ export default function AccountingPage() {
           </DialogTitle>
           <DialogContent>
             <FileUploadComponent
-              onDrop={handleFileDrop}
+              onDrop={handleCloseFileUpload}
               text="Drag and drop your files here"
               iconColor="#3f51b5"
               borderColor="#3f51b5"

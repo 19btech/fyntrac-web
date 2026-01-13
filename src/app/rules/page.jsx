@@ -66,7 +66,7 @@ export default function RulePage() {
     setOpenFileUpload(false);
   };
 
-  const handleFileDrop = (acceptedFiles) => {
+  const handleFileDrop = () => {
 
     const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting/rule/upload';
     const formData = new FormData();
@@ -260,7 +260,7 @@ export default function RulePage() {
           </DialogTitle>
           <DialogContent>
             <FileUploadComponent
-              onDrop={handleFileDrop}
+              onDrop={handleCloseFileUpload}
               text="Drag and drop your files here"
               iconColor="#3f51b5"
               borderColor="#3f51b5"
