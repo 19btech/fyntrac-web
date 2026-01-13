@@ -143,12 +143,12 @@ export default function AccountingPage() {
           <div className='right'>
             <Stack direction="row" spacing={1}>
 
-              <IconButton aria-label="upload rule file" onClick={handleOpenFileUpload} sx={{
+              <IconButton aria-label="Upload Activity Files" onClick={handleOpenFileUpload} sx={{
                 '&:hover': {
                   backgroundColor: 'darkgrey',
                 },
               }}>
-                <Tooltip title="Upload File">
+                <Tooltip title="Upload Activity Files">
                   <FileUploadOutlinedIcon />
                 </Tooltip>
               </IconButton>

@@ -15,9 +15,7 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
   const [modelOrderId, setModelOrderId] = useState('');
   const [modelNameError, setModelNameError] = useState(false);
   const [orderIdError, setOrderIdError] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [openSuccess, setOpenSuccess] = React.useState(false);
 

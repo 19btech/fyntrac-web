@@ -8,10 +8,13 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 
+/* ---------------- Styled Cells ---------------- */
+
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
     backgroundColor: '#EEF6FF',
     color: theme.palette.common.black,
+    fontWeight: 600,
   },
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
@@ -27,20 +30,23 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
+/* ---------------- Number Formatter ---------------- */
+
 const numberFormatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
+/* ---------------- Component ---------------- */
+
 export default function DynamicTable({ columns, rows, rowKey }) {
   return (
     <TableContainer component={Paper}>
-      <Table 
-        sx={{ 
-          width: '100%',  // Takes full available width
-          tableLayout: 'auto', // Allows columns to adjust based on content
-          overflowX: 'auto', // Adds horizontal scroll if needed
-        }} 
+      <Table
+        sx={{
+          width: '100%',
+          tableLayout: 'auto',
+        }}
         aria-label="dynamic table"
       >
         <TableHead>
@@ -55,11 +61,18 @@ export default function DynamicTable({ columns, rows, rowKey }) {
             ))}
           </TableRow>
         </TableHead>
+
         <TableBody>
           {rows.map((row) => (
             <StyledTableRow key={row[rowKey]}>
               {columns.map((column) => {
-                const value = row[column.id];
+                const rawValue = row[column.id];
+
+                const displayValue =
+                  column.format && rawValue != null
+                    ? column.format(rawValue)
+                    : rawValue;
+
                 return (
                   <StyledTableCell
                     key={column.id}
@@ -67,13 +80,13 @@ export default function DynamicTable({ columns, rows, rowKey }) {
                     component={column.id === columns[0].id ? 'th' : undefined}
                     scope={column.id === columns[0].id ? 'row' : undefined}
                     sx={{
-                      whiteSpace: 'nowrap', // Prevents text wrapping
-                      overflow: 'hidden', // Hides overflow
-                      textOverflow: 'ellipsis', // Adds ellipsis for overflow
-                      maxWidth: '200px', // Optional: set max width for cells
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: 200,
                     }}
                   >
-                    {column.format ? column.format(value) : value}
+                    {displayValue}
                   </StyledTableCell>
                 );
               })}
