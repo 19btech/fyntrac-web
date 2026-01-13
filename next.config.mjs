@@ -4,6 +4,7 @@ const nextConfig = {
     optimizeCss: true,  // Keep if using CSS optimization
     // Remove optimizeFonts if present
   },
+  reactStrictMode: false,
   // Other configs...
 };
 
