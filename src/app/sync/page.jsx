@@ -121,7 +121,9 @@ function Row({ row, isExpandedDefault = false }) {
           {row.uploadId}
         </TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{row.jobName}</TableCell>
-
+        <TableCell align="center" sx={{ color: 'text.secondary' }}>
+          {row.postingDate ? formatDateTime(row.postingDate) : ''}
+        </TableCell>
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.starting)}</TableCell>
 
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.endTime)}</TableCell>
@@ -357,7 +359,7 @@ export default function IngestPage() {
             title="Recent Upload"
             action={
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Chip label="Latest" size="small" color="primary" sx={{ fontWeight: 600, height: 24 }} />
+
               </Box>
             }
           >
@@ -368,7 +370,7 @@ export default function IngestPage() {
                     <TableCell />
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Id</TableCell>
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
-
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Posting Date</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
@@ -405,7 +407,7 @@ export default function IngestPage() {
                     <TableCell width={60} />
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Id</TableCell>
                     <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Job Name</TableCell>
-
+                    <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Posting Date</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
