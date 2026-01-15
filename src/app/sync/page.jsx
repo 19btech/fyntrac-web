@@ -20,7 +20,8 @@ import {
   Tooltip,
   useTheme,
   alpha,
-  Container
+  Container,
+  Divider
 } from '@mui/material';
 
 // Icons
@@ -30,21 +31,32 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import TableViewIcon from '@mui/icons-material/TableView';
+
 import { useTenant } from "../tenant-context";
 import axios from 'axios';
 import FileUploadComponent from '../component/file-upload';
+
 // --- HELPERS ---
 
+// 1. Date Only (YYYY-MM-DD)
+const formatDate = (isoString) => {
+  if (!isoString) return '-';
+  return new Date(isoString).toLocaleDateString('en-CA');
+};
+
+// 2. Date & Time (YYYY-MM-DD, HH:MM)
+// ✅ FIXED: Added this missing function
 const formatDateTime = (isoString) => {
   if (!isoString) return '-';
-  return new Date(isoString).toLocaleString('en-US', {
-    month: 'short',
+  return new Date(isoString).toLocaleString('en-GB', {
+    year: 'numeric',
+    month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  });
+  }); 
 };
 
 const StatusChip = ({ status }) => {
@@ -84,14 +96,11 @@ const StatusChip = ({ status }) => {
 
 // --- COMPONENTS ---
 
-// 1. Collapsible Row (Updated with Conditional Error Column)
 function Row({ row, isExpandedDefault = false }) {
   const [open, setOpen] = useState(isExpandedDefault);
   const theme = useTheme();
 
   const hasDetails = row.details && row.details.length > 0;
-
-  // ✅ Check if ANY detail row has an error message
   const hasErrors = hasDetails && row.details.some(d => d.errorMessage);
 
   return (
@@ -121,11 +130,14 @@ function Row({ row, isExpandedDefault = false }) {
           {row.uploadId}
         </TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{row.jobName}</TableCell>
+        
+        {/* Uses formatDate for posting date (Date Only) */}
         <TableCell align="center" sx={{ color: 'text.secondary' }}>
-          {row.postingDate ? formatDateTime(row.postingDate) : ''}
+          {row.postingDate ? formatDate(row.postingDate) : '-'}
         </TableCell>
+        
+        {/* Uses formatDateTime for timestamps */}
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.starting)}</TableCell>
-
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.endTime)}</TableCell>
 
         <TableCell align="center">
@@ -154,41 +166,43 @@ function Row({ row, isExpandedDefault = false }) {
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Written</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Skipped</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Duration</TableCell>
-
-                          {/* ✅ CONDITIONAL HEADER: Only show if errors exist */}
                           {hasErrors && (
                             <TableCell align="left" sx={{ fontWeight: 600 }}>Error</TableCell>
                           )}
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {row.details.map((detail, index) => (
-                          <TableRow key={index}>
-                            <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
-                              {detail.tableName}
-                            </TableCell>
-                            <TableCell align="center">{detail.recordsRead}</TableCell>
-                            <TableCell align="center">{detail.recordsWritten}</TableCell>
-                            <TableCell align="center">{detail.recordsSkipped}</TableCell>
-                            <TableCell align="center" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-                              {formatDateTime(detail.starting).split(',')[1]} - {formatDateTime(detail.endTime).split(',')[1]}
-                            </TableCell>
+                        {row.details.map((detail, index) => {
+                           // Calculate duration simply by showing time range
+                           const start = formatDateTime(detail.starting).split(',')[1] || '';
+                           const end = formatDateTime(detail.endTime).split(',')[1] || '';
+                           
+                           return (
+                            <TableRow key={index}>
+                                <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                                {detail.tableName}
+                                </TableCell>
+                                <TableCell align="center">{detail.recordsRead}</TableCell>
+                                <TableCell align="center">{detail.recordsWritten}</TableCell>
+                                <TableCell align="center">{detail.recordsSkipped}</TableCell>
+                                <TableCell align="center" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                                {start} - {end}
+                                </TableCell>
 
-                            {/* ✅ CONDITIONAL BODY CELL: Only show if errors exist in the set */}
-                            {hasErrors && (
-                              <TableCell align="left" sx={{ fontSize: '0.75rem', maxWidth: 200, wordWrap: 'break-word' }}>
-                                {detail.errorMessage ? (
-                                  <Typography variant="caption" color="error.main" fontWeight={600}>
-                                    {detail.errorMessage}
-                                  </Typography>
-                                ) : (
-                                  <Typography variant="caption" color="text.disabled">-</Typography>
+                                {hasErrors && (
+                                <TableCell align="left" sx={{ fontSize: '0.75rem', maxWidth: 200, wordWrap: 'break-word' }}>
+                                    {detail.errorMessage ? (
+                                    <Typography variant="caption" color="error.main" fontWeight={600}>
+                                        {detail.errorMessage}
+                                    </Typography>
+                                    ) : (
+                                    <Typography variant="caption" color="text.disabled">-</Typography>
+                                    )}
+                                </TableCell>
                                 )}
-                              </TableCell>
-                            )}
-
-                          </TableRow>
-                        ))}
+                            </TableRow>
+                           );
+                        })}
                       </TableBody>
                     </Table>
                   </Card>
@@ -207,7 +221,6 @@ function Row({ row, isExpandedDefault = false }) {
   );
 }
 
-// 2. Fyntrac Styled Card
 const FyntracCard = ({ title, children, action, sx }) => {
   const theme = useTheme();
   return (
@@ -258,8 +271,9 @@ export default function IngestPage() {
   const [recentUpload, setRecentUpload] = useState(null);
   const [historicalUpload, setHistoricalUpload] = useState([]);
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
-  const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
   const { tenant, user } = useTenant();
+  
+  const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
   const fetchUploadActivityCall = `${baseURL}/activitylog/get/recent/loads`;
 
   const headers = {
@@ -295,35 +309,11 @@ export default function IngestPage() {
   const handleOpenFileUpload = () => {
     setOpenFileUpload(true);
   };
+  
   const handleCloseFileUpload = () => {
     setOpenFileUpload(false);
-  };
-
-  const handleFileDrop = (acceptedFiles) => {
-
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting/rule/upload';
-    const formData = new FormData();
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      formData.append('files', acceptedFiles[i]);
-    }
-
-    axios.post(serviceURL, formData, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
-      .then(response => {
-        // Handle success response if needed
-      })
-      .catch(error => {
-        console.error('Upload error:', error);
-        // Handle error if needed
-      });
-
-    // You can handle the uploaded files here
-    handleCloseFileUpload(); // Close the dialog after handling the files
+    // Refresh logs after upload window closes
+    fetchUploadActivitiyLogs();
   };
 
   return (
@@ -332,13 +322,17 @@ export default function IngestPage() {
       <Container maxWidth={false} sx={{ py: 1, px: 2 }}>
 
         {/* 1. Header Section */}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 4 }}>
+        <Box sx={{
+          p: 1.5,
+          borderBottom: '1.5px solid',
+          borderColor: (theme) => alpha(theme.palette.divider, 0.2), display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 4
+        }}>
           <Box>
             <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
               Ingest
             </Typography>
           </Box>
-
+          <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Upload Activity Files">
               <IconButton onClick={handleOpenFileUpload} sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}>
@@ -357,11 +351,7 @@ export default function IngestPage() {
         <Box sx={{ mb: 4 }}>
           <FyntracCard
             title="Recent Upload"
-            action={
-              <Box sx={{ display: 'flex', gap: 1 }}>
-
-              </Box>
-            }
+            action={<Box sx={{ display: 'flex', gap: 1 }}></Box>}
           >
             <TableContainer>
               <Table aria-label="recent upload table">
@@ -396,9 +386,7 @@ export default function IngestPage() {
         <Box>
           <FyntracCard
             title="Historical Loads"
-            action={
-              <IconButton size="small"><RefreshIcon fontSize="small" /></IconButton>
-            }
+          
           >
             <TableContainer>
               <Table aria-label="historical loads table">
@@ -434,6 +422,7 @@ export default function IngestPage() {
 
       </Container>
 
+      {/* File Upload Dialog */}
       <Dialog open={openFileUpload} onClose={handleCloseFileUpload}>
         <DialogTitle>
           <Box
@@ -443,14 +432,13 @@ export default function IngestPage() {
               alignItems: 'start',
             }}
           >
-            {/* Top Left: Image */}
             <Box
               sx={{
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'flex-start',  // Change 'left' to 'flex-start'
+                alignItems: 'flex-start',
                 gap: 1,
-                width: 'fit-content' // Ensures the Box doesn't take more space than needed
+                width: 'fit-content'
               }}
             >
               <img
@@ -458,8 +446,8 @@ export default function IngestPage() {
                 alt="Logo"
                 style={{
                   width: '100px',
-                  height: 'auto',  // Maintain aspect ratio
-                  maxWidth: '100%' // Ensures responsiveness
+                  height: 'auto',
+                  maxWidth: '100%'
                 }}
               />
               <Typography variant="h6">Activity Upload</Typography>
@@ -484,9 +472,6 @@ export default function IngestPage() {
             onDrop={handleCloseFileUpload}
             showActivitySelector={true}
             headerMessage={"Select an activity type and upload activity files for secure validation, ingestion, and processing."}
-            text="Drag and drop your files here"
-            iconColor="#3f51b5"
-            borderColor="#3f51b5"
             filesLimit={5}
           />
         </DialogContent>

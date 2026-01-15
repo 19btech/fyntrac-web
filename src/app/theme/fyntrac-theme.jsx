@@ -242,7 +242,7 @@ const fyntracTheme = createTheme({
     MuiDivider: {
       styleOverrides: {
         root: {
-          borderStyle: "dashed", // Modern dash style
+          borderStyle: "revert", // Modern dash style
           borderColor: "rgba(148, 163, 184, 0.2)",
         },
       },
