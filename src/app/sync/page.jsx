@@ -30,7 +30,6 @@ import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import TableViewIcon from '@mui/icons-material/TableView';
 
 import { useTenant } from "../tenant-context";
 import axios from 'axios';
@@ -154,7 +153,6 @@ function Row({ row, isExpandedDefault = false }) {
               {hasDetails ? (
                 <>
                   <Typography variant="subtitle2" gutterBottom component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main', fontWeight: 700 }}>
-                    <TableViewIcon fontSize="small" />
                     Processing Details
                   </Typography>
                   <Card variant="outlined" sx={{ mt: 2, overflow: 'hidden', borderRadius: 2, boxShadow: 0 }}>
