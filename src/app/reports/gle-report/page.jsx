@@ -104,7 +104,15 @@ const GLEReportPage = () => {
       }
     })
       .then(response => {
-        setReportData(response.data);
+
+                const dataWithIds = response.data.map((item, index) => ({
+          ...item,
+          // 👇 THIS IS THE FIX: Spread the attributes to the top level
+          ...(item.attributes || {}),
+          id: item.id || index + 1,
+        }));
+
+        setReportData(dataWithIds);
       })
       .catch(error => {
         console.error('Error fetching data:', error);
@@ -186,13 +194,22 @@ const GLEReportPage = () => {
   };
 
   const generateGridColumns = (columnDefs) => {
+    console.log('Generating grid columns from:', columnDefs);
     return columnDefs.map((col) => ({
       field: col.attributeName, // Use attributeName as the field
-      headerName: col.attributeAlias, // Use attributeAlias as the header name
+      headerName: toProperCase(col.attributeAlias), // Use attributeAlias as the header name
       width: 200, // Set a default width (you can customize this)
       editable: false, // Set editable to false or true based on your requirements
     }));
   };
+
+    const toProperCase = (str) =>
+    str
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
 
   return (
     <div>

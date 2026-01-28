@@ -41,17 +41,17 @@ function ChartOfAccount({ refreshData }) {
         Accept: '*/*',
       },
     })
-    .then(response => {
-      const metadata = response.data;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('attributeMetadata', JSON.stringify(metadata));
-      }
-      generateColumns(metadata);
-    })
-    .catch(error => {
-      console.error('Error fetching attribute metadata:', error);
-      setLoading(false);
-    });
+      .then(response => {
+        const metadata = response.data;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('attributeMetadata', JSON.stringify(metadata));
+        }
+        generateColumns(metadata);
+      })
+      .catch(error => {
+        console.error('Error fetching attribute metadata:', error);
+        setLoading(false);
+      });
   };
 
   const generateColumns = (metadata) => {
@@ -61,12 +61,37 @@ function ChartOfAccount({ refreshData }) {
       { field: 'accountSubtype', headerName: 'Account Subtype', width: 200 },
     ];
 
-    const dynamicColumns = metadata.map(attr => ({
-      field: attr.attributeName,
-      headerName: toProperCase(attr.attributeName),
-      type: getColumnType(attr.dataType),
-      width: 200,
-    }));
+    const dynamicColumns = metadata.map(attr => {
+      let colType = getColumnType(attr.dataType);
+
+      // 🛑 EMERGENCY FIX: Force PORTFOLIO to be a string
+      // The backend says it's a Date, but the data ("ABC") proves it is a String.
+      if (attr.attributeName === 'PORTFOLIO') {
+        colType = 'string';
+      }
+
+      return {
+        field: attr.attributeName,
+        headerName: toProperCase(attr.attributeName),
+        type: colType,
+        width: 200,
+        valueGetter: (params) => {
+          // MUI v6+ passes an object, older versions pass the value directly.
+          // We handle both safely:
+          const value = params.value !== undefined ? params.value : params;
+
+          if (!value) return null;
+
+          // Only convert to Date if it is TRULY a date column
+          if (colType === 'date') {
+            const date = new Date(value);
+            // Safety check: If "ABC" somehow gets here, treat it as null to prevent crash
+            return isNaN(date.getTime()) ? null : date;
+          }
+          return value;
+        },
+      };
+    });
 
     const editColumn = {
       field: 'edit',
@@ -117,16 +142,19 @@ function ChartOfAccount({ refreshData }) {
         Accept: '*/*',
       },
     })
-    .then(response => {
-      const dataWithIds = response.data.map((item, index) => ({
-        ...item,
-        id: item.id || index + 1, // Ensure each row has an `id`
-      }));
-      setRows(dataWithIds);
-    })
-    .catch(error => {
-      console.error('Error fetching chart of account:', error);
-    });
+      .then(response => {
+        console.log('Fetched chart of account data:', response.data);
+        const dataWithIds = response.data.map((item, index) => ({
+          ...item,
+          // 👇 THIS IS THE FIX: Spread the attributes to the top level
+          ...(item.attributes || {}),
+          id: item.id || index + 1,
+        }));
+        setRows(dataWithIds);
+      })
+      .catch(error => {
+        console.error('Error fetching chart of account:', error);
+      });
   };
 
   const handleCellEditCommit = (params) => {
