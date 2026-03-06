@@ -24,7 +24,7 @@ import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutline
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
 import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
 import { useTenant } from "../../tenant-context";
@@ -60,15 +60,9 @@ const GLEReportPage = () => {
   };
 
   const fetchReportAttributes = () => {
-    
-    const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/get/attributes`;
-    axios.get(fetchSettings, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+
+    const fetchSettings = `/jeReport/get/attributes`;
+    reportingApi.get(fetchSettings)
       .then(response => {
         setAttributeOptions(response.data);
       })
@@ -89,23 +83,17 @@ const GLEReportPage = () => {
   }, [attributeOptions]); // This will log the updated attributeOptions whenever it changes
 
   const executeReport = () => {
-      // Simulate a click anywhere on the page
-  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-       console.log('criteriaList:', criteriaList);
+    // Simulate a click anywhere on the page
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    console.log('criteriaList:', criteriaList);
 
     const filteredCriteriaList = criteriaList.filter(criteria => criteria.filters.length > 0);
     console.log('filters:', filteredCriteriaList);
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/execute`;
-    axios.post(executeReportAPI, filteredCriteriaList, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const executeReportAPI = `/jeReport/execute`;
+    reportingApi.post(executeReportAPI, filteredCriteriaList)
       .then(response => {
 
-                const dataWithIds = response.data.map((item, index) => ({
+        const dataWithIds = response.data.map((item, index) => ({
           ...item,
           // 👇 THIS IS THE FIX: Spread the attributes to the top level
           ...(item.attributes || {}),
@@ -203,7 +191,7 @@ const GLEReportPage = () => {
     }));
   };
 
-    const toProperCase = (str) =>
+  const toProperCase = (str) =>
     str
       .replace(/_/g, ' ')
       .toLowerCase()
@@ -436,16 +424,16 @@ const GLEReportPage = () => {
           </Box>
 
           <Box
-        flex="1" // Third row takes the remaining space
-        overflow="auto" // Enable scrolling if content overflows
-      >
-        <Box
-          height="100%" // Ensure the grid takes full height of the container
-          overflow="auto" // Enable scrolling for the grid if needed
-        >
-          <CustomDataGrid columns={gridHeader} rows={reportData} />
-        </Box>
-      </Box>
+            flex="1" // Third row takes the remaining space
+            overflow="auto" // Enable scrolling if content overflows
+          >
+            <Box
+              height="100%" // Ensure the grid takes full height of the container
+              overflow="auto" // Enable scrolling for the grid if needed
+            >
+              <CustomDataGrid columns={gridHeader} rows={reportData} />
+            </Box>
+          </Box>
         </Box>
       </CustomTabPanel>
     </div>

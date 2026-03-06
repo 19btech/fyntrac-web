@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Dialog
+import {
+  Dialog
   , DialogTitle
   , DialogContent
   , DialogActions
@@ -12,9 +13,10 @@ import { Dialog
   , Typography
   , Tooltip
   , Box
-  , Divider } from '@mui/material';
+  , Divider
+} from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -42,7 +44,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
     'DATE',
     'BOOLEAN'];
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/attribute/add';
+
 
   React.useEffect(() => {
     if (editData) {
@@ -69,7 +71,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   const handleAddAttribute = async () => {
     console.log('Tenant...', tenant);
     try {
-      const response = await axios.post(serviceURL, {
+      const response = await dataloaderApi.post('/attribute/add', {
         userField: userField,
         attributeName: attributeName,
         dataType: dataType,
@@ -77,15 +79,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         isVersionable: isVersionable ? 1 : 0,
         isNullable: isNullable ? 1 : 0,
         id: id
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
-      );
+      });
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
@@ -141,31 +135,31 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
             <Typography variant="h6">Attributes</Typography>
           </Box>
           <Tooltip title='Close'>
-          <IconButton
-            onClick={handleClose}
-            edge="end"
-            aria-label="close"
-            sx={{
-              color: 'grey.500',
-              '&:hover': { color: 'black' },
-            }}
-          >
-            <HighlightOffOutlinedIcon />
-          </IconButton>
+            <IconButton
+              onClick={handleClose}
+              edge="end"
+              aria-label="close"
+              sx={{
+                color: 'grey.500',
+                '&:hover': { color: 'black' },
+              }}
+            >
+              <HighlightOffOutlinedIcon />
+            </IconButton>
           </Tooltip>
         </Box>
       </DialogTitle>
       <Divider />
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <TextField
-         sx={{ width: '500px' }}
+          sx={{ width: '500px' }}
           label="User Field"
           fullWidth
           value={userField}
           onChange={(e) => setUserField(e.target.value)}
         />
         <TextField
-         sx={{ width: '500px' }}
+          sx={{ width: '500px' }}
           label="Attribute Name"
           fullWidth
           value={attributeName}
@@ -173,7 +167,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         />
 
         <Autocomplete
-         sx={{ width: '500px' }}
+          sx={{ width: '500px' }}
           disablePortal
           id="dataType-combo"
           options={defaultDataTypes}
@@ -199,18 +193,18 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
 
       <DialogActions sx={{ justifyContent: "center" }}>
         <Tooltip title='Save'>
-        <Button
-          onClick={handleAddAttribute}
-          sx={{
-            bgcolor: '#14213d',
-            color: 'white',
-            '&:hover': {
-              color: '#E6E6EF', // Prevent text color from changing on hover
-            },
-          }}
-        >
-          Save
-        </Button>
+          <Button
+            onClick={handleAddAttribute}
+            sx={{
+              bgcolor: '#14213d',
+              color: 'white',
+              '&:hover': {
+                color: '#E6E6EF', // Prevent text color from changing on hover
+              },
+            }}
+          >
+            Save
+          </Button>
         </Tooltip>
       </DialogActions>
       <Divider />

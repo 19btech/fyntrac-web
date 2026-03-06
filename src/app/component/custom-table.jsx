@@ -31,7 +31,7 @@ import {
   ErrorOutline as ErrorIcon,
   Key as KeyIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 import ReferenceColumnAutocomplete from "./reference-column-select";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -68,7 +68,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   const [columnErrors, setColumnErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const { tenant, user } = useTenant();
-  const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+  const baseURL = "";
   const [currentTableType, setCurrentTableType] = useState(tableType);
   const [referenceTables, setReferenceTables] = useState(tables);
   const [existingTables, setExistingTables] = useState(['']);
@@ -545,13 +545,13 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       const tableId = editData?.id;
 
       if (isEditMode && tableId) {
-        await axios.put(
+        await dataloaderApi.put(
           `${baseURL}/fyntrac/custom-table/${tableId}`,
           tableData,
           { headers }
         );
       } else {
-        await axios.post(
+        await dataloaderApi.post(
           `${baseURL}/fyntrac/custom-table/create-with-physical`,
           tableData,
           { headers }
@@ -589,7 +589,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     console.log('🚀 fetchExistingTables called');
     try {
       console.log('🌐 Making API call to:', `${baseURL}/fyntrac/custom-table/get/all-tables`);
-      const response = await axios.get(`${baseURL}/fyntrac/custom-table/get/all-tables`, {
+      const response = await dataloaderApi.get(`${baseURL}/fyntrac/custom-table/get/all-tables`, {
         headers: headers
       });
       console.log('📡 Raw API Response:', response);
@@ -725,7 +725,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
           <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ flexShrink: 0 }}>
             <Typography variant="subtitle2" fontWeight={600} display="flex" alignItems="center" gap={1}>
               Table Columns {isEditMode && <Chip label="Edit Mode" size="small" color="primary" />}
-              
+
             </Typography>
             <Button
               size="small"
@@ -875,7 +875,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
             ) : (
               <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                 This table needs a primary key. Select one using the key icon above.
-                
+
               </Typography>
             )}
             {errors.primaryKeys && (

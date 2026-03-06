@@ -4,7 +4,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddTransactionDialog from '../component/add-transaction';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 import { Box } from '@mui/material';
 
@@ -57,17 +57,11 @@ function Transaction({ refreshData }) {
   const fetchTransactionData = async () => {
     console.log('Tenant...', tenant);
     try {
-      const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/transaction/get/all`;
-      const response = await axios.get(url, {
-        headers: {
-          'X-Tenant': tenant,
-          Accept: '*/*',
-        },
-      });
+      const response = await dataloaderApi.get('/transaction/get/all');
       const data = response.data || [];
       const dataWithIds = data.map((item, index) => ({
         ...item,
-        id: item.id || index + 1, // fallback if no ID
+        id: item.id || index + 1,
       }));
       setRows(dataWithIds);
     } catch (error) {
@@ -88,24 +82,24 @@ function Transaction({ refreshData }) {
 
   return (
     <>
-       <div style={{ height: 'auto', width: '100%' }}>
+      <div style={{ height: 'auto', width: '100%' }}>
         <DataGrid
-                sx={{
-          border: 1,
-          borderColor: 'divider',
-          '& .MuiDataGrid-cell:hover': {
-            backgroundColor: 'rgba(0, 0, 0, 0.04)',
-          },
-          '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: 'rgba(0, 0, 0, 0.02)',
-            borderBottom: '2px solid',
-            borderBottomColor: 'divider',
-          },
-          '& .MuiDataGrid-virtualScrollerContent': {
-            width: 'auto',
-            minWidth: '100%',
-          },
-        }}
+          sx={{
+            border: 1,
+            borderColor: 'divider',
+            '& .MuiDataGrid-cell:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+            '& .MuiDataGrid-columnHeaders': {
+              backgroundColor: 'rgba(0, 0, 0, 0.02)',
+              borderBottom: '2px solid',
+              borderBottomColor: 'divider',
+            },
+            '& .MuiDataGrid-virtualScrollerContent': {
+              width: 'auto',
+              minWidth: '100%',
+            },
+          }}
           rows={rows}
           columns={columns}
           pagination

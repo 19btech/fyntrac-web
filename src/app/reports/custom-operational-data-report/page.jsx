@@ -25,7 +25,7 @@ import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutline
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
 import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
 import { useTenant } from "../../tenant-context";
@@ -64,47 +64,37 @@ const CustomOperationalDataReportPage = () => {
     Date: ["<", ">", "==", "!=", "<=", ">="],
   };
 
-const fetchReportAttributes = (source) => {
-  const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/custom-operational-data/get/attributes/${source.label}`;
-  console.log('uri:', fetchSettings);
-  axios.get(fetchSettings, {
-    headers: {
-      'X-Tenant': tenant,
-      Accept: '*/*',
-    }
-  })
-  .then(response => {
-    console.log();
-    setAttributeOptions([]);
-    setAttributeOptions(response.data);
-  })
-  .catch(error => {
-    console.error('Error fetching attributes:', error);
-  });
-};
+  const fetchReportAttributes = (source) => {
+    const fetchSettings = `/custom-operational-data/get/attributes/${source.label}`;
+    console.log('uri:', fetchSettings);
+    reportingApi.get(fetchSettings)
+      .then(response => {
+        console.log();
+        setAttributeOptions([]);
+        setAttributeOptions(response.data);
+      })
+      .catch(error => {
+        console.error('Error fetching attributes:', error);
+      });
+  };
 
-const fetchReportSources = () => {
-  const fetchReportSources = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/custom-operational-data/get/table-names`;
-  console.log('uri:', fetchReportSources);
-  axios.get(fetchReportSources, {
-    headers: {
-      'X-Tenant': tenant,
-      Accept: '*/*',
-    }
-  })
-  .then(response => {
-    console.log();
-    setReportSources([]);
-    setReportSources(response.data);
-    if(reportSources.length > 0) {
-        console.log('reportSources[0]:', reportSources[0]);
-        setReportSource(reportSources[0]);
-    }
-  })
-  .catch(error => {
-    console.error('Error fetching attributes:', error);
-  });
-};
+  const fetchReportSources = () => {
+    const fetchReportSources = `/custom-operational-data/get/table-names`;
+    console.log('uri:', fetchReportSources);
+    reportingApi.get(fetchReportSources)
+      .then(response => {
+        console.log();
+        setReportSources([]);
+        setReportSources(response.data);
+        if (reportSources.length > 0) {
+          console.log('reportSources[0]:', reportSources[0]);
+          setReportSource(reportSources[0]);
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching attributes:', error);
+      });
+  };
   useEffect(() => {
     fetchReportSources();
     fetchReportAttributes(reportSource);
@@ -124,14 +114,8 @@ const fetchReportSources = () => {
 
     const filteredCriteriaList = criteriaList.filter(criteria => criteria.filters.length > 0);
     console.log('filters:', filteredCriteriaList);
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/custom-operational-data/execute/${reportSource.value}`;
-    axios.post(executeReportAPI, filteredCriteriaList, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const executeReportAPI = `/custom-operational-data/execute/${reportSource.value}`;
+    reportingApi.post(executeReportAPI, filteredCriteriaList)
       .then(response => {
         console.log('Report Data:', response.data);
         setReportData(response.data);

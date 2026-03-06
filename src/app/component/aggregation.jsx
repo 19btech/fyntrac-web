@@ -3,7 +3,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddAggregationDialog from '../component/add-aggregation'
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { Alert, AlertTitle } from '@mui/material';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
@@ -46,15 +46,9 @@ function Aggregation({ refreshData }) {
   
   const fetchAggregationData = () => {
     
-    const fetchAggregationDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/get/all';
+    const fetchAggregationDataCall = '/aggregation/get/all';
 
-    axios.get(fetchAggregationDataCall, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(fetchAggregationDataCall)
       .then(response => {
         setRows(response.data);
         // Handle success response if needed

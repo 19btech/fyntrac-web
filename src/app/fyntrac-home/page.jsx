@@ -17,7 +17,7 @@ import {
   alpha
 } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
-import axios from 'axios';
+import { dataloaderApi, reportingApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
 // Icons
@@ -31,13 +31,13 @@ import BarChartWidget from '../component/bar-chart-widget';
 import DynamicTable from '../component/dynamic-data-table';
 
 // --- API CONFIGURATION ---
-const serviceGetOpenAccountingPeriodsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/open-periods'
-const serviceGetCurrentOpenAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/get/current-open-period'
-const serviceCloseAccountingPeriodURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting-period/close'
-const serviceGetWidgetDataURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/widget-data'
-const serviceGetTrendAnalysisURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/trend-analysis-data'
-const serviceGetRankedMetricURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/ranked-metrics'
-const serviceGetMomActivityDataURL = process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI + '/dashboard/get/mom-activity-data'
+const serviceGetOpenAccountingPeriodsURL = '/accounting-period/get/open-periods'
+const serviceGetCurrentOpenAccountingPeriodURL = '/accounting-period/get/current-open-period'
+const serviceCloseAccountingPeriodURL = '/accounting-period/close'
+const serviceGetWidgetDataURL = '/dashboard/get/widget-data'
+const serviceGetTrendAnalysisURL = '/dashboard/get/trend-analysis-data'
+const serviceGetRankedMetricURL = '/dashboard/get/ranked-metrics'
+const serviceGetMomActivityDataURL = '/dashboard/get/mom-activity-data'
 
 // --- REUSABLE COMPONENTS ---
 
@@ -214,14 +214,14 @@ export default function HomePage() {
 
   const handlecloseAccountingPeriod = async () => {
     try {
-      await axios.post(serviceCloseAccountingPeriodURL, {
+      await dataloaderApi.post(serviceCloseAccountingPeriodURL, {
         ...AccountingPeriodRecord,
         "periodId": parseInt(year + month),
         "period": year + '-' + month,
         "fiscalPeriod": parseInt(month),
         "year": parseInt(year),
         "status": 1
-      }, { headers: { 'X-Tenant': tenant, Accept: '*/*' } });
+      });
 
       fetchOpenAccountingPeriods();
       handleClose();
@@ -229,37 +229,37 @@ export default function HomePage() {
   };
 
   const fetchOpenAccountingPeriods = () => {
-    axios.get(serviceGetOpenAccountingPeriodsURL, { headers: { 'X-Tenant': tenant, Accept: '*/*' } })
+    dataloaderApi.get(serviceGetOpenAccountingPeriodsURL)
       .then(response => { setAccountingPeriods(response.data); fillYearList(response.data); fillMonthList(response.data); })
       .catch(error => { });
   };
 
   const fetchWidgetData = () => {
-    axios.get(serviceGetWidgetDataURL, { headers: { 'X-Tenant': tenant, Accept: '*/*' } })
+    reportingApi.get(serviceGetWidgetDataURL)
       .then(response => { setWidgetDataList(response.data); })
       .catch(error => { });
   };
 
   const fetchTrendAnalysisData = () => {
-    axios.get(serviceGetTrendAnalysisURL, { headers: { 'X-Tenant': tenant, Accept: '*/*' } })
+    reportingApi.get(serviceGetTrendAnalysisURL)
       .then(response => { setTrendAnalysisData(response.data); })
       .catch(error => { });
   };
 
   const fetchRankedMetricData = () => {
-    axios.get(serviceGetRankedMetricURL, { headers: { 'X-Tenant': tenant, Accept: '*/*' } })
+    reportingApi.get(serviceGetRankedMetricURL)
       .then(response => { setRankedMetrics(response.data); })
       .catch(error => { });
   };
 
   const fetchMoMActivityData = () => {
-    axios.get(serviceGetMomActivityDataURL, { headers: { 'X-Tenant': tenant, Accept: '*/*' } })
+    reportingApi.get(serviceGetMomActivityDataURL)
       .then(response => { setMomData(response.data.momData); setMomMetricSeries(response.data.monthOverMonthSeries); })
       .catch(error => { });
   };
 
   const fetchCurrentOpenAccountingPeriod = () => {
-    axios.get(serviceGetCurrentOpenAccountingPeriodURL, { headers: { 'X-Tenant': tenant, Accept: '*/*' } })
+    dataloaderApi.get(serviceGetCurrentOpenAccountingPeriodURL)
       .then(response => { setCurrentOpenAccountingPeriod(response.data); })
       .catch(error => { });
   };
@@ -368,8 +368,8 @@ export default function HomePage() {
                         tickLabelStyle: {
                           fontSize: 12,
                           fontWeight: 500,
-                         // angle: -30,
-                         //  textAnchor: 'end',
+                          // angle: -30,
+                          //  textAnchor: 'end',
                         },
                         labelStyle: {
                           fontSize: 13,
@@ -475,7 +475,7 @@ export default function HomePage() {
                         fontSize: 14,
                         fontWeight: 600,
                       },
-                     
+
 
                     }]}
                     series={momMetricSeries}

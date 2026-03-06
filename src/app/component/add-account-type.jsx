@@ -12,7 +12,7 @@ import { Dialog
   , Tooltip
   , Divider } from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -31,7 +31,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
     'CLEARING'];
 
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/add';
+  const serviceURL = '/accounttype/add';
 
   React.useEffect(() => {
     if (editData) {
@@ -49,18 +49,11 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
 
   const handleAccountType = async () => {
     try {
-      const response = await axios.post(serviceURL, {
+      const response = await dataloaderApi.post(serviceURL, {
         accountSubType: accountSubType,
         accountType: accountType,
         id: id
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
+      }
       );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);

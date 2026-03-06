@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -40,8 +40,8 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [accountSubtypes, setAccountSubtypes] = useState([]);
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/chartofaccount/add';
-  const sericeGetSubTypeURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/get/subtypes'
+  const serviceURL = '/chartofaccount/add';
+  const sericeGetSubTypeURL = '/accounttype/get/subtypes'
 
   const [attributeMetadata, setAttributeMetadata] = useState([]);
   const [formValues, setFormValues] = useState({});
@@ -53,13 +53,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   }, []);
 
   const fetchAttributeMetadata = () => {
-    axios.get(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/attribute/get/isreclassable/attributes', {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get('/attribute/get/isreclassable/attributes')
       .then(response => {
         const metadata = response.data;
         setAttributeMetadata(metadata);
@@ -152,13 +146,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
   const fetchAccountSubtypes = () => {
 
-    axios.get(sericeGetSubTypeURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(sericeGetSubTypeURL)
       .then(response => {
         setAccountSubtypes(response.data);
         // Handle success response if needed
@@ -171,20 +159,13 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
   const handleAddChartOfAccount = async () => {
     try {
-      const response = await axios.post(serviceURL, {
+      const response = await dataloaderApi.post(serviceURL, {
         accountName: accountName,
         accountSubtype: accountSubtype,
         accountNumber: accountNumber,
         id: id,
         attributes: formValues,
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
+      }
       );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);

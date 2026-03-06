@@ -36,13 +36,13 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 
 export default function EventConfiguration({ open, onClose, editData }) {
     const { tenant, user } = useTenant();
 
     // Debug environment variables
-    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+    const baseURL = "";
     console.log('🔧 Environment Variables:', {
         baseURL,
         tenant,
@@ -121,12 +121,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     }, [tenant]);
 
     const fetchAttributeMetadata = () => {
-        axios.get(`${baseURL}/attribute/get/all/options`, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(`${baseURL}/attribute/get/all/options`)
             .then(response => {
                 setAttributeList(response.data);
             })
@@ -136,12 +131,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const fetchTransactionMetadata = () => {
-        axios.get(`${baseURL}/transaction/get/all/options`, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(`${baseURL}/transaction/get/all/options`)
             .then(response => {
                 setTransactionList(response.data);
             })
@@ -151,12 +141,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const fetchMetricsMetadata = () => {
-        axios.get(`${baseURL}/aggregation/get/all/options`, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(`${baseURL}/aggregation/get/all/options`)
             .then(response => {
                 const metadata = response.data;
                 const formattedMetrics = Array.isArray(metadata)
@@ -174,12 +159,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const fetchReferenceTableMetadata = () => {
-        axios.get(`${baseURL}/fyntrac/custom-table/get/all/reference-tables/options`, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(`${baseURL}/fyntrac/custom-table/get/all/reference-tables/options`)
             .then(response => {
                 const metadata = Array.isArray(response.data?.data)
                     ? response.data.data
@@ -205,12 +185,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
 
     const fetchOperationalableMetadata = () => {
-        axios.get(`${baseURL}/fyntrac/custom-table/get/all/operational-tables/options`, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(`${baseURL}/fyntrac/custom-table/get/all/operational-tables/options`)
             .then(response => {
                 const metadata = Array.isArray(response.data?.data)
                     ? response.data.data
@@ -241,12 +216,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             uri = `${baseURL}/fyntrac/custom-table/get/values/operational_table/${reference}`;
         }
 
-        axios.get(uri, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(uri)
             .then(response => {
                 const metadata = Array.isArray(response.data?.data)
                     ? response.data.data
@@ -771,14 +741,14 @@ export default function EventConfiguration({ open, onClose, editData }) {
             let response;
             if (editData && editData.id) {
                 console.log(`🔄 UPDATE Operation for ID: ${editData.id}`);
-                response = await axios.put(
+                response = await dataloaderApi.put(
                     `${baseURL}/fyntrac/event-configurations/update/${editData.id}`,
                     requestData,
                     { headers }
                 );
             } else {
                 console.log('🆕 CREATE Operation');
-                response = await axios.post(
+                response = await dataloaderApi.post(
                     `${baseURL}/fyntrac/event-configurations/create`,
                     requestData,
                     { headers }

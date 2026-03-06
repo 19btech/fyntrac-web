@@ -15,7 +15,7 @@ import {
     , Chip
 } from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -44,7 +44,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [errorMessage, setErrorMessage] = useState('');
     const [availableMetrics, setAvailableMetrics] = useState([]);
     const [isMetricssError, setIsMetricsError] = React.useState(false);
-    const serviceGetMetricsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/get/metrics'
+    const serviceGetMetricsURL = '/aggregation/get/metrics'
 
 
     React.useEffect(() => {
@@ -76,13 +76,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
 
     const fetchMetricNames = () => {
 
-        axios.get(serviceGetMetricsURL, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-            }
-        })
+        dataloaderApi.get(serviceGetMetricsURL)
             .then(response => {
                 console.log('Metrics:', response.data);
                 setAvailableMetrics(response.data);
@@ -94,7 +88,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
 
 
     const handleSaveDashboardConfiguration = async () => {
-        const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/dashboard-configuration/save';
+        const serviceURL = '/setting/dashboard-configuration/save';
         try {
             const metricNames = activityGraphMetrics.map(item => item.metricName);
             console.log("Dashboard Configuration:", {
@@ -106,7 +100,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 activityGraphMetrics: metricNames,
                 id: id
             });
-            const response = await axios.post(serviceURL, {
+            const response = await dataloaderApi.post(serviceURL, {
                 widgetOneMetric: widgetOne,
                 widgetTwoMetric: widgetTwo,
                 widgetThreeMetric: widgetThree,
@@ -114,14 +108,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 trendAnalysisGraphMetric: trendAnalysisGraph,
                 activityGraphMetrics: metricNames,
                 id: id
-            },
-                {
-                    headers: {
-                        'X-Tenant': tenant,
-                        Accept: '*/*',
-                        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-                    }
-                }
+            }
             );
             setSuccessMessage(JSON.stringify(response.data));
             setShowSuccessMessage(true);

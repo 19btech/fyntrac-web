@@ -19,7 +19,7 @@ import AddChartofAccount from '../component/add-chart-of-account'
 import AddSubledgerMapping from '../component/add-subledger-mapping';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import { Button, Dialog, Typography, DialogContent, DialogTitle, Divider, Tooltip } from '@mui/material';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -66,19 +66,13 @@ export default function AccountingPage() {
 
   const handleFileDrop = (acceptedFiles) => {
 
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting/rule/upload';
+    const serviceURL = '/accounting/rule/upload';
     const formData = new FormData();
     for (let i = 0; i < acceptedFiles.length; i++) {
       formData.append('files', acceptedFiles[i]);
     }
 
-    axios.post(serviceURL, formData, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.post(serviceURL, formData)
       .then(response => {
         // Handle success response if needed
       })

@@ -12,7 +12,7 @@ import { Dialog
   , Box
   , Divider } from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -33,8 +33,8 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   ];
 
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/add';
-  const serviceGetTransactionNamesURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/transactions'
+  const serviceURL = '/aggregation/add';
+  const serviceGetTransactionNamesURL = '/transaction/get/transactions'
   const [transactionNames, setTransactionNames] = useState([]);
 
   React.useEffect(() => {
@@ -58,13 +58,7 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
 
   const fetchTransactionNames = () => {
 
-    axios.get(serviceGetTransactionNamesURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(serviceGetTransactionNamesURL)
       .then(response => {
         setTransactionNames(response.data);
       })
@@ -75,19 +69,12 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
 
   const handleAddAggregation = async () => {
     try {
-      const response = await axios.post(serviceURL, {
+      const response = await dataloaderApi.post(serviceURL, {
         transactionName: transactionName,
         metricName: metricName,
         level: level,
         id: id
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
+      }
       );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);

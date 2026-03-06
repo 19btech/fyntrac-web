@@ -14,7 +14,7 @@ import {
   , Divider
 } from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -43,9 +43,9 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   const [signs, setSigns] = useState(['AMOUNT < 0', 'AMOUNT > 0']);
   const [entryTypes, setEntryTypes] = useState(['DEBIT', 'CREDIT']);
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/subledgermapping/add';
-  const sericeGetSubTypeURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/get/subtypes'
-  const serviceGetTransactionNamesURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/transactions'
+  const serviceURL = '/subledgermapping/add';
+  const sericeGetSubTypeURL = '/accounttype/get/subtypes'
+  const serviceGetTransactionNamesURL = '/transaction/get/transactions'
 
   React.useEffect(() => {
     if (accountSubtypes.length === 0) {
@@ -74,13 +74,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
 
   const fetchAccountSubtypes = () => {
     console.log('Tenant...', tenant);
-    axios.get(sericeGetSubTypeURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(sericeGetSubTypeURL)
       .then(response => {
         setAccountSubtypes(response.data);
         // Handle success response if needed
@@ -92,13 +86,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
 
   const fetchTransactionNames = () => {
 
-    axios.get(serviceGetTransactionNamesURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(serviceGetTransactionNamesURL)
       .then(response => {
         setTransactionNames(response.data);
       })
@@ -109,20 +97,13 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
 
   const handleAddSubledgerMapping = async () => {
     try {
-      const response = await axios.post(serviceURL, {
+      const response = await dataloaderApi.post(serviceURL, {
         transactionName: transactionName,
         sign: sign,
         entryType: entryType,
         accountSubType: accountSubType,
         id: id
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
+      }
       );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useDropzone } from 'react-dropzone';
 import { TextField, Divider, DialogContent, Box, Typography, LinearProgress, Alert, Snackbar } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -120,14 +120,14 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
   };
 
   const handleFileDrop = (acceptedFiles, modelName, modelOrderId) => {
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/upload';
+    const serviceURL = '/model/upload';
 
     const formData = new FormData();
     formData.append('modelName', modelName);
     formData.append('modelOrderId', modelOrderId);
     formData.append('files', acceptedFiles[0]);   // backend expects ONE file
 
-    axios.post(serviceURL, formData, {
+    dataloaderApi.post(serviceURL, formData, {
       headers: {
         'X-Tenant': tenant
       }

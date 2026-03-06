@@ -20,7 +20,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
 function Row({ row }) {
@@ -123,7 +123,7 @@ export default function RecentLoad() {
 
   const fetchRecentLoad = () => {
     axios
-      .get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/activitylog/get/recent/loads`, {
+      .get(`/activitylog/get/recent/loads`, {
         headers: {
           'X-Tenant': tenant,
           Accept: '*/*',

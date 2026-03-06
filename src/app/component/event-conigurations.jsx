@@ -1,19 +1,19 @@
 "use client"
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import axios from 'axios';
-import { 
-    Typography, 
-    Box, 
-    Switch, 
-    IconButton, 
-    Tooltip, 
+import { dataloaderApi } from '../services/api-client';
+import {
+    Typography,
+    Box,
+    Switch,
+    IconButton,
+    Tooltip,
     Button,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogContentText,
-    DialogActions 
+    DialogActions
 } from '@mui/material';
 import SuccessAlert from '../component/success-alert';
 import ErrorAlert from '../component/error-alert';
@@ -24,25 +24,11 @@ import dynamic from 'next/dynamic';
 
 // Dynamically import the EventConfiguration component (modal/dialog)
 const EventConfigurationModal = dynamic(() => import('./event-configuration'), {
-  ssr: false
+    ssr: false
 });
 
 function EventConfigurationsList({ refreshData }) {
     const { tenant, user } = useTenant();
-    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
-    
-    // FIX: Create apiClient using useMemo with correct baseURL
-    const apiClient = useMemo(() => {
-        if (!user?.id) return null;
-        return axios.create({
-            baseURL: baseURL,
-            headers: {
-                'X-Tenant': tenant,
-                'X-User-Id': user.id,
-                Accept: '*/*',
-            },
-        });
-    }, [user, tenant, baseURL]);
 
     const initialRows = [];
 
@@ -57,7 +43,7 @@ function EventConfigurationsList({ refreshData }) {
     const [open, setOpen] = useState(false);
     const [editData, setEditData] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    
+
     // Delete confirmation dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [eventToDelete, setEventToDelete] = useState(null);
@@ -96,15 +82,7 @@ function EventConfigurationsList({ refreshData }) {
     }));
 
     const fetchEventConfiguration = (eventId) => {
-        const fullUrl = `${baseURL}/fyntrac/event-configurations/get/${eventId}`;
-        console.log('Attempting to fetch from:', fullUrl);
-        axios.get(fullUrl, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-            }
-        })
+        dataloaderApi.get(`/fyntrac/event-configurations/get/${eventId}`)
             .then(response => {
                 const metadata = response.data;
                 console.log('Event configuration [EventId]:', eventId, metadata);
@@ -117,12 +95,8 @@ function EventConfigurationsList({ refreshData }) {
     };
 
     async function updateEventConfigurationStatus(id, isActive) {
-        if (!apiClient) {
-            console.error('API client not ready');
-            throw new Error('API client not ready');
-        }
         try {
-            const response = await apiClient.put(`/fyntrac/event-configurations/update/status/${id}/${isActive}`);
+            const response = await dataloaderApi.put(`/fyntrac/event-configurations/update/status/${id}/${isActive}`);
             return response.data;
         } catch (error) {
             console.error('Error updating status:', error.response?.data || error.message || error);
@@ -131,15 +105,11 @@ function EventConfigurationsList({ refreshData }) {
     }
 
     async function deleteEventConfiguration(eventId) {
-        if (!apiClient) {
-            console.error('API client not ready');
-            throw new Error('API client not ready');
-        }
         try {
-            const response = await apiClient.delete(`/fyntrac/event-configurations/delete/${eventId}`);
+            const response = await dataloaderApi.delete(`/fyntrac/event-configurations/delete/${eventId}`);
             return response.data;
         } catch (error) {
-            console.error('Error updating status:', error.response?.data || error.message || error);
+            console.error('Error deleting:', error.response?.data || error.message || error);
             throw error;
         }
     }
@@ -185,7 +155,7 @@ function EventConfigurationsList({ refreshData }) {
             setSuccessMessage('Event configuration deleted successfully!');
             setShowSuccessMessage(true);
             refreshGridData();
-            
+
             // Close the confirmation dialog
             setDeleteDialogOpen(false);
             setEventToDelete(null);
@@ -305,15 +275,7 @@ function EventConfigurationsList({ refreshData }) {
     };
 
     const fetchModels = () => {
-        const fetchTransactionDataCall = `${baseURL}/fyntrac/event-configurations/all`;
-
-        axios.get(fetchTransactionDataCall, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-            }
-        })
+        dataloaderApi.get('/fyntrac/event-configurations/all')
             .then(response => {
                 console.log('Event Configurations', response.data);
                 setRows(response.data);
@@ -331,7 +293,7 @@ function EventConfigurationsList({ refreshData }) {
 
     return (
         <div>
-   
+
             <div style={{ height: 'auto', width: '100%' }}>
                 <DataGrid
                     rows={rows}
@@ -379,7 +341,7 @@ function EventConfigurationsList({ refreshData }) {
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText id="delete-dialog-description">
-                        Are you sure you want to delete the event configuration "{eventToDelete?.eventName}" (ID: {eventToDelete?.eventId})? 
+                        Are you sure you want to delete the event configuration "{eventToDelete?.eventName}" (ID: {eventToDelete?.eventId})?
                         This action cannot be undone.
                     </DialogContentText>
                 </DialogContent>
@@ -387,9 +349,9 @@ function EventConfigurationsList({ refreshData }) {
                     <Button onClick={handleCancelDelete} color="primary">
                         Cancel
                     </Button>
-                    <Button 
-                        onClick={handleConfirmDelete} 
-                        color="error" 
+                    <Button
+                        onClick={handleConfirmDelete}
+                        color="error"
                         variant="contained"
                         autoFocus
                     >

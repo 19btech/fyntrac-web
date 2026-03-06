@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import {
     Box,
     Button,
@@ -53,12 +53,12 @@ const ExecuteModel = ({ open, onClose }) => {
             return;
         }
 
-        const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/execute';
+        const serviceURL = '/model/execute';
 
         try {
             console.log('Model to execute:', date);
             const payload = { date: date };
-            const response = await axios.post(serviceURL, payload, {
+            const response = await dataloaderApi.post(serviceURL, payload, {
                 headers: {
                     'X-Tenant': tenant,
                     Accept: '*/*',

@@ -3,7 +3,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddAccountTypeDialog from '../component/add-account-type';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
 function AccountType({ refreshData }) {
@@ -40,15 +40,14 @@ function AccountType({ refreshData }) {
 
   const fetchAccountTypeData = () => {
     const fetchAccountTypeDataCall =
-      process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/get/all';
+      '/accounttype/get/all';
 
-    axios
-      .get(fetchAccountTypeDataCall, {
-        headers: {
-          'X-Tenant': tenant,
-          Accept: '*/*',
-        },
-      })
+    dataloaderApi.get(fetchAccountTypeDataCall, {
+      headers: {
+        'X-Tenant': tenant,
+        Accept: '*/*',
+      },
+    })
       .then((response) => {
         setRows(response.data); // Populate rows with fetched data
       })
@@ -77,24 +76,24 @@ function AccountType({ refreshData }) {
   return (
     <div>
       <div style={{ height: 'auto', width: '100%' }}>
-                    <DataGrid
-                      rows={rows}
-                      columns={columns}
-                      initialState={{
-                        pagination: { paginationModel: { pageSize: rowsPerPage } },
-                      }}
-                      
-                     pageSize={rowsPerPage}
-                      page={currentPage}
-                      onPageChange={(newPage) => setCurrentPage(newPage)}
-                      pageSizeOptions={[5, 10, 20]}
-                      pagination
-                    paginationMode='client'
-                      disableSelectionOnClick
-                      editMode="row"
-                      onCellEditCommit={handleCellEditCommit}
-                    />
-                  </div>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          initialState={{
+            pagination: { paginationModel: { pageSize: rowsPerPage } },
+          }}
+
+          pageSize={rowsPerPage}
+          page={currentPage}
+          onPageChange={(newPage) => setCurrentPage(newPage)}
+          pageSizeOptions={[5, 10, 20]}
+          pagination
+          paginationMode='client'
+          disableSelectionOnClick
+          editMode="row"
+          onCellEditCommit={handleCellEditCommit}
+        />
+      </div>
       <AddAccountTypeDialog open={open} onClose={setOpen} editData={editData} />
     </div>
   );

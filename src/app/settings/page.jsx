@@ -17,7 +17,7 @@ import Tab from '@mui/material/Tab';
 import RefreshSharpIcon from '@mui/icons-material/RefreshSharp';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import AddDashboardConfiguration from '../component/add-update-dashboard-config';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import dayjs from 'dayjs';
 import '../common.css';
 import { useTenant } from "../tenant-context";
@@ -56,7 +56,7 @@ export default function SettingsPage() {
     'Sep-2022',
     'Aug-2022'];
 
-  const saveFiscalPeriodServiceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/fiscal-priod/save';
+  const saveFiscalPeriodServiceURL = '/setting/fiscal-priod/save';
   const handleFiscalPeriodChange = (date) => {
     setFiscalPeriodStaringDate(date);
     if (fiscalPeriodStaringDate != null) {
@@ -95,7 +95,7 @@ export default function SettingsPage() {
 
   const saveCurrency = async () => {
     try {
-      const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/save/currency', currency,
+      const response = await dataloaderApi.post('/setting/save/currency', currency,
         {
           headers: {
             'X-Tenant': tenant,
@@ -117,14 +117,8 @@ export default function SettingsPage() {
   };
 
   const fetchCurrencies = () => {
-    const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/currencies';
-    axios.get(fetchSettings, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchSettings = '/setting/get/currencies';
+    dataloaderApi.get(fetchSettings)
       .then(response => {
         setCurrencyList(response.data);
 
@@ -136,14 +130,8 @@ export default function SettingsPage() {
   };
 
   const fetchSettings = () => {
-    const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/settings';
-    axios.get(fetchSettings, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchSettings = '/setting/get/settings';
+    dataloaderApi.get(fetchSettings)
       .then(response => {
         setSettings(response.data);
         const fiscalPeriodDate = new Date(response.data.fiscalPeriodStartDate);
@@ -168,7 +156,7 @@ export default function SettingsPage() {
 
   const handleSaveFiscalPeriod = async () => {
     try {
-      const response = await axios.post(saveFiscalPeriodServiceURL, {
+      const response = await dataloaderApi.post(saveFiscalPeriodServiceURL, {
         homeCurrency: '',
         glamFields: '',
         fiscalPeriodStartDate: new Date(fiscalPeriodStaringDate.toISOString()),
@@ -209,7 +197,7 @@ export default function SettingsPage() {
       return;
     }
     try {
-      const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/restatement-mode/save', {
+      const response = await dataloaderApi.post('/setting/restatement-mode/save', {
         homeCurrency: '',
         glamFields: '',
         fiscalPeriodStartDate: new Date(fiscalPeriodStaringDate.toISOString()),
@@ -248,7 +236,7 @@ export default function SettingsPage() {
 
   const refreshEnvironment = async () => {
     try {
-      const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/refresh/schema', true,
+      const response = await dataloaderApi.post('/setting/refresh/schema', true,
         {
           headers: {
             'X-Tenant': tenant,

@@ -32,7 +32,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 import { useTenant } from "../tenant-context";
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import FileUploadComponent from '../component/file-upload';
 
 // --- HELPERS ---
@@ -55,7 +55,7 @@ const formatDateTime = (isoString) => {
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  }); 
+  });
 };
 
 const StatusChip = ({ status }) => {
@@ -129,12 +129,12 @@ function Row({ row, isExpandedDefault = false }) {
           {row.uploadId}
         </TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{row.jobName}</TableCell>
-        
+
         {/* Uses formatDate for posting date (Date Only) */}
         <TableCell align="center" sx={{ color: 'text.secondary' }}>
           {row.postingDate ? formatDate(row.postingDate) : '-'}
         </TableCell>
-        
+
         {/* Uses formatDateTime for timestamps */}
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.starting)}</TableCell>
         <TableCell align="center" sx={{ color: 'text.secondary' }}>{formatDateTime(row.endTime)}</TableCell>
@@ -171,35 +171,35 @@ function Row({ row, isExpandedDefault = false }) {
                       </TableHead>
                       <TableBody>
                         {row.details.map((detail, index) => {
-                           // Calculate duration simply by showing time range
-                           const start = formatDateTime(detail.starting).split(',')[1] || '';
-                           const end = formatDateTime(detail.endTime).split(',')[1] || '';
-                           
-                           return (
-                            <TableRow key={index}>
-                                <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
-                                {detail.tableName}
-                                </TableCell>
-                                <TableCell align="center">{detail.recordsRead}</TableCell>
-                                <TableCell align="center">{detail.recordsWritten}</TableCell>
-                                <TableCell align="center">{detail.recordsSkipped}</TableCell>
-                                <TableCell align="center" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-                                {start} - {end}
-                                </TableCell>
+                          // Calculate duration simply by showing time range
+                          const start = formatDateTime(detail.starting).split(',')[1] || '';
+                          const end = formatDateTime(detail.endTime).split(',')[1] || '';
 
-                                {hasErrors && (
+                          return (
+                            <TableRow key={index}>
+                              <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                                {detail.tableName}
+                              </TableCell>
+                              <TableCell align="center">{detail.recordsRead}</TableCell>
+                              <TableCell align="center">{detail.recordsWritten}</TableCell>
+                              <TableCell align="center">{detail.recordsSkipped}</TableCell>
+                              <TableCell align="center" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                                {start} - {end}
+                              </TableCell>
+
+                              {hasErrors && (
                                 <TableCell align="left" sx={{ fontSize: '0.75rem', maxWidth: 200, wordWrap: 'break-word' }}>
-                                    {detail.errorMessage ? (
+                                  {detail.errorMessage ? (
                                     <Typography variant="caption" color="error.main" fontWeight={600}>
-                                        {detail.errorMessage}
+                                      {detail.errorMessage}
                                     </Typography>
-                                    ) : (
+                                  ) : (
                                     <Typography variant="caption" color="text.disabled">-</Typography>
-                                    )}
+                                  )}
                                 </TableCell>
-                                )}
+                              )}
                             </TableRow>
-                           );
+                          );
                         })}
                       </TableBody>
                     </Table>
@@ -270,8 +270,8 @@ export default function IngestPage() {
   const [historicalUpload, setHistoricalUpload] = useState([]);
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const { tenant, user } = useTenant();
-  
-  const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+
+  const baseURL = "";
   const fetchUploadActivityCall = `${baseURL}/activitylog/get/recent/loads`;
 
   const headers = {
@@ -281,7 +281,7 @@ export default function IngestPage() {
   };
 
   const fetchUploadActivitiyLogs = () => {
-    axios.get(fetchUploadActivityCall, { headers: headers })
+    dataloaderApi.get(fetchUploadActivityCall, { headers: headers })
       .then(response => {
         const logs = response.data || [];
         if (logs.length > 0) {
@@ -307,7 +307,7 @@ export default function IngestPage() {
   const handleOpenFileUpload = () => {
     setOpenFileUpload(true);
   };
-  
+
   const handleCloseFileUpload = () => {
     setOpenFileUpload(false);
     // Refresh logs after upload window closes
@@ -384,7 +384,7 @@ export default function IngestPage() {
         <Box>
           <FyntracCard
             title="Historical Loads"
-          
+
           >
             <TableContainer>
               <Table aria-label="historical loads table">

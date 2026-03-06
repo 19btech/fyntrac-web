@@ -5,7 +5,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import { IconButton, Tooltip } from '@mui/material';
 import { Edit } from '@mui/icons-material';
 import AddChartOfAccountDialog from '../component/add-chart-of-account';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
 function ChartOfAccount({ refreshData }) {
@@ -35,7 +35,7 @@ function ChartOfAccount({ refreshData }) {
   }, [refreshData]);
 
   const fetchAttributeMetadata = () => {
-    axios.get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/attribute/get/isreclassable/attributes`, {
+    dataloaderApi.get(`/attribute/get/isreclassable/attributes`, {
       headers: {
         'X-Tenant': tenant,
         Accept: '*/*',
@@ -136,7 +136,7 @@ function ChartOfAccount({ refreshData }) {
   };
 
   const fetchChartOfAccountData = () => {
-    axios.get(`${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/chartofaccount/get/all`, {
+    dataloaderApi.get(`/chartofaccount/get/all`, {
       headers: {
         'X-Tenant': tenant,
         Accept: '*/*',

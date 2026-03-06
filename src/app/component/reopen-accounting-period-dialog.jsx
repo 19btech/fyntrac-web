@@ -11,7 +11,7 @@ import TextField from '@mui/material/TextField'
 import Box from '@mui/material/Box';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
 export default function ReopenAccountingPeriodDialog({ dialogTitle, dialogDescription, open, onClose }) {
@@ -25,14 +25,8 @@ export default function ReopenAccountingPeriodDialog({ dialogTitle, dialogDescri
     const [isButtonDisabled, setIsButtonDisabled] = React.useState(true);
 
     const fetchClosedAccountingPeriods = () => {
-        const fetchSettings = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/get/closed/accounting-periods';
-        axios.get(fetchSettings, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-                'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-            }
-        })
+        const fetchSettings = '/setting/get/closed/accounting-periods';
+        dataloaderApi.get(fetchSettings)
             .then(response => {
                 setClosedAccountingPeriods(response.data);
                 const fiscalPeriodDate = new Date(response.data.fiscalPeriodStartDate);
@@ -50,7 +44,7 @@ export default function ReopenAccountingPeriodDialog({ dialogTitle, dialogDescri
 
     const reopenAllRemainingClosedAccountingPeriods = async () => {
         try {
-            const response = await axios.post(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/setting/reopen/accounting-periods',
+            const response = await dataloaderApi.post('/setting/reopen/accounting-periods',
                 accountingPeriod
                 ,
                 {

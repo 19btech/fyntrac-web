@@ -19,7 +19,7 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import GridHeader from "../component/gridHeader";
 import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import { dataloaderApi, reportingApi } from '../services/api-client';
 import CustomTabPanel from '../component/custom-tab-panel';
 import CircularProgress from '@mui/material/CircularProgress';
 import { green } from '@mui/material/colors';
@@ -89,14 +89,8 @@ const InstrumentDiagnosticPage = () => {
   }
 
   const fetchAllModels = () => {
-    const fetchModels = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/get/all`;
-    axios.get(fetchModels, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchModels = `/model/get/all`;
+    dataloaderApi.get(fetchModels)
       .then(response => {
         setModels(response.data);
       })
@@ -107,14 +101,8 @@ const InstrumentDiagnosticPage = () => {
 
 
   const fetchAllPostingDates = () => {
-    const fetchPostingDates = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/get/event-postingdates`;
-    axios.get(fetchPostingDates, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchPostingDates = `/diagnostic/get/event-postingdates`;
+    reportingApi.get(fetchPostingDates)
       .then(response => {
         setPostingDates(response.data);
         console.info('Posting Dates:', response.data);
@@ -125,7 +113,7 @@ const InstrumentDiagnosticPage = () => {
   };
 
   const downloadDiagnostic = () => {
-    const downloadFile = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/download`;
+    const downloadFile = `/diagnostic/download`;
     console.info('postingDate:', postingDate);
     const diagnosticRequest = {
       tenant: tenant,
@@ -136,7 +124,7 @@ const InstrumentDiagnosticPage = () => {
 
     console.log('Download Request:', diagnosticRequest);
 
-    axios.post(downloadFile, diagnosticRequest, {
+    reportingApi.post(downloadFile, diagnosticRequest, {
       headers: {
         'X-Tenant': tenant,
         Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -200,14 +188,9 @@ const InstrumentDiagnosticPage = () => {
 
     console.log('request:', diagnosticRequest);
 
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/generate`;
+    const executeReportAPI = `/diagnostic/generate`;
 
-    axios.post(executeReportAPI, diagnosticRequest, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-      }
-    })
+    reportingApi.post(executeReportAPI, diagnosticRequest)
       .then(response => {
         const data = response.data;
 

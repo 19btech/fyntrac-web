@@ -61,8 +61,8 @@ export default function FileUploadComponent({
     activityTypeRef.current = activityType;
   }, [activityType]);
 
-  const standardURL = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/accounting/rule/upload`;
-  const customURL = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/fyntrac/custom-table/data-upload`;
+  const standardURL = `/accounting/rule/upload`;
+  const customURL = `/fyntrac/custom-table/data-upload`;
 
   const handleDrop = async (acceptedFiles, fileRejections) => {
     // 🔒 Prevent double upload
@@ -98,7 +98,7 @@ export default function FileUploadComponent({
     newFiles.forEach((file) => formData.append("files", file));
 
     try {
-      const response = await axios.post(targetUrl, formData, {
+      const response = await dataloaderApi.post(targetUrl, formData, {
         headers: {
           "X-Tenant": tenant || "",
           "X-User-Id": user?.id || "",

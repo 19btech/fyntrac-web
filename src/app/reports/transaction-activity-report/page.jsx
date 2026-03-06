@@ -24,7 +24,7 @@ import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutline
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
 import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
 import { useTenant } from "../../tenant-context";
@@ -60,14 +60,8 @@ const TransactionActivityReportPage = () => {
   };
 
   const fetchReportAttributes = () => {
-    const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/transaction-activity/get/attributes`;
-    axios.get(fetchSettings, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchSettings = `/transaction-activity/get/attributes`;
+    reportingApi.get(fetchSettings)
       .then(response => {
         setAttributeOptions(response.data);
       })
@@ -88,20 +82,14 @@ const TransactionActivityReportPage = () => {
   }, [attributeOptions]); // This will log the updated attributeOptions whenever it changes
 
   const executeReport = () => {
-      // Simulate a click anywhere on the page
-  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-       console.log('criteriaList:', criteriaList);
+    // Simulate a click anywhere on the page
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    console.log('criteriaList:', criteriaList);
 
     const filteredCriteriaList = criteriaList.filter(criteria => criteria.filters.length > 0);
     console.log('filters:', filteredCriteriaList);
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/transaction-activity/execute`;
-    axios.post(executeReportAPI, filteredCriteriaList, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const executeReportAPI = `/transaction-activity/execute`;
+    reportingApi.post(executeReportAPI, filteredCriteriaList)
       .then(response => {
         setReportData(response.data);
       })
@@ -418,16 +406,16 @@ const TransactionActivityReportPage = () => {
           </Box>
 
           <Box
-        flex="1" // Third row takes the remaining space
-        overflow="auto" // Enable scrolling if content overflows
-      >
-        <Box
-          height="100%" // Ensure the grid takes full height of the container
-          overflow="auto" // Enable scrolling for the grid if needed
-        >
-          <CustomDataGrid columns={gridHeader} rows={reportData} />
-        </Box>
-      </Box>
+            flex="1" // Third row takes the remaining space
+            overflow="auto" // Enable scrolling if content overflows
+          >
+            <Box
+              height="100%" // Ensure the grid takes full height of the container
+              overflow="auto" // Enable scrolling for the grid if needed
+            >
+              <CustomDataGrid columns={gridHeader} rows={reportData} />
+            </Box>
+          </Box>
         </Box>
       </CustomTabPanel>
     </div>

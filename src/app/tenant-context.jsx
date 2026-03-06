@@ -1,5 +1,6 @@
 "use client";
-import React, { createContext, useState, useContext } from "react";
+import React, { createContext, useState, useContext, useEffect } from "react";
+import { authApi } from "./services/api-client";
 
 // Create a combined context for Tenant + User
 const TenantContext = createContext(null);
@@ -24,6 +25,9 @@ export const TenantProvider = ({ children }) => {
     return null;
   });
 
+  // Track if session has been checked
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   // Setter for tenant (also saves to localStorage)
   const setTenant = (newTenant) => {
     setTenantState(newTenant);
@@ -40,6 +44,27 @@ export const TenantProvider = ({ children }) => {
     }
   };
 
+  // Check gateway session on page reload
+  const checkSession = async () => {
+    try {
+      const data = await authApi.getSession();
+      if (data.authenticated) {
+        if (data.user) setUser(data.user);
+
+        // Prevent overwriting a locally selected tenant with null if the session is lagging
+        if (data.tenant) {
+          setTenant(data.tenant);
+        } else if (!tenant && data.tenant) {
+          setTenant(data.tenant);
+        }
+      }
+    } catch (error) {
+      console.log("Session check failed:", error.message);
+    } finally {
+      setSessionChecked(true);
+    }
+  };
+
   // Clear both tenant and user data (used for logout)
   const clearSession = () => {
     setTenantState(null);
@@ -48,7 +73,14 @@ export const TenantProvider = ({ children }) => {
       localStorage.removeItem("selectedTenant");
       localStorage.removeItem("user");
     }
+    // Redirect to gateway's OIDC logout (navigates away from the page)
+    authApi.logout();
   };
+
+  // Check session on mount
+  useEffect(() => {
+    checkSession();
+  }, []);
 
   return (
     <TenantContext.Provider
@@ -58,6 +90,8 @@ export const TenantProvider = ({ children }) => {
         user,
         setUser,
         clearSession,
+        sessionChecked,
+        checkSession,
       }}
     >
       {children}

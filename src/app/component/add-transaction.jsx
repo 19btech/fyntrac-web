@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
@@ -35,7 +35,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
 
 
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/add';
+
 
   React.useEffect(() => {
     if (editData) {
@@ -56,21 +56,13 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
 
   const handleAddTransaction = async () => {
     try {
-      const response = await axios.post(serviceURL, {
+      const response = await dataloaderApi.post('/transaction/add', {
         name: transactionName,
         exclusive: isExclusive ? 1 : 0,
         isGL: isGL ? 1 : 0,
         isReplayable: isReplayable ? 1 : 0,
         id: id
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
-      );
+      });
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
@@ -164,13 +156,13 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         <Tooltip title='Save'>
           <Button
             onClick={handleAddTransaction}
-          sx={{
-            bgcolor: '#14213d',
-            color: 'white',
-            '&:hover': {
-              color: '#E6E6EF', // Prevent text color from changing on hover
-            },
-          }}
+            sx={{
+              bgcolor: '#14213d',
+              color: 'white',
+              '&:hover': {
+                color: '#E6E6EF', // Prevent text color from changing on hover
+              },
+            }}
           >
             Save
           </Button>

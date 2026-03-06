@@ -3,7 +3,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddAttributeDialog from '../component/add-attribute'
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import { useTenant } from "../tenant-context";
 function Attribute({ refreshData }) {
@@ -53,9 +53,9 @@ function Attribute({ refreshData }) {
       ),
     },
   ];
-  
+
   const initialRows = [];
-  
+
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
   const [isDataFetched, setIsDataFetched] = useState(false);
@@ -69,21 +69,11 @@ function Attribute({ refreshData }) {
     setOpen(true); // Open the dialog
   };
 
-  
-  const fetchAttributeData = () => {
-    
-    const fetchAttributeDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/attribute/get/all';
 
-    axios.get(fetchAttributeDataCall, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+  const fetchAttributeData = () => {
+    dataloaderApi.get('/attribute/get/all')
       .then(response => {
         setRows(response.data);
-        // Handle success response if needed
       })
       .catch(error => {
         // Handle error if needed
@@ -124,13 +114,13 @@ function Attribute({ refreshData }) {
           initialState={{
             pagination: { paginationModel: { pageSize: rowsPerPage } },
           }}
-          
-         pageSize={rowsPerPage}
+
+          pageSize={rowsPerPage}
           page={currentPage}
           onPageChange={(newPage) => setCurrentPage(newPage)}
           pageSizeOptions={[5, 10, 20]}
           pagination
-        paginationMode='client'
+          paginationMode='client'
           disableSelectionOnClick
           editMode="row"
           onCellEditCommit={handleCellEditCommit}
@@ -138,7 +128,7 @@ function Attribute({ refreshData }) {
       </div>
       <><AddAttributeDialog open={open} onClose={setOpen} editData={editData} /></>
     </div>
-    
+
   );
 }
 

@@ -25,7 +25,7 @@ import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutline
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
 import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
 import { useTenant } from "../../tenant-context";
@@ -68,24 +68,19 @@ const RollforwardReportPage = () => {
     Date: ["<", ">", "==", "!=", "<=", ">="],
   };
 
-const fetchReportAttributes = (source) => {
-  const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/${source.value}/get/attributes`;
-  console.log('uri:', fetchSettings);
-  axios.get(fetchSettings, {
-    headers: {
-      'X-Tenant': tenant,
-      Accept: '*/*',
-    }
-  })
-  .then(response => {
-    console.log();
-    setAttributeOptions([]);
-    setAttributeOptions(response.data);
-  })
-  .catch(error => {
-    console.error('Error fetching attributes:', error);
-  });
-};
+  const fetchReportAttributes = (source) => {
+    const fetchSettings = `/${source.value}/get/attributes`;
+    console.log('uri:', fetchSettings);
+    reportingApi.get(fetchSettings)
+      .then(response => {
+        console.log();
+        setAttributeOptions([]);
+        setAttributeOptions(response.data);
+      })
+      .catch(error => {
+        console.error('Error fetching attributes:', error);
+      });
+  };
 
   useEffect(() => {
     fetchReportAttributes(reportSource);
@@ -105,14 +100,8 @@ const fetchReportAttributes = (source) => {
 
     const filteredCriteriaList = criteriaList.filter(criteria => criteria.filters.length > 0);
     console.log('filters:', filteredCriteriaList);
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/${reportSource.value}/execute`;
-    axios.post(executeReportAPI, filteredCriteriaList, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const executeReportAPI = `/${reportSource.value}/execute`;
+    reportingApi.post(executeReportAPI, filteredCriteriaList)
       .then(response => {
         setReportData(response.data);
       })

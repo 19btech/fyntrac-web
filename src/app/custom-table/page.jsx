@@ -13,7 +13,7 @@ import FileUploadComponent from '../component/file-upload'
 import Tab from '@mui/material/Tab';
 import CustomTabPanel from '../component/custom-tab-panel';
 import { Button, Tabs, Divider, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import Tooltip from '@mui/material/Tooltip';
 import GridHeader from '../component/gridHeader';
 import '../common.css';
@@ -50,7 +50,7 @@ export default function CustomTablesMain() {
     const { tenant, user } = useTenant();
     const [isDataFetched, setIsDataFetched] = useState(false);
     const [openFileUpload, setOpenFileUpload] = React.useState(false);
-    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
+    const baseURL = "";
     const fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/reference-tables`;
     const [snackbar, setSnackbar] = React.useState({
         open: false,
@@ -68,7 +68,7 @@ export default function CustomTablesMain() {
     const fetchCustomTables = () => {
 
         console.log('Attempting to fetch from:', fetchCustomTablesCall);
-        axios.get(fetchCustomTablesCall, {
+        dataloaderApi.get(fetchCustomTablesCall, {
             headers: headers
         })
             .then(response => {
@@ -151,7 +151,7 @@ export default function CustomTablesMain() {
                     <div className='right'>
                         <Stack direction="row" spacing={1}>
 
-                    
+
                             <Tooltip title="Refresh page" arrow>
                                 <IconButton aria-label="refresh" onClick={handleRefresh} sx={{
                                     '&:hover': {

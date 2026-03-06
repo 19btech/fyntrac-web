@@ -144,7 +144,7 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
             justifyContent: isCollapsed ? 'center' : 'flex-start',
             minHeight: 48,
             color: 'text.secondary',
-            
+
             // Hover State
             '&:hover': {
               bgcolor: 'rgba(145, 158, 171, 0.08)',
@@ -225,13 +225,13 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
 // ----------------------------------------------------------------------
 function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onLogout }) {
   const NAVIGATION = [
-    { segment: "getstarted", title: "Get Started", icon: <StartOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "diagnostic", title: "Diagnostic", icon: <TroubleshootIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "model", title: "Model", icon: <ArticleOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "sync", title: "Ingest", icon: <SyncAltOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "report-dashboard", title: "Reports", icon: <TableChartOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
-    { segment: "settings-dashboard", title: "Settings", icon: <TuneOutlinedIcon /> , fontSize: 'fontSize: "14px !important"' },
+    { segment: "getstarted", title: "Get Started", icon: <StartOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "diagnostic", title: "Diagnostic", icon: <TroubleshootIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "model", title: "Model", icon: <ArticleOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "sync", title: "Ingest", icon: <SyncAltOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "report-dashboard", title: "Reports", icon: <TableChartOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "settings-dashboard", title: "Settings", icon: <TuneOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
     { kind: "divider" },
   ];
 
@@ -268,7 +268,7 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
             title: "Sign Out",
             icon: <LogoutIcon />, // Alert color for logout
             onClick: onLogout,
-            fontSize: 'fontSize: "14px !important"' ,
+            fontSize: 'fontSize: "14px !important"',
           }}
           pathname={pathname}
           onNavigate={onNavigate}
@@ -284,7 +284,7 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
 // 🚀 MAIN LAYOUT
 // ----------------------------------------------------------------------
 export default function DashboardLayoutModern() {
-  const { tenant, user, setTenant } = useTenant();
+  const { tenant, user, setTenant, clearSession } = useTenant();
   const router = useRouter();
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -309,9 +309,8 @@ export default function DashboardLayoutModern() {
     }
   };
 
-  const handleLogoutConfirm = () => {
-    localStorage.removeItem('selectedTenant');
-    setTenant(null);
+  const handleLogoutConfirm = async () => {
+    await clearSession();
     setOpenDialog(false);
     router.replace('/');
   };
@@ -338,14 +337,14 @@ export default function DashboardLayoutModern() {
               >
                 <MenuIcon />
               </IconButton>
-              
+
               {/* Desktop Toggle */}
               <IconButton
                 onClick={handleCollapseToggle}
-                sx={{ 
-                  mr: 2, 
+                sx={{
+                  mr: 2,
                   display: { xs: 'none', sm: 'inline-flex' },
-                  color: 'text.secondary' 
+                  color: 'text.secondary'
                 }}
               >
                 {isCollapsed ? <MenuIcon /> : <MenuOpenIcon />}
@@ -361,21 +360,21 @@ export default function DashboardLayoutModern() {
               {/* USER PROFILE */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {tenant && user && (
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 1.5,
                     bgcolor: alpha('#919EAB', 0.12), // Subtle pill background
                     py: 0.5,
                     px: 1.5,
                     borderRadius: 3
                   }}>
-                    <Avatar sx={{ 
-                      bgcolor: 'primary.main', 
-                      width: 28, 
-                      height: 28, 
+                    <Avatar sx={{
+                      bgcolor: 'primary.main',
+                      width: 28,
+                      height: 28,
                       fontSize: 14,
-                      fontWeight: 700 
+                      fontWeight: 700
                     }}>
                       {user.firstName?.[0]?.toUpperCase()}
                     </Avatar>
@@ -445,16 +444,16 @@ export default function DashboardLayoutModern() {
             component="main"
             sx={{
               flexGrow: 1,
-              p: 0, 
+              p: 0,
               width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
               transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            <Toolbar sx={{ height: HEADER_HEIGHT }} /> 
-            
+            <Toolbar sx={{ height: HEADER_HEIGHT }} />
+
             {/* Added container for content padding */}
             <Box sx={{ p: 0, height: '100%' }}>
-               <PageContent pathname={pathname} />
+              <PageContent pathname={pathname} />
             </Box>
           </Box>
 
@@ -464,7 +463,7 @@ export default function DashboardLayoutModern() {
             onClose={() => setOpenDialog(false)}
             maxWidth="sm"
             fullWidth
-            slotProps={{ 
+            slotProps={{
               paper: { sx: { borderRadius: 3, boxShadow: '0 24px 48px -12px rgba(0,0,0,0.1)' } },
               backdrop: { sx: { backdropFilter: 'blur(3px)' } }
             }}
@@ -481,17 +480,17 @@ export default function DashboardLayoutModern() {
               </Typography>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, pt: 2 }}>
-              <Button 
-                onClick={() => setOpenDialog(false)} 
-                variant="outlined" 
+              <Button
+                onClick={() => setOpenDialog(false)}
+                variant="outlined"
                 color="inherit"
                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
               >
                 Cancel
               </Button>
-              <Button 
-                onClick={handleLogoutConfirm} 
-                variant="contained" 
+              <Button
+                onClick={handleLogoutConfirm}
+                variant="contained"
                 color="error"
                 disableElevation
                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, ml: 2 }}

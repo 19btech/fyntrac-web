@@ -18,7 +18,7 @@ import AddAttributeDialog from '../component/add-attribute';
 import Aggregation from '../component/aggregation'
 import Attribute from '../component/attribute'
 import { Dialog, DialogContent, DialogTitle, Tooltip, Divider, Typography } from '@mui/material';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import AddAggregationDialog from '../component/add-aggregation';
 import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
@@ -68,19 +68,13 @@ export default function RulePage() {
 
   const handleFileDrop = () => {
 
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounting/rule/upload';
+    const serviceURL = '/accounting/rule/upload';
     const formData = new FormData();
     for (let i = 0; i < acceptedFiles.length; i++) {
       formData.append('files', acceptedFiles[i]);
     }
 
-    axios.post(serviceURL, formData, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.post(serviceURL, formData)
       .then(response => {
         // Handle success response if needed
       })

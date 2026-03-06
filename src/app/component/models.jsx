@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import AddTransactionDialog from '../component/add-transaction'
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { green, orange, red } from '@mui/material/colors';
 import { Chip, Switch, IconButton, Tooltip } from '@mui/material';
 import SuccessAlert from '../component/success-alert'
@@ -72,7 +72,7 @@ const { tenant } = useTenant();
   }
 
   const handleActiveModelAction = async (editData) => {
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/save';
+    const serviceURL = '/model/save';
     try {
       if (editData.row.modelStatus === 'INACTIVE') {
         editData.row.modelStatus = 'ACTIVE';
@@ -101,14 +101,7 @@ const { tenant } = useTenant();
         "modelFileId": editData.row.modelFileId
       };
       console.log('Model to Save:', model);
-      const response = await axios.post(serviceURL, model,
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
+      const response = await dataloaderApi.post(serviceURL, model
       );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
@@ -230,15 +223,9 @@ const { tenant } = useTenant();
 
   const fetchModels = () => {
 
-    const fetchTransactionDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/get/all';
+    const fetchTransactionDataCall = '/model/get/all';
 
-    axios.get(fetchTransactionDataCall, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(fetchTransactionDataCall)
       .then(response => {
         console.log('Models', response.data);
         setRows(response.data);

@@ -1,7 +1,7 @@
 "use client"
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import {
     Typography,
     Box,
@@ -30,19 +30,6 @@ const CreateTableDialog = dynamic(() => import('./custom-table'), {
 
 function CustomTablesList({ refreshData, tableType, referenceTables }) {
     const { tenant, user } = useTenant();
-    const baseURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI;
-
-    const apiClient = useMemo(() => {
-        if (!user?.id) return null;
-        return axios.create({
-            baseURL: baseURL,
-            headers: {
-                'X-Tenant': tenant,
-                'X-User-Id': user.id,
-                Accept: '*/*',
-            },
-        });
-    }, [user, tenant, baseURL]);
 
     const initialRows = [];
 
@@ -96,14 +83,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     }));
 
     const fetchCustomTable = (tableId) => {
-        const fullUrl = `${baseURL}/fyntrac/custom-table/get/${tableId}`;
-        console.log('Attempting to fetch from:', fullUrl);
-        axios.get(fullUrl, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(`/fyntrac/custom-table/get/${tableId}`)
             .then(response => {
                 const metadata = response.data;
                 console.log('Custom table [TableId]:', tableId, metadata.data);
@@ -116,12 +96,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     };
 
     async function updateCustomTableStatus(id, isActive) {
-        if (!apiClient) {
-            console.error('API client not ready');
-            throw new Error('API client not ready');
-        }
         try {
-            const response = await apiClient.put(`/fyntrac/custom-table/update/status/${id}/${isActive}`);
+            const response = await dataloaderApi.put(`/fyntrac/custom-table/update/status/${id}/${isActive}`);
             return response.data;
         } catch (error) {
             console.error('Error updating status:', error.response?.data || error.message || error);
@@ -130,12 +106,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     }
 
     async function deleteCustomTable(tableId) {
-        if (!apiClient) {
-            console.error('API client not ready');
-            throw new Error('API client not ready');
-        }
         try {
-            const response = await apiClient.delete(`/fyntrac/custom-table/delete/${tableId}`);
+            const response = await dataloaderApi.delete(`/fyntrac/custom-table/delete/${tableId}`);
             return response.data;
         } catch (error) {
             console.error('Error deleting table:', error.response?.data || error.message || error);
@@ -367,18 +339,11 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     ];
 
     const fetchCustomTables = () => {
-        let fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/reference-tables`;
-        if (tableType === 'OPERATIONAL') {
-            fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/operational-tables`;
-        }
+        const endpoint = tableType === 'OPERATIONAL'
+            ? '/fyntrac/custom-table/operational-tables'
+            : '/fyntrac/custom-table/reference-tables';
 
-        console.log('Attempting to fetch from:', fetchCustomTablesCall);
-        axios.get(fetchCustomTablesCall, {
-            headers: {
-                'X-Tenant': tenant,
-                Accept: '*/*',
-            }
-        })
+        dataloaderApi.get(endpoint)
             .then(response => {
                 console.log('Custom Tables', response.data.data);
                 setRows(response.data.data);
@@ -452,8 +417,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                 }}
                 tableType={'OPERATIONAL'}
                 tables={referenceTables}
-                 editData={editData}
-               
+                editData={editData}
+
             />)}
 
             {/* Delete Confirmation Dialog */}

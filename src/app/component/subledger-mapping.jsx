@@ -3,7 +3,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import IconButton from '@mui/material/IconButton';
 import { Edit } from '@mui/icons-material';
 import AddSubledgerMappingDialog from '../component/add-subledger-mapping'
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import { Alert, AlertTitle, Tooltip } from '@mui/material';
 import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
@@ -51,15 +51,9 @@ function SubledgerMapping({ refreshData }) {
   
   const fetchChartOfAccountData = () => {
     
-    const fetchTransactionDataCall = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/subledgermapping/get/all';
+    const fetchTransactionDataCall = '/subledgermapping/get/all';
 
-    axios.get(fetchTransactionDataCall, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(fetchTransactionDataCall)
       .then(response => {
         setRows(response.data);
         // Handle success response if needed
