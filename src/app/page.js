@@ -1,7 +1,8 @@
 "use client";
+import { Suspense } from "react";
 import LoginPage from "./auth/auth-page";
 import fyntracTheme from "./theme/fyntrac-theme";
-import { ThemeProvider, CssBaseline } from "@mui/material";
+import { ThemeProvider, CssBaseline, CircularProgress, Box } from "@mui/material";
 import { TenantProvider } from "./tenant-context";
 export default function Home() {
   return (
@@ -9,7 +10,15 @@ export default function Home() {
       <TenantProvider>
         <ThemeProvider theme={fyntracTheme}>
           <CssBaseline />
-          <LoginPage />
+          <Suspense
+            fallback={
+              <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+                <CircularProgress />
+              </Box>
+            }
+          >
+            <LoginPage />
+          </Suspense>
         </ThemeProvider>
       </TenantProvider>
     </div>
