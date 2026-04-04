@@ -39,7 +39,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
-            latest
+            0.0.3-SNAPSHOT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
