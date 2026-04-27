@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import apiClient from '../services/api-client';
 import {
   Box,
   Typography,
@@ -61,7 +62,7 @@ export default function ReportDashboard() {
       reports: [
         { name: "Setup Events", description: "Define business events that aggregate required data from multple input sources.", component: EventConfigurationMain },
         { name: "Setup Custom Tables", description: "Create and manage custom operational and reference data tables to support business specific needs.", component: CustomTablesMain },
-        { name: "DSL Studio", description: "Built,test and execute custom business logic for financial workflows.", component: ComingSoon }
+        { name: "DSL Studio", description: "Built,test and execute custom business logic for financial workflows.", url: process.env.NEXT_PUBLIC_DSL_STUDIO_URL || "http://localhost:3000" }
       ]
     },
   ];
@@ -154,7 +155,24 @@ export default function ReportDashboard() {
                     }}
                   >
                     <CardActionArea
-                      onClick={() => setSelectedReport(report)}
+                      onClick={async () => {
+                        if (report.url) {
+                          try {
+                            // Fetch the ID token from the gateway and pass it to DSL Studio
+                            const response = await apiClient.get('/auth/token');
+                            const token = response.data?.token;
+                            const url = token
+                              ? `${report.url}?token=${encodeURIComponent(token)}`
+                              : report.url;
+                            window.open(url, '_blank');
+                          } catch (err) {
+                            console.error('Failed to fetch token for DSL Studio, opening without token:', err);
+                            window.open(report.url, '_blank');
+                          }
+                        } else {
+                          setSelectedReport(report);
+                        }
+                      }}
                       sx={{
                         height: '100%',
                         p: 3,
