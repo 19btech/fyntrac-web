@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import apiClient from '../services/api-client';
+import { useTenant } from '../tenant-context';
 import {
   Box,
   Typography,
@@ -30,6 +31,7 @@ import AccountingPage from '../accounting/page';
 
 export default function ReportDashboard() {
   const [selectedReport, setSelectedReport] = useState(null);
+  const { user, tenant } = useTenant();
 
   const ComingSoon = () => (
     <Box sx={{ textAlign: 'center', py: 10, color: 'text.secondary', bgcolor: '#f9fafb', borderRadius: 2 }}>
@@ -161,9 +163,15 @@ export default function ReportDashboard() {
                             // Fetch the ID token from the gateway and pass it to DSL Studio
                             const response = await apiClient.get('/auth/token');
                             const token = response.data?.token;
-                            const url = token
-                              ? `${report.url}?token=${encodeURIComponent(token)}`
-                              : report.url;
+                            const params = new URLSearchParams();
+                            if (token) params.set('token', token);
+                            
+                            const displayName = user?.firstName || user?.name || user?.email || tenant || '';
+                            if (displayName) params.set('firstName', displayName);
+                            
+                            if (tenant) params.set('tenant', tenant);
+                            const qs = params.toString();
+                            const url = qs ? `${report.url}?${qs}` : report.url;
                             window.open(url, '_blank');
                           } catch (err) {
                             console.error('Failed to fetch token for DSL Studio, opening without token:', err);
