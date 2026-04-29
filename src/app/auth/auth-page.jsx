@@ -114,11 +114,19 @@ export default function LoginPage() {
             setLoginError(data.tenantError);
           }
 
-          // If tenant is already selected, go to main
-          if (data.tenant) {
+          // If tenant is already selected AND the user didn't just log out,
+          // auto-navigate to main. Otherwise show the Sign In button.
+          const justLoggedOut = sessionStorage.getItem("just_logged_out");
+          if (data.tenant && !justLoggedOut) {
             setTenant(data.tenant);
             router.push("/main");
             return;
+          }
+
+          // If they did just log out, clear the flag so next sign-in is clean
+          if (justLoggedOut) {
+            sessionStorage.removeItem("just_logged_out");
+            setAuthenticated(false); // show Sign In button
           }
         }
       } catch (error) {
@@ -139,6 +147,8 @@ export default function LoginPage() {
 
   // --- 4. Redirect to Zitadel login ---
   const handleSignIn = () => {
+    // Clear the logout flag so next session check can auto-redirect normally
+    sessionStorage.removeItem("just_logged_out");
     window.location.href = authApi.getLoginUrl();
   };
 

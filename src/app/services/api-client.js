@@ -81,12 +81,18 @@ export const authApi = {
     },
 
     /**
-     * Logout: redirects to the gateway's logout endpoint which performs
-     * OIDC RP-Initiated Logout with Zitadel.
+     * Logout: POSTs to the gateway's logout endpoint which performs
+     * OIDC RP-Initiated Logout with Zitadel, then redirects to the frontend login page.
+     * NOTE: Spring Security logout requires POST, not GET.
      */
     logout: () => {
         if (typeof window !== "undefined") {
-            window.location.href = `${GATEWAY_URI}/auth/logout`;
+            // Use a hidden form POST — fetch with redirect:'follow' loses the final URL
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = `${GATEWAY_URI}/auth/logout`;
+            document.body.appendChild(form);
+            form.submit();
         }
     },
 };

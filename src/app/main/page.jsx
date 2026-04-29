@@ -28,8 +28,7 @@ import {
   Button,
   Tooltip
 } from '@mui/material';
-import { useRouter } from 'next/navigation';
-import { useTenant, TenantProvider } from "../tenant-context";
+import { useTenant } from "../tenant-context";
 import PageContent from '../component/pageContent';
 import fyntracTheme from "../theme/fyntrac-theme";
 // Icons
@@ -285,7 +284,6 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
 // ----------------------------------------------------------------------
 export default function DashboardLayoutModern() {
   const { tenant, user, setTenant, clearSession } = useTenant();
-  const router = useRouter();
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -309,10 +307,9 @@ export default function DashboardLayoutModern() {
     }
   };
 
-  const handleLogoutConfirm = async () => {
-    await clearSession();
+  const handleLogoutConfirm = () => {
     setOpenDialog(false);
-    router.replace('/');
+    clearSession(); // Clears localStorage + redirects via window.location.href to gateway OIDC logout
   };
 
   const currentDrawerWidth = isCollapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
@@ -320,9 +317,8 @@ export default function DashboardLayoutModern() {
   if (!mounted) return null;
 
   return (
-    <TenantProvider>
-      <ThemeProvider theme={fyntracTheme}>
-        <Box sx={{ display: 'flex', minHeight: '100vh', }}>
+    <ThemeProvider theme={fyntracTheme}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', }}>
           <CssBaseline />
 
           {/* 1. APPBAR */}
@@ -359,31 +355,33 @@ export default function DashboardLayoutModern() {
 
               {/* USER PROFILE */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                {tenant && user && (
+                {tenant && (
                   <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1.5,
-                    bgcolor: alpha('#919EAB', 0.12), // Subtle pill background
+                    bgcolor: alpha('#919EAB', 0.12),
                     py: 0.5,
                     px: 1.5,
                     borderRadius: 3
                   }}>
-                    <Avatar sx={{
-                      bgcolor: 'primary.main',
-                      width: 28,
-                      height: 28,
-                      fontSize: 14,
-                      fontWeight: 700
-                    }}>
-                      {user.firstName?.[0]?.toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                      <Typography variant="subtitle2" sx={{ color: 'text.primary', lineHeight: 1 }}>
-                        {user.firstName} /  {tenant}
-                      </Typography>
-
-                    </Box>
+                    {/* Resolve display name: user.firstName → user.name → user.email → tenant */}
+                    {(() => {
+                      const displayName = user?.firstName || user?.name || user?.email || tenant || '';
+                      const initial = displayName?.[0]?.toUpperCase();
+                      return (
+                        <>
+                          <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, fontSize: 14, fontWeight: 700 }}>
+                            {initial}
+                          </Avatar>
+                          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                            <Typography variant="subtitle2" sx={{ color: 'text.primary', lineHeight: 1 }}>
+                              {displayName} / {tenant}
+                            </Typography>
+                          </Box>
+                        </>
+                      );
+                    })()}
                   </Box>
                 )}
               </Box>
@@ -500,8 +498,7 @@ export default function DashboardLayoutModern() {
             </DialogActions>
           </Dialog>
 
-        </Box>
-      </ThemeProvider>
-    </TenantProvider>
+      </Box>
+    </ThemeProvider>
   );
 }
