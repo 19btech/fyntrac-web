@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import apiClient from '../services/api-client';
+import { useTenant } from '../tenant-context';
 import {
   Box,
   Typography,
@@ -15,10 +17,10 @@ import {
   Chip,
   Fade
 } from '@mui/material';
-import { 
+import {
   Close,
   ArrowForward,
-  AssessmentOutlined 
+  AssessmentOutlined
 } from '@mui/icons-material';
 
 // Import your actual report pages
@@ -31,6 +33,7 @@ import CustomOperationalDataReportPage from '../reports/custom-operational-data-
 export default function ReportDashboard() {
   const [open, setOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
+  const { user, tenant } = useTenant();
 
   const ComingSoon = () => (
     <Box sx={{ textAlign: 'center', py: 5, color: 'text.secondary' }}>
@@ -44,31 +47,54 @@ export default function ReportDashboard() {
       name: "Standard Reports",
       tag: "Standard",
       reports: [
-        { name: "Transaction Activity Report", description:"Shows all transaction movements for each instrument over time.", component: TransactionActivityReportPage },
-        { name: "Attribute History Report", description:"Displays how key instrument attributes changed across posting periods.", component: ComingSoon },
-        { name: "Balance Rollforward Report", description:"Summarizes opening balances, period movements, and closing balances.", component: RollforwardReportPage }
+        { name: "Transaction Activity Report", description: "Shows all transaction movements for each instrument over time.", component: TransactionActivityReportPage },
+        { name: "Attribute History Report", description: "Displays how key instrument attributes changed across posting periods.", component: ComingSoon },
+        { name: "Balance Rollforward Report", description: "Summarizes opening balances, period movements, and closing balances.", component: RollforwardReportPage }
       ]
     },
     {
       name: "Accounting Reports",
       tag: "Accounting",
       reports: [
-        { name: "Journal Entry Report", description:"Lists all generated accounting entries for the selected period.", component: GLEReportPage },
-        { name: "Trial Balance", description:"Provides account-level debit and credit totals to validate balanced books.", component: ComingSoon }
+        { name: "Journal Entry Report", description: "Lists all generated accounting entries for the selected period.", component: GLEReportPage },
+        { name: "Trial Balance", description: "Provides account-level debit and credit totals to validate balanced books.", component: ComingSoon },
+
       ]
     },
     {
       name: "Custom Table Reports",
       tag: "Custom",
       reports: [
-        { name: "Operational Activity Report", description:"Presents data extracted from operational custom tables.", component: CustomOperationalDataReportPage },
-        { name: "Reference Meta Data", description:"Shows the structure and stored values of reference-data tables.", component: CustomRefDataReportPage }
+        { name: "Operational Activity Report", description: "Presents data extracted from operational custom tables.", component: CustomOperationalDataReportPage },
+        { name: "Reference Meta Data", description: "Shows the structure and stored values of reference-data tables.", component: CustomRefDataReportPage },
+        { name: "Fyntrac Insight", description: "Fyntrac reporting tool for custom reports.", url: process.env.NEXT_PUBLIC_INSIGHT_URL || "http://localhost:3001" }
       ]
     },
   ];
 
-  const handleCardClick = (reportObject) => {
-    setSelectedReport(reportObject);
+  const handleCardClick = async (report) => {
+    if (report.url) {
+      try {
+        // Fetch the OIDC ID token from the gateway and pass it to Fyntrac Insight
+        const response = await apiClient.get('/auth/token');
+        const token = response.data?.token;
+        const params = new URLSearchParams();
+        if (token) params.set('token', token);
+
+        const displayName = user?.firstName || user?.name || user?.email || tenant || '';
+        if (displayName) params.set('firstName', displayName);
+        if (tenant) params.set('tenant', tenant);
+
+        const qs = params.toString();
+        const url = qs ? `${report.url}?${qs}` : report.url;
+        window.open(url, '_blank');
+      } catch (err) {
+        console.error('Failed to fetch token for Fyntrac Insight, opening without token:', err);
+        window.open(report.url, '_blank');
+      }
+      return;
+    }
+    setSelectedReport(report);
     setOpen(true);
   };
 
@@ -86,10 +112,10 @@ export default function ReportDashboard() {
 
   return (
     <Container maxWidth={false} sx={{ py: 1, px: { xs: 2, md: 3 }, minHeight: '100vh', textAlign: 'left' }}>
-      
+
       {categories.map((cat, catIdx) => (
         <Box key={catIdx} sx={{ mb: 6, width: '100%' }}>
-          
+
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
             <Typography variant="overline" fontWeight="bold" fontSize="0.85rem" color="text.secondary" sx={{ letterSpacing: 1.5, textTransform: 'uppercase' }}>
               {cat.name}
@@ -101,10 +127,10 @@ export default function ReportDashboard() {
             {cat.reports.map((report, idx) => (
               <Grid size={{ xs: 12, md: 6, lg: 4 }} key={idx}>
                 <Fade in={true} timeout={(idx + 1) * 300}>
-                  <Card 
+                  <Card
                     elevation={0}
-                    sx={{ 
-                      height: '100%', 
+                    sx={{
+                      height: '100%',
                       borderRadius: 4,
                       border: '1px solid',
                       borderColor: 'grey.200',
@@ -114,25 +140,25 @@ export default function ReportDashboard() {
                         transform: 'translateY(-4px)',
                         boxShadow: '0 12px 24px -10px rgba(0, 0, 0, 0.1)',
                         borderColor: 'primary.main',
-                        bgcolor: '#eff6ff', 
+                        bgcolor: '#eff6ff',
                       }
                     }}
                   >
-                    <CardActionArea 
-                      onClick={() => handleCardClick(report)} 
-                      sx={{ 
-                        height: '100%', 
-                        p: 3, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'flex-start', 
+                    <CardActionArea
+                      onClick={() => handleCardClick(report)}
+                      sx={{
+                        height: '100%',
+                        p: 3,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
                         justifyContent: 'space-between',
                         '& .MuiCardActionArea-focusHighlight': { background: 'transparent' }
                       }}
                     >
                       <Box sx={{ width: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                           <Chip label={cat.tag} size="small" sx={{ bgcolor: 'grey.100', fontWeight: 600, color: 'text.secondary' }} />
+                          <Chip label={cat.tag} size="small" sx={{ bgcolor: 'grey.100', fontWeight: 600, color: 'text.secondary' }} />
                         </Box>
                         <Typography variant="h6" fontWeight="700" gutterBottom sx={{ lineHeight: 1.3 }}>
                           {report.name}
@@ -154,10 +180,10 @@ export default function ReportDashboard() {
         </Box>
       ))}
 
-      <Dialog 
-        open={open} 
-        onClose={handleClose} 
-        maxWidth={false} 
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth={false}
         scroll="paper"
         slotProps={{
           paper: {
@@ -171,7 +197,7 @@ export default function ReportDashboard() {
           },
           backdrop: {
             sx: {
-              backdropFilter: 'blur(4px)', 
+              backdropFilter: 'blur(4px)',
               backgroundColor: 'rgba(0, 0, 0, 0.4)'
             }
           }
@@ -181,14 +207,14 @@ export default function ReportDashboard() {
           <Box>
           </Box>
           <IconButton onClick={handleClose} sx={{ bgcolor: 'grey.50', '&:hover': { bgcolor: 'grey.200' } }}>
-            <Close sx={{size: 'small'}}/>
+            <Close sx={{ size: 'small' }} />
           </IconButton>
         </DialogTitle>
-        
+
         <DialogContent dividers sx={{ p: 1, bgcolor: '#fafafa' }}>
-           {selectedReport && selectedReport.component && (
-             <selectedReport.component />
-           )}
+          {selectedReport && selectedReport.component && (
+            <selectedReport.component />
+          )}
         </DialogContent>
       </Dialog>
     </Container>

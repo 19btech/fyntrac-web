@@ -16,7 +16,7 @@ import SuccessAlert from '../component/success-alert'
 import ErrorAlert from '../component/error-alert'
 import { useTenant } from "../tenant-context";
 
-const ExecuteModel = ({ open, onClose }) => {
+const ExecuteModel = ({ open, onClose, modelType }) => {
     const { tenant } = useTenant();
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
@@ -53,7 +53,8 @@ const ExecuteModel = ({ open, onClose }) => {
             return;
         }
 
-        const serviceURL = '/model/execute';
+        const isDsl = modelType === 'DSL' || modelType === 'PYTHON';
+        const serviceURL = isDsl ? '/model/execute/dsl' : '/model/execute';
 
         try {
             console.log('Model to execute:', date);
@@ -148,6 +149,11 @@ const ExecuteModel = ({ open, onClose }) => {
                             }}
                         />
                         <Typography variant="h6">Model Execution</Typography>
+                        {modelType && (
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                                Type: {modelType}
+                            </Typography>
+                        )}
                     </Box>
                     <IconButton
                         onClick={handleClose}

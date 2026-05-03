@@ -1,730 +1,1112 @@
-"use client"
-import React, { useEffect } from 'react';
-import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid2';
-import IconButton from '@mui/material/IconButton';
-import Stack from '@mui/material/Stack';
-import { styled } from '@mui/material/styles';
-import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
-import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
-import PlayCircleOutlineOutlinedIcon from '@mui/icons-material/PlayCircleOutlineOutlined';
-import Tab from '@mui/material/Tab';
-import Models from '../component/models';
-import CustomTabPanel from '../component/custom-tab-panel';
+"use client";
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Box,
+  Typography,
+  IconButton,
+  Card,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Collapse,
+  Chip,
+  Switch,
+  LinearProgress,
+  TablePagination,
+  useTheme,
+  alpha,
+  Container,
+  Divider,
+  Tooltip,
+  Paper,
+  Dialog,
+  CircularProgress,
+  Snackbar,
+  Alert
+} from '@mui/material';
+
+// Icons
+import RefreshIcon from '@mui/icons-material/Refresh';
+import UploadIcon from '@mui/icons-material/Upload';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DownloadIcon from '@mui/icons-material/Download';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import LayersIcon from '@mui/icons-material/Layers';
+
+// API & Context
+import { dataloaderApi } from '../services/api-client';
+import { useTenant } from '../tenant-context';
+
+// Dialog components
 import ModelUploadComponent from '../component/model-upload';
-import { DialogTitle, Tabs, TabPanel, List, ListItem, Paper, Button, Dialog, DialogActions, DialogContent, Divider } from '@mui/material';
-import axios from 'axios';
-import Tooltip from '@mui/material/Tooltip';
-import GridHeader from '../component/gridHeader';
 import ExecuteModel from '../component/execute-model';
-import '../common.css';
-import PythonIcon from '../icons/python-icon';
 
-import Editor from "@monaco-editor/react";
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import RocketLaunchOutlinedIcon from '@mui/icons-material/RocketLaunchOutlined';
-import ArrowBackIosNewOutlinedIcon from '@mui/icons-material/ArrowBackIosNewOutlined';
+// --- HELPERS ---
 
-import ListItemIcon from '@mui/material/ListItemIcon';
+const formatDate = (isoString) => {
+  if (!isoString) return '—';
+  return new Date(isoString).toLocaleDateString('en-CA');
+};
 
-import ListItemText from '@mui/material/ListItemText';
-import ListItemButton from '@mui/material/ListItemButton';
+const StatusChip = ({ status }) => {
+  const isSuccess = status === 'ACTIVE' || status === 'COMPLETED';
+  const isError = status === 'FAILED';
+  const isIdle = status === 'IDLE' || status === 'INACTIVE' || status === 'CONFIGURE';
 
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
+  let bg = alpha('#22c55e', 0.1);
+  let color = '#166534';
+  let border = alpha('#22c55e', 0.2);
 
-import Collapse from '@mui/material/Collapse';
-import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
-import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
-import FileUploadComponent from '../component/file-upload';
-import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
-import DataFileList from '../component/data-file-list';
-import { useTenant } from "../tenant-context";
-
-const VisuallyHiddenInput = styled('input')({
-  clip: 'rect(0 0 0 0)',
-  clipPath: 'inset(50%)',
-  height: 1,
-  overflow: 'hidden',
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  whiteSpace: 'nowrap',
-  width: 1,
-});
-
-export default function ModelPage() {
-   const { tenant } = useTenant();
-  const [openFileUpload, setOpenFileUpload] = React.useState(false);
-  const [openTestDataFileUpload, setOpenTestDataFileUpload] = React.useState(false);
-  const [panelIndex, setPanelIndex] = React.useState(0); // Initialize with the first tab index
-  const [modelRefreshKey, setModelRefreshKey] = React.useState(0); // Example state for refresh key
-  const [openExecuteModel, setOpenExecuteModel] = React.useState(false);
-  const [openPythonModel, setOpenPythonModel] = React.useState(false);
-  const [headerLabel, setHeaderLabel] = React.useState('Model Management');
-  const [open, setOpen] = React.useState(true);
-  const [activityDataOpen, setActivityDataOpen] = React.useState(true);
-  const [refDataOpen, setRefDataOpen] = React.useState(true);
-  const [refDataFiles, setRefDataFiles] = React.useState([]);
-  const [activityDataFiles, setActivityDataFiles] = React.useState([]);
-  const [outputDataFiles, setOutputDataFiles] = React.useState([]);
-  const [projectDataFiles, setProjectDataFiles] = React.useState([]);
-  // define the tenant name once
-  const TENANT_NAME = `Test_${tenant}`;
-
-  const [tabValue, setTabValue] = React.useState(0);
-
-  const handleChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  const handleClick = () => {
-    setOpen(!open);
-  };
-
-  const handleActivityDataClick = () => {
-    setActivityDataOpen(!activityDataOpen);
-  };
-
-  const handleRefDataClick = () => {
-    setRefDataOpen(!refDataOpen);
-  };
-
-  const handleModelChange = (event, newValue) => {
-    setPanelIndex(newValue); // Update the panel index
-  };
-
-  const handleRefresh = () => {
-
-  };
-
-  const handleOpenFileUpload = () => {
-    setOpenFileUpload(true);
-  };
-  const handleCloseFileUpload = () => {
-    setOpenFileUpload(false);
-  };
-
-  const handleCloseTestDataFileUpload = () => {
-    setOpenTestDataFileUpload(false);
-  };
-
-  const handleFileDrop = (acceptedFiles, modelName, modelOrderId) => {
-    // You can handle the uploaded files here
-    setTimeout(() => {
-      handleCloseFileUpload();
-      setOpenFileUpload(true);
-    }, 10000) // Close the dialog after handling the files
-  };
-
-  const handleClickOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  const handlePlay = () => {
-    setOpenExecuteModel(true);
-
-    const executeModel = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/play-ground/execute-model`;
-
-
-    axios.post(executeModel, {
-      headers: {
-        'X-Tenant': TENANT_NAME,
-        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      },
-      responseType: 'blob' // ✅ required
-    })
-      .then(response => {
-        console.info('Model execution message sent successfully', response);
-      })
-      .catch(error => {
-        console.error('Error Model Execution:', error);
-      });
-
-  };
-
-  const openPythonModelScreen = () => {
-    setHeaderLabel('Python Model');
-    setOpenPythonModel(true);
-  };
-
-  const closePythonModelScreen = () => {
-    setHeaderLabel('Model');
-    setOpenPythonModel(false);
-  };
-
-  useEffect(() => {
-    fetchRefDataFiles();
-    fetchActivityDataFiles();
-    fetchOutputDataFiles();
-    fetchProjectDataFiles();
-  }, []);
-
-  const handleFileClick = (file) => {
-    const downloadFile = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/play-ground/download/file`;
-
-    console.log('Download Request:', downloadFile, file);
-
-    axios.post(downloadFile, file, {
-      headers: {
-        'X-Tenant': TENANT_NAME,
-        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      },
-      responseType: 'blob' // ✅ required
-    })
-      .then(response => {
-        const url = window.URL.createObjectURL(
-          new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        );
-
-        // Use backend-provided filename, fallback to default
-        const disposition = response.headers['content-disposition'];
-        let fileName = file.name;
-        if (disposition && disposition.includes("filename=")) {
-          fileName = disposition.split("filename=")[1].replace(/"/g, '');
-        }
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', fileName);
-        document.body.appendChild(link);
-        link.click();
-
-        // cleanup
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      })
-      .catch(error => {
-        console.error('Error downloading Excel file:', error);
-      });
-  };
-
-  const fetchRefDataFiles = async () => {
-    try {
-      const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/play-ground/get/ref-data-files`;
-      console.log('url:', url);
-      const response = await axios.get(url, {
-        headers: {
-          'X-Tenant': TENANT_NAME,
-          Accept: '*/*',
-        },
-      });
-      const data = response.data || [];
-      console.log(data);
-      setRefDataFiles(data);
-    } catch (error) {
-      console.error('Error fetching ref data files:', error);
-    }
-  };
-
-
-  const fetchActivityDataFiles = async () => {
-    try {
-      const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/play-ground/get/activity-data-files`;
-      const response = await axios.get(url, {
-        headers: {
-          'X-Tenant': TENANT_NAME,
-          Accept: '*/*',
-        },
-      });
-      const data = response.data || [];
-      console.log(data);
-      setActivityDataFiles(data);
-    } catch (error) {
-      console.error('Error fetching ref data files:', error);
-    }
-  };
-
-  const fetchOutputDataFiles = async () => {
-    try {
-      const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/play-ground/get/output-data-files`;
-      const response = await axios.get(url, {
-        headers: {
-          'X-Tenant': TENANT_NAME,
-          Accept: '*/*',
-        },
-      });
-      const data = response.data || [];
-      console.log(data);
-      setOutputDataFiles(data);
-    } catch (error) {
-      console.error('Error fetching ref data files:', error);
-    }
-  };
-
-  const fetchProjectDataFiles = async () => {
-    try {
-      const url = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/play-ground/get/project-data-files`;
-      const response = await axios.get(url, {
-        headers: {
-          'X-Tenant': TENANT_NAME,
-          Accept: '*/*',
-        },
-      });
-      const data = response.data || [];
-      console.log(data);
-      setProjectDataFiles(data);
-    } catch (error) {
-      console.error('Error fetching ref data files:', error);
-    }
-  };
-
-  const handleTestDataFileDrop = (acceptedFiles) => {
-
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/play-ground/test-data/upload';
-    const formData = new FormData();
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      formData.append('files', acceptedFiles[i]);
-    }
-
-    axios.post(serviceURL, formData, {
-      headers: {
-        'X-Tenant': TENANT_NAME,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
-      .then(response => {
-        // Handle success response if needed
-      })
-      .catch(error => {
-        console.error('Upload error:', error);
-        // Handle error if needed
-      });
-
-    // You can handle the uploaded files here
-    handleCloseFileUpload(); // Close the dialog after handling the files
-  };
-
-
+  if (isError) {
+    bg = alpha('#ef4444', 0.1);
+    color = '#991b1b';
+    border = alpha('#ef4444', 0.2);
+  } else if (isIdle) {
+    bg = alpha('#64748b', 0.1);
+    color = '#334155';
+    border = alpha('#64748b', 0.2);
+  } else if (!isSuccess && !isError) {
+    bg = alpha('#3b82f6', 0.1);
+    color = '#1e40af';
+    border = alpha('#3b82f6', 0.2);
+  }
 
   return (
+    <Chip
+      label={status || '—'}
+      size="small"
+      sx={{
+        fontWeight: 700,
+        fontSize: '0.7rem',
+        borderRadius: 1,
+        height: 24,
+        bgcolor: bg,
+        color: color,
+        border: `1px solid ${border}`
+      }}
+    />
+  );
+};
 
+// --- COMPONENTS ---
 
-    <>
-      {openPythonModel ? (
-        <>
-          <Grid container spacing={2}>
-            <Grid size="auto">
-              <div className='left'>
-                <GridHeader>
-                  {headerLabel}
-                </GridHeader>
-              </div>
-            </Grid>
-            <Grid size={6} />
+// Execution Summary Panel
+const SUMMARY_STATUS_CONFIG = {
+  SUCCESS:        { color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  icon: CheckCircleOutlineIcon },
+  PARTIAL_SUCCESS:{ color: '#d97706', bg: 'rgba(217,119,6,0.08)',  icon: ErrorOutlineIcon },
+  FAILED:         { color: '#dc2626', bg: 'rgba(220,38,38,0.08)',  icon: ErrorOutlineIcon },
+};
 
-            <Grid size="grow">
-              <div className='right'>
-                <Stack direction="row" spacing={1}>
-                  <Tooltip title="Back to main model screen" arrow>
-                    <IconButton aria-label="Back to previous screen" onClick={closePythonModelScreen} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <ArrowBackIosNewOutlinedIcon />
-                    </IconButton>
-                  </Tooltip>
+function StatCard({ icon: Icon, label, value, color, bg }) {
+  return (
+    <Box sx={{
+      flex: 1, minWidth: 130, p: 2, borderRadius: 2,
+      bgcolor: bg || 'rgba(99,102,241,0.06)',
+      display: 'flex', alignItems: 'center', gap: 1.5
+    }}>
+      <Box sx={{
+        width: 38, height: 38, borderRadius: '50%',
+        bgcolor: color ? `${color}18` : 'rgba(99,102,241,0.12)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+      }}>
+        <Icon sx={{ fontSize: 20, color: color || '#6366f1' }} />
+      </Box>
+      <Box>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, lineHeight: 1 }}>{label}</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: color || 'text.primary', lineHeight: 1.3 }}>{value ?? '—'}</Typography>
+      </Box>
+    </Box>
+  );
+}
 
-                  <Tooltip title="Save model" arrow>
-                    <IconButton aria-label="refresh" onClick={handleRefresh} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <SaveOutlinedIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Deploy model" arrow>
-                    <IconButton aria-label="upload rule file" onClick={handleOpenFileUpload} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <RocketLaunchOutlinedIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Execute model" arrow>
-                    <IconButton aria-label="add" onClick={handlePlay} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <PlayCircleOutlineOutlinedIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              </div>
-            </Grid>
-          </Grid>
+function ExecutionSummaryPanel() {
+  const theme = useTheme();
+  const [summary, setSummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
 
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await dataloaderApi.get('/model/execution-summary');
+      // Find the most recent EXECUTION_SUMMARY entry if response is an array,
+      // or use directly if it's the aggregated object.
+      const data = res.data;
+      setSummary(Array.isArray(data) ? data[0] : data);
+    } catch (e) {
+      setSummary(null);
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, []);
 
-          <Divider />
+  useEffect(() => {
+    fetchSummary();
+    const timer = setInterval(fetchSummary, 15000);
+    return () => clearInterval(timer);
+  }, [fetchSummary]);
 
-          <Box sx={{ flexGrow: 1, height: "85vh", p: 2, minWidth: "95vh", }}>
+  const cfg = summary?.statusCounts
+    ? (Object.keys(summary.statusCounts).length === 1 && summary.statusCounts['SUCCESS']
+        ? SUMMARY_STATUS_CONFIG.SUCCESS
+        : summary.statusCounts['FAILED'] ? SUMMARY_STATUS_CONFIG.FAILED : SUMMARY_STATUS_CONFIG.PARTIAL_SUCCESS)
+    : SUMMARY_STATUS_CONFIG.SUCCESS;
 
+  const fmtMs = (ms) => {
+    if (!ms && ms !== 0) return '—';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms/1000).toFixed(1)}s`;
+    return `${(ms/60000).toFixed(1)}m`;
+  };
 
+  const fmtDate = (d) => {
+    if (!d) return '—';
+    const s = String(d);
+    if (s.length === 8) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    return s;
+  };
 
-            <Grid container spacing={0} sx={{ height: "83vh", }}>
+  if (loadingSummary) return (
+    <Box sx={{ mb: 3, p: 2, borderRadius: 3, bgcolor: 'background.paper', boxShadow: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <CircularProgress size={18} />
+      <Typography variant="body2" color="text.secondary">Loading execution summary…</Typography>
+    </Box>
+  );
 
-              {/* Column 1: Chat Window */}
-              <Grid xs={3}>   {/* Was 4 → reduced to give more space to editor */}
-                <Paper
-                  elevation={3}
-                  sx={{
-                    p: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    minWidth: "22vw",   // ✅ ensures column never gets too thin
-                  }}
-                >
-                  <Box sx={{ flexGrow: 1, overflowY: "auto" }}>
-                    <p>Chat window AI</p>
-                  </Box>
-                </Paper>
-              </Grid>
+  if (!summary || (!summary.totalBatches && !summary.totalInstruments)) return (
+    <Box sx={{ mb: 3, p: 2.5, borderRadius: 3, bgcolor: 'background.paper', boxShadow: 1, border: '1px dashed', borderColor: 'divider' }}>
+      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+        No execution summary available for the current execution date.
+      </Typography>
+    </Box>
+  );
 
-              {/* Column 2: Icon Menu */}
-              <Grid xs={4} sx={{ paddingLeft: 2, height: '100vh' }}>
+  const successBatches = summary.statusCounts?.SUCCESS ?? summary.totalSuccess ?? 0;
+  const failedBatches  = summary.statusCounts?.FAILED  ?? summary.totalFailed  ?? 0;
+  const overallStatus  = failedBatches === 0 ? 'SUCCESS' : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
+  const statusCfg      = SUMMARY_STATUS_CONFIG[overallStatus] || SUMMARY_STATUS_CONFIG.SUCCESS;
+  const StatusIcon     = statusCfg.icon;
 
+  return (
+    <Box sx={{
+      mb: 3, p: 2.5, borderRadius: 3, bgcolor: 'background.paper',
+      boxShadow: `0 2px 8px ${alpha(theme.palette.grey[400], 0.18)}`,
+      border: `1.5px solid ${alpha(statusCfg.color, 0.2)}`,
+    }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <StatusIcon sx={{ color: statusCfg.color, fontSize: 22 }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            Last Execution Summary
+          </Typography>
+          <Chip
+            label={overallStatus.replace('_', ' ')}
+            size="small"
+            sx={{
+              fontWeight: 700, fontSize: '0.68rem', borderRadius: 1, height: 22,
+              bgcolor: statusCfg.bg, color: statusCfg.color,
+              border: `1px solid ${alpha(statusCfg.color, 0.3)}`
+            }}
+          />
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="caption" color="text.secondary">
+            Posting Date: <strong>{fmtDate(summary.postingDate)}</strong>
+          </Typography>
+          <Tooltip title="Refresh summary">
+            <IconButton size="small" onClick={fetchSummary}>
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
 
+      {/* Stat Cards */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <StatCard
+          icon={LayersIcon}
+          label="Total Batches"
+          value={summary.totalBatches ?? 0}
+          color="#6366f1"
+        />
+        <StatCard
+          icon={FiberManualRecordIcon}
+          label="Instruments"
+          value={(summary.totalInstruments ?? 0).toLocaleString()}
+          color="#0ea5e9"
+        />
+        <StatCard
+          icon={CheckCircleOutlineIcon}
+          label="Successful Batches"
+          value={successBatches}
+          color="#16a34a"
+        />
+        <StatCard
+          icon={ErrorOutlineIcon}
+          label="Failed Batches"
+          value={failedBatches}
+          color={failedBatches > 0 ? '#dc2626' : '#94a3b8'}
+        />
+        <StatCard
+          icon={AccessTimeIcon}
+          label="Total Duration"
+          value={fmtMs(summary.totalDurationMs)}
+          color="#7c3aed"
+        />
+        <StatCard
+          icon={AccessTimeIcon}
+          label="Avg Batch Time"
+          value={fmtMs(summary.avgBatchMs)}
+          color="#0891b2"
+        />
+      </Box>
 
-                <Paper
-                  elevation={3}
-                  sx={{
-                    height: '83vh',
-                    overflow: "auto",
-                    width: '17vw',
-                    borderTopLeftRadius: '12px',
-                    borderBottomLeftRadius: '12px',
-                    borderTopRightRadius: 0,
-                    borderBottomRightRadius: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  {/* --- top fixed section (optional) --- */}
-                  <Box sx={{ flex: '0 0 auto' }}>
-                    {/* e.g. logo, title */}
-                  </Box>
+      {/* Errors */}
+      {summary.errors?.length > 0 && (
+        <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)' }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626' }}>Errors:</Typography>
+          {summary.errors.map((e, i) => (
+            <Typography key={i} variant="caption" display="block" sx={{ color: '#991b1b', mt: 0.5, fontSize: '0.72rem' }}>
+              • {e}
+            </Typography>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
-                  {/* --- scrollable section --- */}
-                  <Box
-                    sx={{
-                      flex: '1 1 auto',
-                      overflowY: 'auto',
-                      overflowX: 'hidden',
-                      minWidth: '15vw',
-                    }}
-                  >
+// Live Execution Progress Panel
+function ExecutionProgressPanel() {
+  const theme = useTheme();
+  const [progress, setProgress]   = useState(null);  // /execution-progress data
+  const [batches,  setBatches]    = useState([]);     // /execution-summary batches[]
+  const [isLive,   setIsLive]     = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const prevCompleted = useRef(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const stablePolls = useRef(0);
 
-                    <nav aria-label="Data setup">
-                      <List>
-                        <ListItem disablePadding>
-                          <ListItemButton>
-                            <ListItemIcon>
-                              <Tooltip title="Upload test data" arrow>
-                                <IconButton
-                                  aria-label="add"
-                                  onClick={() => setOpenTestDataFileUpload(true)}
-                                  sx={{
-                                    "&:hover": { backgroundColor: "darkgrey" },
-                                  }}
-                                >
-                                  <FileUploadOutlinedIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </ListItemIcon>
-                            <ListItemText primary="Setup Data" />
-                          </ListItemButton>
-                        </ListItem>
-                      </List>
-                    </nav>
+  const poll = useCallback(async () => {
+    try {
+      // Single call — /execution-progress now includes batches[] too.
+      // Count queries only; no full document loads during polling.
+      const res = await dataloaderApi.get('/model/execution-progress');
+      const p   = res.data;
 
-                    <Divider sx={{ p: 0 }} />
-
-                    {/* everything else — including Collapse content */}
-                    <ListItemButton onClick={handleClick}>
-                      <Box sx={{ display: "flex", alignItems: "left", mr: 0 }}>
-                        {open ? <ExpandLess /> : <ExpandMore />}
-                      </Box>
-                      <Box sx={{ display: "flex", alignItems: "left", flexGrow: 1 }}>
-                        <ListItemText primary="Input Data" />
-                      </Box>
-                    </ListItemButton>
-
-                    <Collapse in={open} timeout="auto" unmountOnExit>
-                      <Box sx={{ paddingLeft: 3 }}>
-                        <ListItemButton onClick={handleActivityDataClick}>
-                          <Box sx={{ display: "flex", alignItems: "left", mr: 0 }}>
-                            {activityDataOpen ? <ExpandLess /> : <ExpandMore />}
-                          </Box>
-                          <Box sx={{ display: "flex", alignItems: "left", flexGrow: 1 }}>
-                            <ListItemText primary="Activity Data" />
-                          </Box>
-                        </ListItemButton>
-
-                        <Collapse in={activityDataOpen} timeout="auto" unmountOnExit>
-                          <List component="div" disablePadding>
-                            <DataFileList files={activityDataFiles} onFileClick={handleFileClick} />
-                          </List>
-                        </Collapse>
-                      </Box>
-
-                      <Box sx={{ paddingLeft: 3 }}>
-
-                        <ListItemButton onClick={handleRefDataClick}>
-                          {/* Collapse icon on far left */}
-                          <Box sx={{ display: "flex", alignItems: "left", mr: 0 }}>
-                            {refDataOpen ? <ExpandLess /> : <ExpandMore />}
-                          </Box>
-
-                          {/* Middle section: Inbox icon + text */}
-                          <Box sx={{ display: "flex", alignItems: "left", flexGrow: 1 }}>
-                            <ListItemText primary="Accounting Rules" />
-                          </Box>
-
-
-                        </ListItemButton>
-
-                        <Collapse in={refDataOpen} timeout="auto" unmountOnExit>
-                          <List component="div" disablePadding>
-                            <DataFileList files={refDataFiles} onFileClick={handleFileClick} />
-                          </List>
-                        </Collapse>
-                      </Box>
-                    </Collapse>
-
-                    <Divider sx={{ p: 2 }} />
-
-                    <ListItemButton onClick={handleClick}>
-                      {/* Collapse icon on far left */}
-                      <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
-                        {open ? <ExpandLess /> : <ExpandMore />}
-                      </Box>
-
-                      {/* Middle section: Inbox icon + text */}
-                      <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
-                        <ListItemText primary="Output Data" />
-                      </Box>
-
-                      {/* Right section: extra icons */}
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <RefreshOutlinedIcon />
-                        <DeleteForeverOutlinedIcon />
-                      </Box>
-                    </ListItemButton>
-
-                    <Collapse in={open} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        <ListItemButton sx={{ pl: 4 }}>
-                          <ListItemIcon>
-                            <CalendarViewMonthIcon />
-                          </ListItemIcon>
-                          <ListItemText primary="Starred" />
-                        </ListItemButton>
-                      </List>
-                    </Collapse>
-
-
-                    <Divider sx={{ p: 2 }} />
-
-                    <ListItemButton onClick={handleClick}>
-                      {/* Collapse icon on far left */}
-                      <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
-                        {open ? <ExpandLess /> : <ExpandMore />}
-                      </Box>
-
-                      {/* Middle section: Inbox icon + text */}
-                      <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
-                        <ListItemText primary="Project Files" />
-                      </Box>
-
-                    </ListItemButton>
-
-                    <Collapse in={open} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        <ListItemButton sx={{ pl: 4 }}>
-                          <ListItemIcon>
-                            <CalendarViewMonthIcon />
-                          </ListItemIcon>
-                          <ListItemText primary="Starred" />
-                        </ListItemButton>
-                      </List>
-                    </Collapse>
-                  </Box>
-                </Paper>
-              </Grid>
-
-              <Grid xs={5} >
-                <Paper sx={{ alignItems: "left", height: "83vh", width: "39vw", overflow: "auto", paddingLeft: 1, }}>
-
-                  <Box
-                    sx={{
-                      border: "1px solid #ccc",           // light gray border
-                      borderTopLeftRadius: "8px",         // round top-left corner
-                      borderTopRightRadius: "8px",        // round top-right corner
-                      borderBottomLeftRadius: 0,
-                      borderBottomRightRadius: 0,
-                      overflow: "hidden",
-                      width: "17%",
-                    }}
-                  >
-                    <Tabs
-                      value={tabValue}
-                      onChange={handleChange}
-                      slotProps={{
-                        style: { display: "none" },       // ✅ hides the underline indicator
-                      }}
-                      sx={{
-                        minHeight: 25,
-                        ".MuiTab-root": {
-                          minHeight: 25,
-                          textTransform: "none",          // ✅ keeps your case
-                        },
-                      }}
-                    >
-                      <Tab label="Model.py" />
-                    </Tabs>
-                  </Box>
-
-
-                  {tabValue === 0 && (
-
-                    <Editor
-                      defaultLanguage="python"
-                      defaultValue="// Start coding here..."
-                      theme="vs-dark"
-                    />)}
-                </Paper>
-              </Grid>
-
-
-            </Grid>
-          </Box>
-
-        </>
-
-      )
-        : (<>
-          <Grid container spacing={3}>
-            <Grid size="auto">
-              <div className='left'>
-                <GridHeader>
-                  {headerLabel}
-                </GridHeader>
-              </div>
-            </Grid>
-            <Grid size={6} />
-
-            <Grid size="grow">
-              <div className='right'>
-                <Stack direction="row" spacing={1}>
-                  {/* <Tooltip title="Python model page" arrow>
-                    <IconButton aria-label="Python model" onClick={openPythonModelScreen} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <PythonIcon />
-                    </IconButton>
-                  </Tooltip> */}
-
-                  <Tooltip title="Refresh page" arrow>
-                    <IconButton aria-label="refresh" onClick={handleRefresh} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <CachedRoundedIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Upload Model" arrow>
-                    <IconButton aria-label="Upload Model" onClick={handleOpenFileUpload} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <FileUploadOutlinedIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Execute model" arrow>
-                    <IconButton aria-label="add" onClick={handlePlay} sx={{
-                      '&:hover': {
-                        backgroundColor: 'darkgrey',
-                      },
-                    }}>
-                      <PlayCircleOutlineOutlinedIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              </div>
-            </Grid>
-          </Grid>
-
-
-          <Divider />
-
-          <Box>
-            <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
-              <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleModelChange} aria-label="Loaded Models">
-                <Tab label="Models" sx={{ textTransform: 'none' }} />
-              </Tabs>
-            </Box>
-            <CustomTabPanel value={panelIndex} index={panelIndex}>
-              <Models refreshData={setModelRefreshKey} key={modelRefreshKey}> </Models>
-            </CustomTabPanel>
-          </Box>
-
-          <div>
-            <Dialog open={openFileUpload} onClose={handleCloseFileUpload}>
-              <DialogContent>
-                <ModelUploadComponent
-                  onDrop={handleFileDrop}
-                  text="Drag and drop your files here"
-                  iconColor="#3f51b5"
-                  borderColor="#3f51b5"
-                  filesLimit={1}
-                />
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={handleCloseFileUpload} color="primary">
-                  Cancel
-                </Button>
-              </DialogActions>
-            </Dialog>
-
-          </div>
-
-          <><ExecuteModel open={openExecuteModel} onClose={setOpenExecuteModel} /></>
-        </>)
+      const completed = p?.completedBatches ?? 0;
+      if (completed !== prevCompleted.current) {
+        stablePolls.current = 0;
+        setIsRunning(true);
+      } else if (!p?.isComplete) {
+        stablePolls.current += 1;
+        if (stablePolls.current >= 3) setIsRunning(false);
+      } else {
+        setIsRunning(false);
       }
+      prevCompleted.current = completed;
 
-      <>
-        <Dialog open={openTestDataFileUpload} onClose={handleCloseTestDataFileUpload}>
-          <DialogTitle>Upload Files</DialogTitle>
-          <DialogContent>
-            <FileUploadComponent
-              onDrop={handleTestDataFileDrop}
-              text="Drag and drop your files here"
-              iconColor="#3f51b5"
-              borderColor="#3f51b5"
-              filesLimit={5}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseTestDataFileUpload} color="primary">
-              Cancel
-            </Button>
-          </DialogActions>
-        </Dialog>
+      setProgress(p);
+      setBatches(p?.batches ?? []);
+      setLastUpdated(new Date());
+    } catch { /* silent — never block the UI */ }
+  }, []);
 
-      </>
+  useEffect(() => {
+    poll();
+    if (!isLive) return;
+    // Adaptive interval: poll faster while actively running, back off when idle
+    const interval = isRunning ? 2000 : 10000;
+    const t = setInterval(poll, interval);
+    return () => clearInterval(t);
+  }, [poll, isLive, isRunning]);
+
+  const fmtMs = (ms) => {
+    if (!ms && ms !== 0) return '—';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms/1000).toFixed(1)}s`;
+    return `${(ms/60000).toFixed(1)}m`;
+  };
+  const fmtTime = (d) => {
+    if (!d) return '';
+    return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  if (!progress) return null;
+
+  const { completionPct = 0, completedBatches = 0, totalExpectedBatches = 0,
+          totalInstruments = 0, totalInstrumentsProcessed = 0,
+          successBatches = 0, failedBatches = 0, isComplete = false, pageSize = 0 } = progress;
+
+  const statusColor = isRunning ? '#6366f1' : failedBatches > 0 ? '#dc2626' : '#16a34a';
+  const statusLabel = isRunning ? 'Running…'
+    : isComplete ? (failedBatches > 0 ? 'Completed with errors' : 'Completed')
+    : completedBatches === 0 ? 'Idle' : 'Partial';
+
+  const fmtDate = (d) => {
+    if (!d) return '—';
+    const s = String(d);
+    return s.length === 8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : s;
+  };
+
+  return (
+    <Box sx={{
+      mb: 3, borderRadius: 3, overflow: 'hidden', bgcolor: 'background.paper',
+      boxShadow: `0 2px 12px ${alpha(theme.palette.grey[400], 0.2)}`,
+      border: `1.5px solid ${alpha(statusColor, 0.25)}`,
+    }}>
+      {/* Header bar */}
+      <Box sx={{
+        px: 2.5, py: 1.5, display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between',
+        bgcolor: alpha(statusColor, 0.05),
+        borderBottom: collapsed ? 'none' : `1px solid ${alpha(statusColor, 0.15)}`,
+        cursor: 'pointer',
+      }} onClick={() => setCollapsed(c => !c)}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {isRunning
+            ? <CircularProgress size={16} thickness={5} sx={{ color: statusColor }} />
+            : <FiberManualRecordIcon sx={{ fontSize: 14, color: statusColor }} />
+          }
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+            Live Execution Progress
+          </Typography>
+          <Chip label={statusLabel} size="small" sx={{
+            height: 20, fontSize: '0.65rem', fontWeight: 700,
+            bgcolor: alpha(statusColor, 0.1), color: statusColor,
+            border: `1px solid ${alpha(statusColor, 0.3)}`
+          }} />
+          {/* Posting date — always visible so you always know which date is running */}
+          {progress?.postingDate && (
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 0.5,
+              px: 1.2, py: 0.3, borderRadius: 1.5,
+              bgcolor: alpha('#0ea5e9', 0.08),
+              border: '1px solid ' + alpha('#0ea5e9', 0.25),
+            }}>
+              <AccessTimeIcon sx={{ fontSize: 13, color: '#0ea5e9' }} />
+              <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#0369a1', letterSpacing: '0.02em' }}>
+                {fmtDate(progress.postingDate)}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {lastUpdated && (
+            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+              Updated {fmtTime(lastUpdated)}
+            </Typography>
+          )}
+          <Tooltip title={isLive ? 'Pause polling' : 'Resume polling'}>
+            <IconButton size="small" onClick={e => { e.stopPropagation(); setIsLive(l => !l); }}>
+              {isLive
+                ? <FiberManualRecordIcon sx={{ fontSize: 14, color: '#16a34a' }} />
+                : <FiberManualRecordIcon sx={{ fontSize: 14, color: '#94a3b8' }} />
+              }
+            </IconButton>
+          </Tooltip>
+          <IconButton size="small" onClick={e => { e.stopPropagation(); setCollapsed(c => !c); }}>
+            {collapsed ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowUpIcon fontSize="small" />}
+          </IconButton>
+        </Box>
+      </Box>
+
+      <Collapse in={!collapsed}>
+        <Box sx={{ p: 2.5 }}>
+          {/* Progress bar */}
+          <Box sx={{ mb: 2 }}>
+
+            {/* Row 1: Batch count + completion % */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  Batches Completed:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {completedBatches} of {totalExpectedBatches || '?'}
+                </Typography>
+                {successBatches > 0 && (
+                  <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 600 }}>· {successBatches} succeeded</Typography>
+                )}
+                {failedBatches > 0 && (
+                  <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 600 }}>· {failedBatches} failed</Typography>
+                )}
+              </Box>
+              <Typography variant="caption" sx={{ color: statusColor, fontWeight: 700, fontSize: '0.85rem' }}>
+                {completionPct}%{isComplete && !isRunning ? ' ✓' : ''}
+              </Typography>
+            </Box>
+
+            {/* Row 2: Instrument breakdown */}
+            {totalInstruments > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  Instruments Processed:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {totalInstrumentsProcessed.toLocaleString()} of {totalInstruments.toLocaleString()}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  · batch size {pageSize}
+                </Typography>
+              </Box>
+            )}
+
+            <Tooltip
+              title={`${completionPct}% = ${completedBatches} completed batches ÷ ${totalExpectedBatches} expected batches (${totalInstruments} instruments ÷ ${pageSize} batch size)`}
+              placement="top"
+            >
+              <LinearProgress
+                variant={isRunning ? 'buffer' : 'determinate'}
+                value={completionPct}
+                valueBuffer={Math.min(100, completionPct + (isRunning ? 5 : 0))}
+                sx={{
+                  height: 8, borderRadius: 4, cursor: 'help',
+                  bgcolor: alpha(statusColor, 0.1),
+                  '& .MuiLinearProgress-bar': { bgcolor: statusColor, borderRadius: 4, transition: 'transform 0.6s ease' },
+                  '& .MuiLinearProgress-bar2Buffer': { bgcolor: alpha(statusColor, 0.2) },
+                }}
+              />
+            </Tooltip>
+          </Box>
+
+          {/* Per-batch timeline */}
+          {batches.length > 0 && (
+            <Box sx={{
+              maxHeight: 280, overflowY: 'auto',
+              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+              borderRadius: 2, bgcolor: alpha(theme.palette.grey[50], 0.5),
+            }}>
+              {/* Table header */}
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: '52px 1fr 90px 90px 90px 90px',
+                px: 1.5, py: 1,
+                bgcolor: alpha(theme.palette.grey[100], 0.8),
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
+                position: 'sticky', top: 0, zIndex: 1,
+              }}>
+                {['Batch', 'Job ID', 'Type', 'Instruments', 'Duration', 'Status'].map(h => (
+                  <Typography key={h} variant="caption" sx={{
+                    fontWeight: 700, fontSize: '0.65rem',
+                    color: 'text.secondary', textTransform: 'uppercase'
+                  }}>{h}</Typography>
+                ))}
+              </Box>
+
+              {/* Batch rows */}
+              {[...batches].reverse().map((b, i) => {
+                const bStatus = b.status ?? 'UNKNOWN';
+                const bColor  = bStatus === 'SUCCESS' ? '#16a34a' : bStatus === 'FAILED' ? '#dc2626' : '#d97706';
+                return (
+                  <Box key={i} sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '52px 1fr 90px 90px 90px 90px',
+                    px: 1.5, py: 0.75, alignItems: 'center',
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.25)}`,
+                    '&:last-child': { borderBottom: 'none' },
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.03) },
+                    transition: 'background 0.15s',
+                  }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      #{(b.batchNumber ?? i) + 1}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.disabled', fontFamily: 'monospace', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {b.jobId ?? '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {b.modelType ?? '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      {b.instrumentCount ?? 0}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#7c3aed' }}>
+                      {fmtMs(b.durationMs)}
+                    </Typography>
+                    <Box>
+                      <Chip label={bStatus} size="small" sx={{
+                        height: 18, fontSize: '0.6rem', fontWeight: 700,
+                        bgcolor: alpha(bColor, 0.1), color: bColor,
+                        border: `1px solid ${alpha(bColor, 0.3)}`
+                      }} />
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+
+          {batches.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+              Waiting for batch data…
+            </Typography>
+          )}
+        </Box>
+      </Collapse>
+    </Box>
+  );
+}
+
+// Fyntrac Card
+const FyntracCard = ({ title, children, action, sx }) => {
+  const theme = useTheme();
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 3,
+        boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}, 0px 0px 2px ${alpha(theme.palette.grey[400], 0.2)}`,
+        bgcolor: 'background.paper',
+        transition: 'box-shadow 0.3s, transform 0.2s ease-in-out',
+        '&:hover': {
+          boxShadow: `0px 12px 24px ${alpha(theme.palette.grey[400], 0.3)}`,
+          transform: 'translateY(-2px)'
+        },
+        ...sx
+      }}
+    >
+      <Box
+        sx={{
+          px: 3,
+          py: 2.5,
+          borderBottom: '1px solid',
+          borderColor: alpha(theme.palette.divider, 0.5),
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 700, color: 'text.primary' }}>
+          {title}
+        </Typography>
+        {action}
+      </Box>
+      <Box sx={{ p: 0 }}>
+        {children}
+      </Box>
+    </Card>
+  );
+};
+
+// Row Component
+function Row({ row, onToggleStatus, onDownload, onExecute }) {
+  const [open, setOpen] = useState(false);
+  const theme = useTheme();
+
+  // Lazy-fetch summary when row is first expanded
+  const [rowSummary, setRowSummary] = useState(null);
+  const [rowSummaryLoading, setRowSummaryLoading] = useState(false);
+  const [fetchedFor, setFetchedFor] = useState(null);
+
+  const handleExpand = async () => {
+    const next = !open;
+    setOpen(next);
+    // Only fetch once per row (keyed by model id)
+    if (next && fetchedFor !== row.id) {
+      setRowSummaryLoading(true);
+      const modelType = row.modelType === 'DSL' ? 'PYTHON' : row.modelType;
+      try {
+        const res = await dataloaderApi.get(
+          `/model/execution-summary${modelType ? `?modelType=${modelType}` : ''}`
+        );
+        const data = res.data;
+        setRowSummary(Array.isArray(data) ? data[0] : data);
+      } catch {
+        setRowSummary(null);
+      } finally {
+        setRowSummaryLoading(false);
+        setFetchedFor(row.id);
+      }
+    }
+  };
+
+  const handleToggle = () => onToggleStatus(row);
+  const handleDownload = (e) => { e.stopPropagation(); onDownload(row); };
+  const handleExecute = (e) => { e.stopPropagation(); onExecute(row); };
+
+  const fmtMs = (ms) => {
+    if (!ms && ms !== 0) return '—';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
+  };
+  const fmtDate = (d) => {
+    if (!d) return '—';
+    const s = String(d);
+    return s.length === 8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : s;
+  };
+
+  const successBatches = rowSummary?.statusCounts?.SUCCESS ?? rowSummary?.totalSuccess ?? 0;
+  const failedBatches  = rowSummary?.statusCounts?.FAILED  ?? rowSummary?.totalFailed  ?? 0;
+  const overallStatus  = !rowSummary ? null
+    : failedBatches === 0 ? 'SUCCESS'
+    : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
+  const statusCfg = overallStatus ? (SUMMARY_STATUS_CONFIG[overallStatus] || SUMMARY_STATUS_CONFIG.SUCCESS) : null;
+
+  return (
+    <>
+      <TableRow
+        sx={{
+          '& > *': { borderBottom: 'unset' },
+          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+          transition: 'background-color 0.2s',
+          cursor: 'pointer'
+        }}
+        onClick={handleExpand}
+      >
+        <TableCell width={60}>
+          <IconButton
+            aria-label="expand row"
+            size="small"
+            onClick={(e) => { e.stopPropagation(); handleExpand(); }}
+            sx={{
+              bgcolor: open ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+              color: open ? 'primary.main' : 'action.active'
+            }}
+          >
+            {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </TableCell>
+
+        <TableCell component="th" scope="row" sx={{ fontWeight: 600, color: 'text.primary' }}>
+          {row.orderId || '—'}
+        </TableCell>
+        <TableCell sx={{ color: 'text.secondary' }}>{row.modelName || '—'}</TableCell>
+        <TableCell sx={{ color: 'text.secondary' }}>{row.modelType || '—'}</TableCell>
+        <TableCell sx={{ color: 'text.secondary' }}>{formatDate(row.uploadDate)}</TableCell>
+        <TableCell><StatusChip status={row.modelStatus} /></TableCell>
+        <TableCell><StatusChip status={null} /></TableCell>
+        <TableCell sx={{ color: 'text.secondary' }}>{row.uploadedBy || '—'}</TableCell>
+
+        <TableCell onClick={(e) => e.stopPropagation()} align="center">
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <Tooltip title={`Execute ${row.modelType || 'Model'}`}>
+              <IconButton size="small" color="primary" onClick={handleExecute} disabled={row.modelStatus !== 'ACTIVE'}>
+                <PlayArrowIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download">
+              <IconButton size="small" onClick={handleDownload} disabled={!row.modelFileId}>
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={row.modelStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}>
+              <Switch
+                size="small"
+                checked={row.modelStatus === 'ACTIVE'}
+                onChange={handleToggle}
+              />
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" color="error" disabled>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </TableCell>
+      </TableRow>
+
+      {/* Expanded: Execution Summary */}
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <Box sx={{ mx: 2, my: 1.5, p: 2.5, bgcolor: alpha(theme.palette.grey[50], 0.5), borderRadius: 2, border: `1px dashed ${theme.palette.divider}` }}>
+
+              {rowSummaryLoading && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">Loading execution summary…</Typography>
+                </Box>
+              )}
+
+              {!rowSummaryLoading && !rowSummary && (
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', py: 0.5 }}>
+                  No execution summary found for this model type.
+                </Typography>
+              )}
+
+              {!rowSummaryLoading && rowSummary && (
+                <>
+                  {/* Summary header */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {statusCfg && <statusCfg.icon sx={{ color: statusCfg.color, fontSize: 20 }} />}
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                        Last Execution Summary
+                      </Typography>
+                      {overallStatus && (
+                        <Chip
+                          label={overallStatus.replace('_', ' ')}
+                          size="small"
+                          sx={{
+                            fontWeight: 700, fontSize: '0.65rem', borderRadius: 1, height: 20,
+                            bgcolor: statusCfg.bg, color: statusCfg.color,
+                            border: `1px solid ${alpha(statusCfg.color, 0.3)}`
+                          }}
+                        />
+                      )}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Posting Date: <strong>{fmtDate(rowSummary.postingDate)}</strong>
+                    </Typography>
+                  </Box>
+
+                  {/* Stat grid */}
+                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                    {[{ label: 'Total Batches',    value: rowSummary.totalBatches ?? 0,                            color: '#6366f1', icon: LayersIcon },
+                      { label: 'Instruments',      value: (rowSummary.totalInstruments ?? 0).toLocaleString(),    color: '#0ea5e9', icon: FiberManualRecordIcon },
+                      { label: 'Successful',       value: successBatches,                                          color: '#16a34a', icon: CheckCircleOutlineIcon },
+                      { label: 'Failed',           value: failedBatches,                                           color: failedBatches > 0 ? '#dc2626' : '#94a3b8', icon: ErrorOutlineIcon },
+                      { label: 'Total Duration',   value: fmtMs(rowSummary.totalDurationMs),                      color: '#7c3aed', icon: AccessTimeIcon },
+                      { label: 'Avg Batch',        value: fmtMs(rowSummary.avgBatchMs),                           color: '#0891b2', icon: AccessTimeIcon },
+                    ].map(({ label, value, color, icon: Icon }) => (
+                      <Box key={label} sx={{
+                        flex: 1, minWidth: 140,
+                        display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5,
+                        borderRadius: 2, bgcolor: `${color}0d`, border: `1px solid ${color}22`
+                      }}>
+                        <Box sx={{
+                          width: 34, height: 34, borderRadius: '50%',
+                          bgcolor: `${color}1a`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                        }}>
+                          <Icon sx={{ fontSize: 18, color }} />
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.68rem', display: 'block', lineHeight: 1.2 }}>{label}</Typography>
+                          <Typography sx={{ fontWeight: 700, fontSize: '1rem', color, lineHeight: 1.4 }}>{value}</Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+
+                  {/* Errors */}
+                  {rowSummary.errors?.length > 0 && (
+                    <Box sx={{ mt: 1.5, p: 1, borderRadius: 1.5, bgcolor: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626' }}>Errors:</Typography>
+                      {rowSummary.errors.map((e, i) => (
+                        <Typography key={i} variant="caption" display="block" sx={{ color: '#991b1b', mt: 0.3, fontSize: '0.7rem' }}>• {e}</Typography>
+                      ))}
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
     </>
-  )
+  );
+}
+
+
+// --- MAIN PAGE ---
+export default function ModelPage() {
+  const theme = useTheme();
+  const { tenant } = useTenant();
+
+  // Data state
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Dialog state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [executeOpen, setExecuteOpen] = useState(false);
+  const [selectedModelType, setSelectedModelType] = useState(null);
+
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  // --- Data fetching ---
+  const fetchModels = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await dataloaderApi.get('/model/get/all');
+      setRows(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch models:', err);
+      setError('Failed to load models. Please try again.');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchModels();
+  }, [fetchModels]);
+
+  // --- Action handlers ---
+
+  const handleRefresh = () => {
+    fetchModels();
+  };
+
+  const handleToggleStatus = async (model) => {
+    const newStatus = model.modelStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const updatedModel = {
+      id: model.id,
+      orderId: model.orderId,
+      modelName: model.modelName,
+      uploadDate: model.uploadDate,
+      uploadStatus: model.uploadStatus,
+      modelStatus: newStatus,
+      uploadedBy: model.uploadedBy,
+      isDeleted: model.isDeleted,
+      lastModifiedDate: model.lastModifiedDate,
+      modifiedBy: model.modifiedBy,
+      modelConfig: model.modelConfig,
+      modelFileId: model.modelFileId,
+    };
+
+    try {
+      await dataloaderApi.post('/model/save', updatedModel);
+      // Optimistic update
+      setRows((prev) =>
+        prev.map((r) => (r.id === model.id ? { ...r, modelStatus: newStatus } : r))
+      );
+      setSnackbar({ open: true, message: `Model "${model.modelName}" set to ${newStatus}`, severity: 'success' });
+    } catch (err) {
+      console.error('Failed to update model status:', err);
+      setSnackbar({ open: true, message: 'Failed to update model status.', severity: 'error' });
+    }
+  };
+
+  const handleDownload = async (model) => {
+    if (!model.modelFileId) return;
+    try {
+      const response = await dataloaderApi.get(`/model/download/${model.modelFileId}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${model.modelName || 'model'}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download model:', err);
+      setSnackbar({ open: true, message: 'Failed to download model file.', severity: 'error' });
+    }
+  };
+
+  const handleUploadClose = () => {
+    setUploadOpen(false);
+    fetchModels(); // Refresh after upload dialog closes
+  };
+
+  const handleExecuteOpen = (model) => {
+    setSelectedModelType(model?.modelType ?? null);
+    setExecuteOpen(true);
+  };
+
+  const handleExecuteClose = (val) => {
+    setExecuteOpen(false);
+    setSelectedModelType(null);
+    fetchModels(); // Refresh after execute dialog closes
+  };
+
+  // Pagination handlers
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Paginated rows
+  const paginatedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  return (
+    <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
+
+      <Container maxWidth={false} sx={{ py: 1, px: 2 }}>
+
+        {/* 1. Header Section */}
+        <Box sx={{
+          p: 1.5,
+          borderBottom: '1.5px solid',
+          borderColor: (theme) => alpha(theme.palette.divider, 0.2),
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { sm: 'center' },
+          gap: 2,
+          mb: 4
+        }}>
+          <Box>
+            <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
+              Model Management
+            </Typography>
+          </Box>
+          <Divider />
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Run Model (select a model row to pick type)">
+              <IconButton
+                sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
+                onClick={() => handleExecuteOpen(null)}
+              >
+                <PlayCircleOutlineIcon color="action" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Upload Model">
+              <IconButton
+                sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
+                onClick={() => setUploadOpen(true)}
+              >
+                <UploadIcon color="action" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Refresh">
+              <IconButton
+                sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
+                onClick={handleRefresh}
+              >
+                <RefreshIcon color="action" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+
+        {/* 2. Live Progress Panel */}
+        <ExecutionProgressPanel />
+
+        {/* 3. Main Data Table */}
+        <Box>
+          <FyntracCard title="Loaded Models">
+
+            {/* Loading indicator */}
+            {loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
+                <CircularProgress size={36} />
+                <Typography sx={{ ml: 2 }} color="text.secondary">Loading models…</Typography>
+              </Box>
+            )}
+
+            {/* Error state */}
+            {!loading && error && (
+              <Box sx={{ py: 4, textAlign: 'center' }}>
+                <Typography color="error">{error}</Typography>
+              </Box>
+            )}
+
+            {/* Table */}
+            {!loading && !error && (
+              <>
+                <TableContainer>
+                  <Table aria-label="model table">
+                    <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.5) }}>
+                      <TableRow>
+                        <TableCell width={60} />
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Execution ID</TableCell>
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Model Type</TableCell>
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Upload Date</TableCell>
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Model Status</TableCell>
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Execution Status</TableCell>
+                        <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>User</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {paginatedRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                            <Typography color="text.secondary">No models found. Upload a model to get started.</Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        paginatedRows.map((row) => (
+                          <Row
+                            key={row.id}
+                            row={row}
+                            onToggleStatus={handleToggleStatus}
+                            onDownload={handleDownload}
+                            onExecute={handleExecuteOpen}
+                          />
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                {/* Pagination Footer */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <TablePagination
+                    component="div"
+                    count={rows.length}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    rowsPerPageOptions={[5, 10, 25]}
+                  />
+                </Box>
+              </>
+            )}
+
+          </FyntracCard>
+        </Box>
+
+      </Container>
+
+      {/* Upload Dialog */}
+      <Dialog
+        open={uploadOpen}
+        onClose={handleUploadClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <ModelUploadComponent
+          onDrop={() => {}}
+          text="Drag and drop model file here or click to browse"
+        />
+      </Dialog>
+
+      {/* Execute Dialog */}
+      <ExecuteModel open={executeOpen} onClose={handleExecuteClose} modelType={selectedModelType} />
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+    </Box>
+  );
 }
