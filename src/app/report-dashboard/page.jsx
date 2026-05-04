@@ -66,8 +66,7 @@ export default function ReportDashboard() {
       tag: "Custom",
       reports: [
         { name: "Operational Activity Report", description: "Presents data extracted from operational custom tables.", component: CustomOperationalDataReportPage },
-        { name: "Reference Meta Data", description: "Shows the structure and stored values of reference-data tables.", component: CustomRefDataReportPage },
-        { name: "Fyntrac Insight", description: "Fyntrac reporting tool for custom reports.", url: process.env.NEXT_PUBLIC_INSIGHT_URL || "http://localhost:3001" }
+        { name: "Reference Meta Data", description: "Shows the structure and stored values of reference-data tables.", component: CustomRefDataReportPage }
       ]
     },
   ];
@@ -83,7 +82,8 @@ export default function ReportDashboard() {
 
         const displayName = user?.firstName || user?.name || user?.email || tenant || '';
         if (displayName) params.set('firstName', displayName);
-        if (tenant) params.set('tenant', tenant);
+        const tenantId = typeof tenant === 'string' ? tenant : (tenant?.id || tenant?.tenantId || tenant?.name || '');
+        if (tenantId) params.set('tenant', tenantId);
 
         const qs = params.toString();
         const url = qs ? `${report.url}?${qs}` : report.url;
@@ -120,7 +120,25 @@ export default function ReportDashboard() {
             <Typography variant="overline" fontWeight="bold" fontSize="0.85rem" color="text.secondary" sx={{ letterSpacing: 1.5, textTransform: 'uppercase' }}>
               {cat.name}
             </Typography>
-            <Box sx={{ height: '2px', bgcolor: 'divider', flexGrow: 1, ml: 2, opacity: 0.9 }} />
+            <Box sx={{ height: '2px', bgcolor: 'divider', flexGrow: 1, mx: 2, opacity: 0.9 }} />
+            {cat.name === "Standard Reports" && (
+              <Box
+                component="img"
+                src="/fyntrac-insight.png"
+                alt="Fyntrac Insight"
+                sx={{
+                  height: 30,
+                  mr: 2,
+                  objectFit: 'contain',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))',
+                  transition: 'transform 0.2s',
+                  '&:hover': { transform: 'scale(1.02)' }
+                }}
+                onClick={() => handleCardClick({ url: process.env.NEXT_PUBLIC_INSIGHT_URL || "http://localhost:3001" })}
+              />
+            )}
           </Box>
 
           <Grid container spacing={3}>
