@@ -103,9 +103,9 @@ const StatusChip = ({ status }) => {
 
 // Execution Summary Panel
 const SUMMARY_STATUS_CONFIG = {
-  SUCCESS:        { color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  icon: CheckCircleOutlineIcon },
-  PARTIAL_SUCCESS:{ color: '#d97706', bg: 'rgba(217,119,6,0.08)',  icon: ErrorOutlineIcon },
-  FAILED:         { color: '#dc2626', bg: 'rgba(220,38,38,0.08)',  icon: ErrorOutlineIcon },
+  SUCCESS: { color: '#16a34a', bg: 'rgba(22,163,74,0.08)', icon: CheckCircleOutlineIcon },
+  PARTIAL_SUCCESS: { color: '#d97706', bg: 'rgba(217,119,6,0.08)', icon: ErrorOutlineIcon },
+  FAILED: { color: '#dc2626', bg: 'rgba(220,38,38,0.08)', icon: ErrorOutlineIcon },
 };
 
 function StatCard({ icon: Icon, label, value, color, bg }) {
@@ -161,21 +161,21 @@ function ExecutionSummaryPanel() {
 
   const cfg = summary?.statusCounts
     ? (Object.keys(summary.statusCounts).length === 1 && summary.statusCounts['SUCCESS']
-        ? SUMMARY_STATUS_CONFIG.SUCCESS
-        : summary.statusCounts['FAILED'] ? SUMMARY_STATUS_CONFIG.FAILED : SUMMARY_STATUS_CONFIG.PARTIAL_SUCCESS)
+      ? SUMMARY_STATUS_CONFIG.SUCCESS
+      : summary.statusCounts['FAILED'] ? SUMMARY_STATUS_CONFIG.FAILED : SUMMARY_STATUS_CONFIG.PARTIAL_SUCCESS)
     : SUMMARY_STATUS_CONFIG.SUCCESS;
 
   const fmtMs = (ms) => {
     if (!ms && ms !== 0) return '—';
     if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms/1000).toFixed(1)}s`;
-    return `${(ms/60000).toFixed(1)}m`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
   };
 
   const fmtDate = (d) => {
     if (!d) return '—';
     const s = String(d);
-    if (s.length === 8) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    if (s.length === 8) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
     return s;
   };
 
@@ -195,10 +195,10 @@ function ExecutionSummaryPanel() {
   );
 
   const successBatches = summary.statusCounts?.SUCCESS ?? summary.totalSuccess ?? 0;
-  const failedBatches  = summary.statusCounts?.FAILED  ?? summary.totalFailed  ?? 0;
-  const overallStatus  = failedBatches === 0 ? 'SUCCESS' : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
-  const statusCfg      = SUMMARY_STATUS_CONFIG[overallStatus] || SUMMARY_STATUS_CONFIG.SUCCESS;
-  const StatusIcon     = statusCfg.icon;
+  const failedBatches = summary.statusCounts?.FAILED ?? summary.totalFailed ?? 0;
+  const overallStatus = failedBatches === 0 ? 'SUCCESS' : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
+  const statusCfg = SUMMARY_STATUS_CONFIG[overallStatus] || SUMMARY_STATUS_CONFIG.SUCCESS;
+  const StatusIcon = statusCfg.icon;
 
   return (
     <Box sx={{
@@ -294,9 +294,9 @@ function ExecutionSummaryPanel() {
 function ExecutionProgressPanel() {
   const theme = useTheme();
   const { tenant } = useTenant();
-  const [progress, setProgress]   = useState(null);  // /execution-progress data
-  const [batches,  setBatches]    = useState([]);     // /execution-summary batches[]
-  const [isLive,   setIsLive]     = useState(true);
+  const [progress, setProgress] = useState(null);  // /execution-progress data
+  const [batches, setBatches] = useState([]);     // /execution-summary batches[]
+  const [isLive, setIsLive] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const prevCompleted = useRef(0);
@@ -311,7 +311,7 @@ function ExecutionProgressPanel() {
       const res = await dataloaderApi.get('/model/execution-progress', {
         headers: { 'X-Tenant': tenant }
       });
-      const p   = res.data;
+      const p = res.data;
 
       const completed = p?.completedBatches ?? 0;
       if (completed !== prevCompleted.current) {
@@ -343,8 +343,8 @@ function ExecutionProgressPanel() {
   const fmtMs = (ms) => {
     if (!ms && ms !== 0) return '—';
     if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms/1000).toFixed(1)}s`;
-    return `${(ms/60000).toFixed(1)}m`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
   };
   const fmtTime = (d) => {
     if (!d) return '';
@@ -354,18 +354,18 @@ function ExecutionProgressPanel() {
   if (!progress) return null;
 
   const { completionPct = 0, completedBatches = 0, totalExpectedBatches = 0,
-          totalInstruments = 0, totalInstrumentsProcessed = 0,
-          successBatches = 0, failedBatches = 0, isComplete = false, pageSize = 0 } = progress;
+    totalInstruments = 0, totalInstrumentsProcessed = 0,
+    successBatches = 0, failedBatches = 0, isComplete = false, pageSize = 0 } = progress;
 
   const statusColor = isRunning ? '#6366f1' : failedBatches > 0 ? '#dc2626' : '#16a34a';
   const statusLabel = isRunning ? 'Running…'
     : isComplete ? (failedBatches > 0 ? 'Completed with errors' : 'Completed')
-    : completedBatches === 0 ? 'Idle' : 'Partial';
+      : completedBatches === 0 ? 'Idle' : 'Partial';
 
   const fmtDate = (d) => {
     if (!d) return '—';
     const s = String(d);
-    return s.length === 8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : s;
+    return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : s;
   };
 
   return (
@@ -516,7 +516,7 @@ function ExecutionProgressPanel() {
               {/* Batch rows */}
               {[...batches].reverse().map((b, i) => {
                 const bStatus = b.status ?? 'UNKNOWN';
-                const bColor  = bStatus === 'SUCCESS' ? '#16a34a' : bStatus === 'FAILED' ? '#dc2626' : '#d97706';
+                const bColor = bStatus === 'SUCCESS' ? '#16a34a' : bStatus === 'FAILED' ? '#dc2626' : '#d97706';
                 return (
                   <Box key={i} sx={{
                     display: 'grid',
@@ -657,14 +657,14 @@ function Row({ row, onToggleStatus, onDownload, onExecute }) {
   const fmtDate = (d) => {
     if (!d) return '—';
     const s = String(d);
-    return s.length === 8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : s;
+    return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : s;
   };
 
   const successBatches = rowSummary?.statusCounts?.SUCCESS ?? rowSummary?.totalSuccess ?? 0;
-  const failedBatches  = rowSummary?.statusCounts?.FAILED  ?? rowSummary?.totalFailed  ?? 0;
-  const overallStatus  = !rowSummary ? null
+  const failedBatches = rowSummary?.statusCounts?.FAILED ?? rowSummary?.totalFailed ?? 0;
+  const overallStatus = !rowSummary ? null
     : failedBatches === 0 ? 'SUCCESS'
-    : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
+      : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
   const statusCfg = overallStatus ? (SUMMARY_STATUS_CONFIG[overallStatus] || SUMMARY_STATUS_CONFIG.SUCCESS) : null;
 
   return (
@@ -777,12 +777,12 @@ function Row({ row, onToggleStatus, onDownload, onExecute }) {
 
                   {/* Stat grid */}
                   <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                    {[{ label: 'Total Batches',    value: rowSummary.totalBatches ?? 0,                            color: '#6366f1', icon: LayersIcon },
-                      { label: 'Instruments',      value: (rowSummary.totalInstruments ?? 0).toLocaleString(),    color: '#0ea5e9', icon: FiberManualRecordIcon },
-                      { label: 'Successful',       value: successBatches,                                          color: '#16a34a', icon: CheckCircleOutlineIcon },
-                      { label: 'Failed',           value: failedBatches,                                           color: failedBatches > 0 ? '#dc2626' : '#94a3b8', icon: ErrorOutlineIcon },
-                      { label: 'Total Duration',   value: fmtMs(rowSummary.totalDurationMs),                      color: '#7c3aed', icon: AccessTimeIcon },
-                      { label: 'Avg Batch',        value: fmtMs(rowSummary.avgBatchMs),                           color: '#0891b2', icon: AccessTimeIcon },
+                    {[{ label: 'Total Batches', value: rowSummary.totalBatches ?? 0, color: '#6366f1', icon: LayersIcon },
+                    { label: 'Instruments', value: (rowSummary.totalInstruments ?? 0).toLocaleString(), color: '#0ea5e9', icon: FiberManualRecordIcon },
+                    { label: 'Successful', value: successBatches, color: '#16a34a', icon: CheckCircleOutlineIcon },
+                    { label: 'Failed', value: failedBatches, color: failedBatches > 0 ? '#dc2626' : '#94a3b8', icon: ErrorOutlineIcon },
+                    { label: 'Total Duration', value: fmtMs(rowSummary.totalDurationMs), color: '#7c3aed', icon: AccessTimeIcon },
+                    { label: 'Avg Batch', value: fmtMs(rowSummary.avgBatchMs), color: '#0891b2', icon: AccessTimeIcon },
                     ].map(({ label, value, color, icon: Icon }) => (
                       <Box key={label} sx={{
                         flex: 1, minWidth: 140,
@@ -878,6 +878,7 @@ export default function ModelPage() {
       id: model.id,
       orderId: model.orderId,
       modelName: model.modelName,
+      modelType: model.modelType,
       uploadDate: model.uploadDate,
       uploadStatus: model.uploadStatus,
       modelStatus: newStatus,
@@ -1092,7 +1093,7 @@ export default function ModelPage() {
         fullWidth
       >
         <ModelUploadComponent
-          onDrop={() => {}}
+          onDrop={() => { }}
           text="Drag and drop model file here or click to browse"
         />
       </Dialog>
