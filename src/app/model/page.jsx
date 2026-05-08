@@ -1092,10 +1092,64 @@ export default function ModelPage() {
         maxWidth="md"
         fullWidth
       >
-        <ModelUploadComponent
-          onDrop={() => { }}
-          text="Drag and drop model file here or click to browse"
-        />
+        <DialogTitle>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'start',
+            }}
+          >
+            {/* Top Left: Logo and Title */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 1,
+                width: 'fit-content'
+              }}
+            >
+              <img
+                src="fyntrac.png"
+                alt="Logo"
+                style={{
+                  width: '120px', // Slightly larger for the 'md' dialog
+                  height: 'auto',
+                  maxWidth: '100%'
+                }}
+              />
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
+                Model Upload
+              </Typography>
+            </Box>
+
+            {/* Top Right: Close Button */}
+            <Tooltip title="Close">
+              <IconButton
+                onClick={handleUploadClose}
+                edge="end"
+                aria-label="close"
+                sx={{
+                  color: 'grey.500',
+                  '&:hover': { color: 'error.main' },
+                }}
+              >
+                <HighlightOffOutlinedIcon fontSize="large" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 4 }}>
+          <ModelUploadComponent
+            onDrop={() => { }} // You can pass handleUploadClose here if you want it to close after drop
+            text="Drag and drop model file here or click to browse"
+            // Assuming your component supports these based on your reference code
+            iconColor="#3f51b5"
+            borderColor="#3f51b5"
+          />
+        </DialogContent>
       </Dialog>
 
       {/* Execute Dialog */}
