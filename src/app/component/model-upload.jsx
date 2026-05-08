@@ -142,9 +142,9 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
         const errData = error.response?.data;
         let errMsg = "Upload failed";
         if (typeof errData === 'string') {
-           errMsg = errData;
+          errMsg = errData;
         } else if (errData && typeof errData === 'object') {
-           errMsg = errData.message || JSON.stringify(errData);
+          errMsg = errData.message || JSON.stringify(errData);
         }
         console.error('Upload data:', errMsg);
         setModelNameError(true);
@@ -165,8 +165,6 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
 
   return (
     <div>
-      <img src="fyntrac.png" alt="Sample Image" width="100" height="30" />
-      <p>Upload model</p>
       <Box>
         <Divider />
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

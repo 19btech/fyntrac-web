@@ -1116,7 +1116,7 @@ export default function ModelPage() {
                 src="fyntrac.png"
                 alt="Logo"
                 style={{
-                  width: '120px', // Slightly larger for the 'md' dialog
+                  width: '100px', // Slightly larger for the 'md' dialog
                   height: 'auto',
                   maxWidth: '100%'
                 }}
