@@ -24,6 +24,7 @@ import {
   Tooltip,
   Paper,
   Dialog,
+  DialogContent, DialogTitle,
   CircularProgress,
   Snackbar,
   Alert
@@ -43,6 +44,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LayersIcon from '@mui/icons-material/Layers';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
 // API & Context
 import { dataloaderApi } from '../services/api-client';
