@@ -1,36 +1,48 @@
-import React, { useState } from 'react';
-import { dataloaderApi } from '../services/api-client';
+import React, { useState, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { TextField, Divider, DialogContent, Box, Typography, LinearProgress, Alert, Snackbar } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import SuccessAlert from '../component/success-alert'
-import ErrorAlert from '../component/error-alert'
+import {
+  Box,
+  Typography,
+  LinearProgress,
+  TextField,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  IconButton,
+  Alert,
+  Stack,
+  Fade,
+  Avatar
+} from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import {
+  CloudUpload as CloudUploadIcon,
+  Delete as DeleteIcon,
+  CheckCircle as SuccessIcon,
+  Error as ErrorIcon,
+  DescriptionOutlined as DescriptionIcon
+} from "@mui/icons-material";
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
-function ModelUploadComponent({ onDrop, text, iconColor, borderColor, backgroundColor, filesLimit }) {
+export default function ModelUploadComponent({ onDrop, text, headerMessage = "Upload model files for processing" }) {
+  const theme = useTheme();
   const { tenant } = useTenant();
-  const [uploading, setUploading] = useState(false);
-  const [progressMap, setProgressMap] = useState({});
+
   const [modelName, setModelName] = useState('');
   const [modelOrderId, setModelOrderId] = useState('');
   const [modelNameError, setModelNameError] = useState(false);
   const [orderIdError, setOrderIdError] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [openSuccess, setOpenSuccess] = React.useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+  
+  const [files, setFiles] = useState([]);
+  const [status, setStatus] = useState("idle"); // idle, uploading, success, error
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  const handleSuccessClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-
-    setOpenSuccess(false);
-  };
-
-  const validateFile = (file) => {
-    const allowedTypes = ['application/vnd.ms-excel', 'text/csv', 'application/zip'];
-    return allowedTypes.includes(file.type);
-  };
+  const uploadLock = useRef(false);
 
   const validateFields = () => {
     let isValid = true;
@@ -39,10 +51,10 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
       setModelNameError(true);
       isValid = false;
     } else {
-      const regex = /^[A-Za-z][A-Za-z0-9]*$/; // Starts with an alphabet, followed by alphanumeric characters
+      const regex = /^[A-Za-z][A-Za-z0-9]*$/;
       if (!regex.test(modelName)) {
         setModelNameError(true);
-        setErrorMessage('Input must start with an alphabet and afterwards may contain number(s).');
+        setErrorMessage('Model Name must start with an alphabet and afterwards may contain number(s).');
         isValid = false;
         return false;
       }
@@ -54,11 +66,9 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
       setOrderIdError(true);
       isValid = false;
     } else {
-      // Regular expression to match the desired pattern
       const regex = /^[0-9]+[A-Za-z]*$/;
-
       if (!regex.test(modelOrderId)) {
-        setErrorMessage('Input must start with a number and may end with letters.');
+        setErrorMessage('Model Order Id must start with a number and may end with letters.');
         setOrderIdError(true);
         isValid = false;
         return false;
@@ -67,186 +77,337 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
       setErrorMessage('');
     }
 
-    if (!isValid) {
+    if (!isValid && !errorMessage) {
       setErrorMessage('Please fill in all required fields correctly.');
-    } else {
+    } else if (isValid) {
       setErrorMessage('');
     }
 
     return isValid;
   };
 
-  const handleFileUpload = (file) => {
-    const reader = new FileReader();
+  const handleDrop = async (acceptedFiles, fileRejections) => {
+    if (uploadLock.current) return;
+    uploadLock.current = true;
 
-    reader.onprogress = (event) => {
-      const loaded = event.loaded;
-      const total = event.total;
-      const progress = Math.round((loaded / total) * 100);
-
-      setProgressMap((prevMap) => ({
-        ...prevMap,
-        [file.name]: progress,
-      }));
-    };
-
-    reader.onload = () => {
-      // Handle the file here if needed
-      // Example: console.log(`File "${file.name}" processed`);
-    };
-
-    reader.readAsBinaryString(file);
-  };
-
-  const handleDrop = (acceptedFiles) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
     if (!validateFields()) {
+      uploadLock.current = false;
       return;
     }
 
-    setUploading(true);
-    setProgressMap({});
+    if (fileRejections.length > 0) {
+      setErrorMessage("Invalid file type or size. Please check your files.");
+      uploadLock.current = false;
+      return;
+    }
 
-    acceptedFiles.forEach((file) => {
-      handleFileUpload(file);
-    });
+    const newFiles = acceptedFiles.map((file) =>
+      Object.assign(file, { preview: URL.createObjectURL(file) })
+    );
 
-    // Simulate upload completion after 2 seconds
-    setTimeout(() => {
-      setUploading(false);
-      handleFileDrop(acceptedFiles, modelName, modelOrderId);
-      onDrop(acceptedFiles, modelName, modelOrderId);
-    }, 5000);
-  };
+    setFiles(newFiles);
+    setStatus("uploading");
 
-  const handleFileDrop = (acceptedFiles, modelName, modelOrderId) => {
     const serviceURL = '/model/upload';
-
     const formData = new FormData();
     formData.append('modelName', modelName);
     formData.append('modelOrderId', modelOrderId);
-    formData.append('files', acceptedFiles[0]);   // backend expects ONE file
+    formData.append('files', newFiles[0]); // backend expects ONE file
 
-    dataloaderApi.post(serviceURL, formData, {
-      headers: {
-        'X-Tenant': tenant,
-        'Content-Type': undefined
-      }
-    })
-      .then(response => {
-        console.log('success response', response.data);
-        setSuccessMessage(response.data);
-        setOpenSuccess(true);
-      })
-      .catch(error => {
-        const errData = error.response?.data;
-        let errMsg = "Upload failed";
-        if (typeof errData === 'string') {
-          errMsg = errData;
-        } else if (errData && typeof errData === 'object') {
-          errMsg = errData.message || JSON.stringify(errData);
-        }
-        console.error('Upload data:', errMsg);
-        setModelNameError(true);
-        setErrorMessage(errMsg);
+    try {
+      const response = await dataloaderApi.post(serviceURL, formData, {
+        headers: {
+          'X-Tenant': tenant,
+          'Content-Type': 'multipart/form-data' // updated to handle FormData correctly via axios
+        },
+        onUploadProgress: (e) => {
+          const percent = Math.floor((e.loaded / (e.total || 1)) * 100);
+          const progressMap = {};
+          newFiles.forEach((f) => (progressMap[f.name] = percent));
+          setUploadProgress(progressMap);
+        },
       });
-  };
 
+      setStatus("success");
+      setSuccessMessage(response.data || "Upload Successful!");
+
+      setTimeout(() => {
+        setSuccessMessage(null);
+        setStatus("idle");
+        setFiles([]);
+        setUploadProgress({});
+        setModelName('');
+        setModelOrderId('');
+        uploadLock.current = false;
+        if (onDrop) onDrop(acceptedFiles, modelName, modelOrderId);
+      }, 5000);
+
+    } catch (error) {
+      const errData = error.response?.data;
+      let errMsg = "Upload failed";
+      if (typeof errData === 'string') {
+        errMsg = errData;
+      } else if (errData && typeof errData === 'object') {
+        errMsg = errData.message || JSON.stringify(errData);
+      }
+      
+      setModelNameError(true);
+      setStatus("error");
+      setErrorMessage(errMsg);
+      uploadLock.current = false;
+    }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
     multiple: false,
-    // validator: validateFields,
+    disabled: status === "uploading" || status === "success",
+    noClick: false,
     accept: {
-      'application/vnd.ms-excel': ['.xls', '.xlsx']
+      'application/vnd.ms-excel': ['.xls', '.xlsx'],
+      'text/csv': ['.csv'],
+      'application/zip': ['.zip']
     },
-    maxFiles: filesLimit || Infinity,
+    maxFiles: 1,
   });
 
-  return (
-    <div>
-      <Box>
-        <Divider />
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <TextField
-            sx={{ width: 500 }}
-            label="Model Name"
-            fullWidth
-            value={modelName}
-            onChange={(e) => { setModelName(e.target.value) }}
-            required
-            error={modelNameError}
-            helperText={modelNameError ? errorMessage : ''}
-          />
-          <TextField
-            sx={{ width: 500 }}
-            label="Model Order Id"
-            fullWidth
-            value={modelOrderId}
-            onChange={(e) => { setModelOrderId(e.target.value) }}
-            required
-            error={orderIdError}
-            helperText={orderIdError ? errorMessage : ''}
-          />
-        </DialogContent>
-      </Box>
-
-      {/* Show Alert if there's an error message */}
-      {errorMessage && (
-        <Alert severity="error" sx={{ margin: '16px 0' }}>
-          {errorMessage}
-        </Alert>
-      )}
-
-      <Box
-        {...getRootProps()}
+  if (status === "success") {
+    return (
+      <Paper
+        elevation={0}
+        variant="outlined"
         sx={{
-          border: `2px dashed ${borderColor || '#ccc'}`,
-          borderRadius: '8px',
-          padding: '20px',
-          textAlign: 'center',
-          backgroundColor: isDragActive ? (backgroundColor || '#f5f5f5') : 'transparent',
-          cursor: 'pointer',
+          p: 6,
+          borderRadius: 4,
+          borderColor: alpha(theme.palette.success.main, 0.3),
+          bgcolor: alpha(theme.palette.success.main, 0.04),
+          textAlign: "center",
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 300
         }}
       >
+        <Fade in={true} timeout={600}>
+          <Box>
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.success.main, 0.15),
+                color: "success.main",
+                width: 80,
+                height: 80,
+                mb: 3,
+                mx: 'auto'
+              }}
+            >
+              <SuccessIcon sx={{ fontSize: 48 }} />
+            </Avatar>
+            <Typography variant="h5" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>
+              Upload Successful
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
+              Your model has been successfully uploaded and processed.
+            </Typography>
+            <LinearProgress
+              sx={{ mt: 4, width: '100%', maxWidth: 200, borderRadius: 2, height: 6 }}
+              color="success"
+            />
+            <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: "block", fontWeight: 500 }}>
+              Closing window in 5 seconds...
+            </Typography>
+          </Box>
+        </Fade>
+      </Paper>
+    );
+  }
 
-
-        <input {...getInputProps()} />
-        <CloudUploadIcon sx={{ fontSize: 48, color: iconColor || '#757575', marginBottom: '10px' }} />
-        <Typography variant="body1" sx={{ color: iconColor || '#757575' }}>
-          {uploading ? 'Uploading...' : isDragActive ? 'Drop the files here' : text || 'Drag and drop files here or click to browse'}
+  return (
+    <Paper
+      elevation={0}
+      variant="outlined"
+      sx={{
+        borderRadius: 4,
+        borderColor: 'divider',
+        overflow: 'hidden'
+      }}
+    >
+      {/* HEADER SECTION */}
+      <Box sx={{ p: 3, bgcolor: alpha(theme.palette.primary.main, 0.02), borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="body2" color="text.secondary">
+          {headerMessage}
         </Typography>
-        {uploading && (
-          <>
-            {Object.entries(progressMap).map(([fileName, progress]) => (
-              <Box key={fileName} sx={{ marginTop: '10px' }}>
-                <Typography variant="body2">{fileName}</Typography>
-                <LinearProgress variant="determinate" value={progress} />
-              </Box>
-            ))}
-          </>
-        )}
       </Box>
 
-      <div>
-        <Snackbar
-          open={openSuccess}
-          autoHideDuration={6000}
-          onClose={handleSuccessClose}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
-          <Alert
-            onClose={handleSuccessClose}
-            severity="success"
-            variant="filled"
-            sx={{ width: '100%' }}
-          >
-            {JSON.stringify(successMessage)}
-          </Alert>
-        </Snackbar>
-      </div>
+      {/* CONTENT SECTION */}
+      <Box sx={{ p: 4 }}>
+        <Stack spacing={3}>
 
-    </div>
+          <Stack spacing={2} direction={{ xs: 'column', sm: 'row' }}>
+            <TextField
+              label="Model Name"
+              fullWidth
+              value={modelName}
+              onChange={(e) => { 
+                setModelName(e.target.value);
+                if (modelNameError) setModelNameError(false);
+              }}
+              required
+              error={modelNameError}
+              disabled={status !== "idle" && status !== "error"}
+            />
+            <TextField
+              label="Model Order Id"
+              fullWidth
+              value={modelOrderId}
+              onChange={(e) => { 
+                setModelOrderId(e.target.value);
+                if (orderIdError) setOrderIdError(false);
+              }}
+              required
+              error={orderIdError}
+              disabled={status !== "idle" && status !== "error"}
+            />
+          </Stack>
+
+          {errorMessage && (
+            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+
+          {/* DROPZONE */}
+          <Box
+            {...getRootProps()}
+            sx={{
+              p: 5,
+              border: "2px dashed",
+              borderColor: isDragActive
+                ? theme.palette.primary.main
+                : alpha(theme.palette.text.secondary, 0.2),
+              borderRadius: 3,
+              textAlign: "center",
+              cursor: status === "idle" || status === "error" ? "pointer" : "default",
+              bgcolor: isDragActive
+                ? alpha(theme.palette.primary.main, 0.04)
+                : alpha(theme.palette.background.default, 0.5),
+              transition: "all 0.3s ease",
+              opacity: status === "uploading" ? 0.6 : 1,
+              "&:hover": {
+                borderColor: (status === "idle" || status === "error") ? theme.palette.primary.main : undefined,
+                bgcolor: (status === "idle" || status === "error") ? alpha(theme.palette.primary.main, 0.02) : undefined
+              }
+            }}
+          >
+            <input {...getInputProps()} />
+
+            <Avatar
+              sx={{
+                width: 64,
+                height: 64,
+                bgcolor: isDragActive ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.text.secondary, 0.05),
+                color: isDragActive ? "primary.main" : "text.secondary",
+                mx: 'auto',
+                mb: 2,
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <CloudUploadIcon sx={{ fontSize: 32 }} />
+            </Avatar>
+
+            <Typography variant="h6" gutterBottom fontWeight={600} color={isDragActive ? "primary.main" : "text.primary"}>
+              {isDragActive ? "Drop model file here" : text || "Click or drag model file to upload"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Supported formats: Excel (.xls, .xlsx), CSV, ZIP
+            </Typography>
+          </Box>
+
+          {/* FILE LIST */}
+          {files.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1.5, ml: 1, fontWeight: 600, color: 'text.secondary' }}>
+                Files Queue ({files.length})
+              </Typography>
+              <List disablePadding>
+                {files.map((file) => (
+                  <ListItem
+                    key={file.name}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      mb: 1.5,
+                      bgcolor: 'background.paper',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        borderColor: (status === 'idle' || status === 'error') ? 'primary.main' : 'divider',
+                        bgcolor: alpha(theme.palette.background.paper, 0.8)
+                      }
+                    }}
+                  >
+                    <ListItemIcon>
+                      <Avatar
+                        variant="rounded"
+                        sx={{
+                          bgcolor: status === "error" ? alpha(theme.palette.error.main, 0.1) : alpha(theme.palette.primary.main, 0.1),
+                          color: status === "error" ? "error.main" : "primary.main"
+                        }}
+                      >
+                        {status === "error" ? <ErrorIcon /> : <DescriptionIcon />}
+                      </Avatar>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {file.name}
+                        </Typography>
+                      }
+                      slotProps={{ secondary: { component: "div" } }}
+                      secondary={
+                        status === "uploading" ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                            <Box sx={{ width: '100%', mr: 2 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={uploadProgress[file.name] || 0}
+                                sx={{ height: 6, borderRadius: 3 }}
+                              />
+                            </Box>
+                            <Box sx={{ minWidth: 35 }}>
+                              <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                {`${uploadProgress[file.name] || 0}%`}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </Typography>
+                        )
+                      }
+                    />
+                    {(status === "idle" || status === "error") && (
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setFiles((prev) => prev.filter((f) => f.name !== file.name))
+                        }
+                        sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </Stack>
+      </Box>
+    </Paper>
   );
 }
-
-export default ModelUploadComponent;
