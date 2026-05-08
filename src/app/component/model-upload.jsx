@@ -129,7 +129,8 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
 
     dataloaderApi.post(serviceURL, formData, {
       headers: {
-        'X-Tenant': tenant
+        'X-Tenant': tenant,
+        'Content-Type': undefined
       }
     })
       .then(response => {
