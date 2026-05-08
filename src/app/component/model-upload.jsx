@@ -138,10 +138,16 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
         setOpenSuccess(true);
       })
       .catch(error => {
-        const err = error.response?.data || "Upload failed";
-        console.error('Upload data:', err);
+        const errData = error.response?.data;
+        let errMsg = "Upload failed";
+        if (typeof errData === 'string') {
+           errMsg = errData;
+        } else if (errData && typeof errData === 'object') {
+           errMsg = errData.message || JSON.stringify(errData);
+        }
+        console.error('Upload data:', errMsg);
         setModelNameError(true);
-        setErrorMessage(err);
+        setErrorMessage(errMsg);
       });
   };
 

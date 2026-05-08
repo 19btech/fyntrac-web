@@ -132,12 +132,16 @@ function StatCard({ icon: Icon, label, value, color, bg }) {
 
 function ExecutionSummaryPanel() {
   const theme = useTheme();
+  const { tenant } = useTenant();
   const [summary, setSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
 
   const fetchSummary = useCallback(async () => {
+    if (!tenant) return;
     try {
-      const res = await dataloaderApi.get('/model/execution-summary');
+      const res = await dataloaderApi.get('/model/execution-summary', {
+        headers: { 'X-Tenant': tenant }
+      });
       // Find the most recent EXECUTION_SUMMARY entry if response is an array,
       // or use directly if it's the aggregated object.
       const data = res.data;
@@ -289,6 +293,7 @@ function ExecutionSummaryPanel() {
 // Live Execution Progress Panel
 function ExecutionProgressPanel() {
   const theme = useTheme();
+  const { tenant } = useTenant();
   const [progress, setProgress]   = useState(null);  // /execution-progress data
   const [batches,  setBatches]    = useState([]);     // /execution-summary batches[]
   const [isLive,   setIsLive]     = useState(true);
@@ -299,10 +304,13 @@ function ExecutionProgressPanel() {
   const stablePolls = useRef(0);
 
   const poll = useCallback(async () => {
+    if (!tenant) return;
     try {
       // Single call — /execution-progress now includes batches[] too.
       // Count queries only; no full document loads during polling.
-      const res = await dataloaderApi.get('/model/execution-progress');
+      const res = await dataloaderApi.get('/model/execution-progress', {
+        headers: { 'X-Tenant': tenant }
+      });
       const p   = res.data;
 
       const completed = p?.completedBatches ?? 0;
@@ -606,6 +614,7 @@ const FyntracCard = ({ title, children, action, sx }) => {
 function Row({ row, onToggleStatus, onDownload, onExecute }) {
   const [open, setOpen] = useState(false);
   const theme = useTheme();
+  const { tenant } = useTenant();
 
   // Lazy-fetch summary when row is first expanded
   const [rowSummary, setRowSummary] = useState(null);
@@ -616,12 +625,13 @@ function Row({ row, onToggleStatus, onDownload, onExecute }) {
     const next = !open;
     setOpen(next);
     // Only fetch once per row (keyed by model id)
-    if (next && fetchedFor !== row.id) {
+    if (next && fetchedFor !== row.id && tenant) {
       setRowSummaryLoading(true);
       const modelType = row.modelType === 'DSL' ? 'PYTHON' : row.modelType;
       try {
         const res = await dataloaderApi.get(
-          `/model/execution-summary${modelType ? `?modelType=${modelType}` : ''}`
+          `/model/execution-summary${modelType ? `?modelType=${modelType}` : ''}`,
+          { headers: { 'X-Tenant': tenant } }
         );
         const data = res.data;
         setRowSummary(Array.isArray(data) ? data[0] : data);
