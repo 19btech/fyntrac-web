@@ -1089,7 +1089,7 @@ export default function ModelPage() {
       <Dialog
         open={uploadOpen}
         onClose={handleUploadClose}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <ModelUploadComponent
