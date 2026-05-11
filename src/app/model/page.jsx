@@ -978,14 +978,7 @@ export default function ModelPage() {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Run Model (select a model row to pick type)">
-              <IconButton
-                sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
-                onClick={() => handleExecuteOpen(null)}
-              >
-                <PlayCircleOutlineIcon color="action" />
-              </IconButton>
-            </Tooltip>
+
             <Tooltip title="Upload Model">
               <IconButton
                 sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
