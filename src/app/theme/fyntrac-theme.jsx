@@ -40,7 +40,7 @@ const fontFamily = '"Inter", "Helvetica Neue", Arial, sans-serif';
 
 const fyntracTheme = createTheme({
   palette,
-  
+
   typography: {
     fontFamily,
     h1: { fontWeight: 800, letterSpacing: -1 },
@@ -130,8 +130,8 @@ const fyntracTheme = createTheme({
           padding: "8px 12px",
           transition: "background-color 160ms, color 160ms",
           "&.Mui-selected": {
-            backgroundColor: '#eef2ff',
-            "&:hover": { backgroundColor: '#eef2ff' },
+            backgroundColor: '#14213d',
+            "&:hover": { backgroundColor: '#789dedff' },
           },
         },
       },
@@ -177,7 +177,18 @@ const fyntracTheme = createTheme({
           },
         },
         contained: {
-          background: `linear-gradient(135deg, ${palette.primary.main} 0%, ${palette.primary.dark} 100%)`,
+          background: "#14213d",
+          color: "#fff",
+          boxShadow: "0 6px 16px rgba(20, 33, 61, 0.25)",
+          "&:hover": {
+            background: "#0d1628",
+            boxShadow: "0 8px 22px rgba(20, 33, 61, 0.35)",
+          },
+          "&.Mui-disabled": {
+            background: "rgba(20, 33, 61, 0.35)",
+            color: "#fff",
+            boxShadow: "none",
+          },
         }
       },
     },
@@ -251,7 +262,7 @@ const fyntracTheme = createTheme({
         },
       },
     },
-    
+
     // --- TOOLTIP ---
     MuiTooltip: {
       styleOverrides: {
@@ -271,9 +282,9 @@ const fyntracTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundColor: "#FFFFFF !important",
-          backdropFilter: "none", 
+          backdropFilter: "none",
           boxShadow: "none",
-          borderBottom: "none", 
+          borderBottom: "none",
           color: palette.text.primary, // Ensures text/icons remain visible (dark)
         },
       },

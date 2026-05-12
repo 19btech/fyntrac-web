@@ -46,6 +46,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import LayersIcon from '@mui/icons-material/Layers';
 
 // API & Context
 import { dataloaderApi } from '../services/api-client';
@@ -445,7 +446,7 @@ function ExecutionProgressPanel() {
                   Batches Completed:
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                  {completedBatches} of {totalExpectedBatches || '?'}
+                  {completedBatches} of {isComplete ? completedBatches : (totalExpectedBatches || (totalInstruments > 0 && pageSize > 0 ? Math.ceil(totalInstruments / pageSize) : '?'))}
                 </Typography>
                 {successBatches > 0 && (
                   <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 600 }}>· {successBatches} succeeded</Typography>
@@ -990,22 +991,7 @@ export default function ModelPage() {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Run Model (select a model row to pick type)">
-              <IconButton
-                sx={{
-                  bgcolor: 'rgba(22,163,74,0.1)',
-                  border: '1px solid rgba(21,128,61,0.35)',
-                  color: '#16a34a',
-                  boxShadow: 1,
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' },
-                  '&:active': { transform: 'scale(0.94)' },
-                }}
-                onClick={() => handleExecuteOpen(null)}
-              >
-                <PlayCircleOutlineIcon />
-              </IconButton>
-            </Tooltip>
+
             <Tooltip title="Upload Model">
               <IconButton
                 sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}

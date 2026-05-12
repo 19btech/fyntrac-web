@@ -114,11 +114,11 @@ export default function SettingsPage() {
 
   // Reporting period
   const [reportingPeriod, setReportingPeriod] = useState('6');
-  const reportingPeriodList = ['6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24'];
+  const reportingPeriodList = ['6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
 
   // Reopen period
   const [reopenPeriod, setReopenPeriod] = useState('Nov-2022');
-  const reopenPriodList = ['Nov-2022','Oct-2022','Sep-2022','Aug-2022'];
+  const reopenPriodList = ['Nov-2022', 'Oct-2022', 'Sep-2022', 'Aug-2022'];
 
   // Delete entries
   const [deleteEntriesDate, setDeleteEntriesDate] = useState(null);
@@ -156,8 +156,11 @@ export default function SettingsPage() {
   // ── API calls ─────────────────────────────────────────────────────────────
   const fetchCurrencies = () => {
     dataloaderApi.get('/setting/get/currencies')
-      .then(response => setCurrencyList(response.data))
-      .catch(() => {});
+      .then(response => {
+        console.log("Currency List: ", response.data);
+        setCurrencyList(response.data)
+      })
+      .catch(() => { });
   };
 
   const fetchSettings = () => {
@@ -168,7 +171,7 @@ export default function SettingsPage() {
         setRestatementMode(response.data.restatementMode === 1);
         setCurrency(response.data.currency);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   React.useEffect(() => {
@@ -498,7 +501,7 @@ export default function SettingsPage() {
             description="Choose the default currency for your environment."
           >
             <Autocomplete
-              disablePortal size="small"
+              size="small"
               options={currencyList || []}
               value={currency || null}
               getOptionLabel={(option) => option || ''}
@@ -528,7 +531,7 @@ export default function SettingsPage() {
             description="Set the number of recent posting periods to include in reports."
           >
             <Autocomplete
-              disablePortal size="small"
+              size="small"
               options={reportingPeriodList}
               value={reportingPeriod}
               getOptionLabel={(option) => option}
@@ -561,7 +564,7 @@ export default function SettingsPage() {
             description="Select a closed period to reopen for adjustments."
           >
             <Autocomplete
-              disablePortal size="small"
+              size="small"
               options={reopenPriodList}
               value={reopenPeriod}
               getOptionLabel={(option) => option}
