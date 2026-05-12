@@ -17,9 +17,9 @@ import {
 } from '@mui/material';
 import SuccessAlert from '../component/success-alert';
 import ErrorAlert from '../component/error-alert';
-import { styled } from '@mui/material/styles';
+import { styled, alpha } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
-import { DeleteOutlineOutlined, Edit, Add } from '@mui/icons-material';
+import { DeleteOutlineOutlined, EditOutlined, Add } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
 
 // Dynamically import the EventConfiguration component (modal/dialog)
@@ -204,7 +204,8 @@ function EventConfigurationsList({ refreshData }) {
         {
             field: 'description',
             headerName: 'Description',
-            width: 450,
+            flex: 1,
+            minWidth: 200,
             editable: false,
         },
         {
@@ -250,22 +251,24 @@ function EventConfigurationsList({ refreshData }) {
             field: 'action',
             headerName: 'Action',
             headerAlign: 'center',
-            width: 100,
+            width: 110,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <div>
-                    <Tooltip title='Edit Event Configuration'>
-                        <IconButton onClick={() => handleEdit(params.row)} >
-                            <Edit />
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', height: '100%' }}>
+                    <Tooltip title='Edit Event Configuration' placement="left">
+                        <IconButton size="small" onClick={() => handleEdit(params.row)}
+                            sx={{ color: '#14213d', bgcolor: alpha('#14213d', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#14213d', 0.14) } }}>
+                            <EditOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title='Delete Event Configuration'>
-                        <IconButton onClick={() => handleDeleteClick(params.row)} >
-                            <DeleteOutlineOutlined />
+                    <Tooltip title='Delete Event Configuration' placement="right">
+                        <IconButton size="small" onClick={() => handleDeleteClick(params.row)}
+                            sx={{ color: '#ef4444', bgcolor: alpha('#ef4444', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#ef4444', 0.14) } }}>
+                            <DeleteOutlineOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
-                </div>
+                </Box>
             ),
         },
     ];
@@ -294,24 +297,75 @@ function EventConfigurationsList({ refreshData }) {
     return (
         <div>
 
-            <div style={{ height: 'auto', width: '100%' }}>
+            <Box
+                sx={{
+                    width: '100%',
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
+                    animation: 'fadeInUp 0.35s ease both',
+                    '@keyframes fadeInUp': {
+                        from: { opacity: 0, transform: 'translateY(12px)' },
+                        to: { opacity: 1, transform: 'translateY(0)' },
+                    },
+                }}
+            >
                 <DataGrid
                     rows={rows}
                     columns={columns}
                     initialState={{
                         pagination: { paginationModel: { pageSize: rowsPerPage } },
                     }}
-                    pageSize={rowsPerPage}
-                    page={currentPage}
-                    onPageChange={(newPage) => setCurrentPage(newPage)}
                     pageSizeOptions={[5, 10, 20]}
-                    pagination
                     paginationMode='client'
-                    disableSelectionOnClick
-                    editMode="row"
+                    disableRowSelectionOnClick
+                    autoHeight
                     key={refreshTrigger}
+                    sx={{
+                        border: 0,
+                        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        fontSize: '0.85rem',
+                        '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
+                        '& .MuiDataGrid-columnHeaders': {
+                            bgcolor: '#f8fafc',
+                            color: '#475569',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                            letterSpacing: 0.5,
+                            textTransform: 'uppercase',
+                            borderBottom: '2px solid #e2e8f0',
+                        },
+                        '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
+                        '& .MuiDataGrid-columnSeparator': { display: 'none' },
+                        '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                        '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                        '& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIconButton': { color: '#94a3b8' },
+                        '& .MuiDataGrid-row': {
+                            transition: 'background 0.15s',
+                            '&:hover': { bgcolor: alpha('#14213d', 0.03) },
+                            '&.Mui-selected': { bgcolor: alpha('#14213d', 0.06) },
+                        },
+                        '& .MuiDataGrid-cell': {
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                            display: 'flex',
+                            alignItems: 'center',
+                        },
+                        '& .MuiDataGrid-footerContainer': {
+                            borderTop: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: alpha('#14213d', 0.02),
+                        },
+                        '& .MuiTablePagination-root': {
+                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                            fontSize: '0.8rem',
+                        },
+                    }}
                 />
-            </div>
+            </Box>
 
             {/* Event Configuration Modal */}
             <EventConfigurationModal

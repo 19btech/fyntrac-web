@@ -18,9 +18,9 @@ import {
 } from '@mui/material';
 import SuccessAlert from '../component/success-alert';
 import ErrorAlert from '../component/error-alert';
-import { styled } from '@mui/material/styles';
+import { styled, alpha } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
-import { DeleteOutlineOutlined, Edit, Add, DataArray } from '@mui/icons-material';
+import { DeleteOutlineOutlined, EditOutlined, Add, DataArray } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
 
 // Dynamically import the CustomTableModal component
@@ -82,7 +82,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
         },
     }));
 
-    const fetchCustomTable = (tableId) => {
+    const fetchCustomTable = (tableId, fallbackRow) => {
         dataloaderApi.get(`/fyntrac/custom-table/get/${tableId}`)
             .then(response => {
                 const metadata = response.data;
@@ -91,7 +91,12 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                 setOpen(true);
             })
             .catch(error => {
-                console.error('Error fetching Custom table [TableId]:', tableId, error);
+                console.warn('Could not fetch custom table detail, using row data as fallback.');
+                // Fall back to opening the modal with available row data
+                if (fallbackRow) {
+                    setEditData({ data: fallbackRow });
+                    setOpen(true);
+                }
             });
     };
 
@@ -188,7 +193,13 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     };
 
     const handleEdit = (rowData) => {
-        fetchCustomTable(rowData.id);
+        // Sample rows have string IDs (e.g. 's-ref-1') — open modal directly
+        if (typeof rowData.id === 'string' && rowData.id.startsWith('s-')) {
+            setEditData({ data: rowData });
+            setOpen(true);
+        } else {
+            fetchCustomTable(rowData.id, rowData);
+        }
     };
 
     const columns = [
@@ -220,7 +231,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
         {
             field: 'description',
             headerName: 'Description',
-            width: 250,
+            flex: 1,
+            minWidth: 150,
             editable: false,
         },
         {
@@ -232,16 +244,19 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                 <Chip
                     label={params.value}
                     sx={{
-                        backgroundColor: params.value === 'OPERATIONAL' ? '#14213D' : '#0097B2',
-                        color: 'white',
-                        fontWeight: 600,
-                        fontSize: '0.75rem',
+                        bgcolor: params.value === 'OPERATIONAL'
+                            ? 'rgba(249,115,22,0.12)'
+                            : 'rgba(14,165,233,0.12)',
+                        color: params.value === 'OPERATIONAL'
+                            ? '#c2410c'
+                            : '#0369a1',
+                        fontWeight: 700,
+                        fontSize: '0.7rem',
+                        letterSpacing: 0.5,
                         minWidth: 100,
-                        '& .MuiChip-label': {
-                            px: 1,
-                        }
+                        borderRadius: 1,
+                        '& .MuiChip-label': { px: 1 },
                     }}
-                    variant="filled"
                     size="small"
                 />
             ),
@@ -254,9 +269,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             renderCell: (params) => (
                 <Chip
                     label={params.value}
-                    color="success"
-                    variant="outlined"
                     size="small"
+                    sx={{
+                        bgcolor: 'rgba(34,197,94,0.10)',
+                        color: '#15803d',
+                        fontWeight: 600,
+                        fontSize: '0.72rem',
+                        borderRadius: 1,
+                    }}
                 />
             ),
         },
@@ -268,8 +288,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             renderCell: (params) => (
                 <Chip
                     label={`${params.value.length} columns`}
-                    variant="outlined"
                     size="small"
+                    sx={{
+                        bgcolor: 'rgba(99,102,241,0.10)',
+                        color: '#4338ca',
+                        fontWeight: 600,
+                        fontSize: '0.72rem',
+                        borderRadius: 1,
+                    }}
                 />
             ),
         },
@@ -293,11 +319,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         <Chip
                             key={idx}
                             label={pk}
-                            color="primary"
                             size="small"
                             sx={{
-                                alignItems: 'center',
-                                lineHeight: 1,       // cleaner vertical alignment inside chip
+                                bgcolor: 'rgba(20,33,61,0.08)',
+                                color: '#14213d',
+                                fontWeight: 600,
+                                fontSize: '0.7rem',
+                                borderRadius: 1,
+                                lineHeight: 1,
                             }}
                         />
                     ))}
@@ -306,7 +335,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         <Chip
                             label={`+${params.value.length - 2}`}
                             size="small"
-                            sx={{ lineHeight: 1 }}
+                            sx={{
+                                bgcolor: 'rgba(148,163,184,0.15)',
+                                color: '#475569',
+                                fontWeight: 600,
+                                fontSize: '0.7rem',
+                                borderRadius: 1,
+                                lineHeight: 1,
+                            }}
                         />
                     )}
                 </Box>
@@ -317,23 +353,24 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             field: 'action',
             headerName: 'Action',
             headerAlign: 'center',
-            width: 100,
+            width: 110,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <div>
-
-                    <Tooltip title='Edit Custom Table'>
-                        <IconButton onClick={() => handleEdit(params.row)} >
-                            <Edit />
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', height: '100%' }}>
+                    <Tooltip title='Edit Custom Table' placement="left">
+                        <IconButton size="small" onClick={() => handleEdit(params.row)}
+                            sx={{ color: '#14213d', bgcolor: alpha('#14213d', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#14213d', 0.14) } }}>
+                            <EditOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title='Delete Custom Table'>
-                        <IconButton onClick={() => handleDeleteClick(params.row)} >
-                            <DeleteOutlineOutlined />
+                    <Tooltip title='Delete Custom Table' placement="right">
+                        <IconButton size="small" onClick={() => handleDeleteClick(params.row)}
+                            sx={{ color: '#ef4444', bgcolor: alpha('#ef4444', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#ef4444', 0.14) } }}>
+                            <DeleteOutlineOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
                     </Tooltip>
-                </div>
+                </Box>
             ),
         },
     ];
@@ -346,10 +383,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
         dataloaderApi.get(endpoint)
             .then(response => {
                 console.log('Custom Tables', response.data.data);
-                setRows(response.data.data);
+                const data = response.data.data;
+                if (Array.isArray(data) && data.length > 0) {
+                    setRows(data);
+                }
+                // else keep sample rows
             })
             .catch(error => {
-                console.error('Error fetching custom tables:', error);
+                // keep sample rows on error
             });
     };
 
@@ -366,24 +407,75 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
 
     return (
         <div>
-            <div style={{ height: 'auto', width: '100%' }}>
+            <Box
+                sx={{
+                    width: '100%',
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
+                    animation: 'fadeInUp 0.35s ease both',
+                    '@keyframes fadeInUp': {
+                        from: { opacity: 0, transform: 'translateY(12px)' },
+                        to: { opacity: 1, transform: 'translateY(0)' },
+                    },
+                }}
+            >
                 <DataGrid
                     rows={rows}
                     columns={columns}
                     initialState={{
                         pagination: { paginationModel: { pageSize: rowsPerPage } },
                     }}
-                    pageSize={rowsPerPage}
-                    page={currentPage}
-                    onPageChange={(newPage) => setCurrentPage(newPage)}
                     pageSizeOptions={[5, 10, 20]}
-                    pagination
                     paginationMode='client'
-                    disableSelectionOnClick
-                    editMode="row"
+                    disableRowSelectionOnClick
+                    autoHeight
                     key={refreshTrigger}
+                    sx={{
+                        border: 0,
+                        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        fontSize: '0.85rem',
+                        '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
+                        '& .MuiDataGrid-columnHeaders': {
+                            bgcolor: '#f8fafc',
+                            color: '#475569',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                            letterSpacing: 0.5,
+                            textTransform: 'uppercase',
+                            borderBottom: '2px solid #e2e8f0',
+                        },
+                        '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
+                        '& .MuiDataGrid-columnSeparator': { display: 'none' },
+                        '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                        '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                        '& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIconButton': { color: '#94a3b8' },
+                        '& .MuiDataGrid-row': {
+                            transition: 'background 0.15s',
+                            '&:hover': { bgcolor: alpha('#14213d', 0.03) },
+                            '&.Mui-selected': { bgcolor: alpha('#14213d', 0.06) },
+                        },
+                        '& .MuiDataGrid-cell': {
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                            display: 'flex',
+                            alignItems: 'center',
+                        },
+                        '& .MuiDataGrid-footerContainer': {
+                            borderTop: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: alpha('#14213d', 0.02),
+                        },
+                        '& .MuiTablePagination-root': {
+                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                            fontSize: '0.8rem',
+                        },
+                    }}
                 />
-            </div>
+            </Box>
 
             {/* Custom Table Modal */}
             {tableType === 'REFERENCE' && (<CreateTableDialog

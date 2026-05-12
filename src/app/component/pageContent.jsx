@@ -20,7 +20,7 @@ import CustomRefDataReportPage from '../reports/custom-ref-data-report/page';
 import CustomOperationalDataReportPage from '../reports/custom-operational-data-report/page';
 import SettingsDashboard from '../settings-dashboard/page';
 import ReportDashboard from '../report-dashboard/page';
-export default function PageContent({ pathname, method }) {
+export default function PageContent({ pathname, method, settingsKey }) {
 
   const renderContent = () => {
     console.log('pathName:', pathname);
@@ -60,7 +60,7 @@ export default function PageContent({ pathname, method }) {
       case '/diagnostic':
         return <InstrumentDiagnosticPage />
       case '/settings-dashboard':
-        return <SettingsDashboard />
+        return <SettingsDashboard key={settingsKey} />
       case '/python-model':
         return <PythonModel setOpenPythonModel={method} />
       default:

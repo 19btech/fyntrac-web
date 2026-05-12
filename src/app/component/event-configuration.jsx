@@ -28,7 +28,9 @@ import {
     Grid,
     Alert,
     Snackbar,
+    useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
@@ -40,6 +42,7 @@ import { dataloaderApi } from '../services/api-client';
 
 export default function EventConfiguration({ open, onClose, editData }) {
     const { tenant, user } = useTenant();
+    const theme = useTheme();
 
     // Debug environment variables
     const baseURL = "";
@@ -867,40 +870,64 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 },
             }}
         >
-            <DialogTitle
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
-                    py: 1.5,
-                    px: 3,
-                    fontWeight: 'bold',
-                    fontSize: '1.25rem',
-                    backgroundColor: '#f5f5f5',
-                }}
-            >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <img src="fyntrac.png" alt="Logo" style={{ width: '150px', height: 'auto' }} />
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
-                        {editData ? 'Edit Event' : 'Create Event'}
-                    </Typography>
-                </Box>
+            <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        px: 3,
+                        pt: 3,
+                        pb: 2.5,
+                        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <Chip
+                                    label={editData ? 'Edit Mode' : 'Setup Event'}
+                                    size="small"
+                                    sx={{
+                                        height: 18,
+                                        fontSize: '0.6rem',
+                                        fontWeight: 700,
+                                        letterSpacing: 0.8,
+                                        textTransform: 'uppercase',
+                                        bgcolor: editData
+                                            ? alpha(theme.palette.warning.main, 0.1)
+                                            : alpha(theme.palette.primary.main, 0.1),
+                                        color: editData
+                                            ? theme.palette.warning.dark
+                                            : theme.palette.primary.main,
+                                        borderRadius: 1,
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                                {editData ? 'Edit Event' : 'Create Event'}
+                            </Typography>
+                        </Box>
+                    </Box>
 
-                <Tooltip title="Close">
-                    <IconButton
-                        onClick={handleClose}
-                        edge="end"
-                        aria-label="close"
-                        sx={{
-                            color: 'grey.500',
-                            '&:hover': { color: 'black' },
-                        }}
-                    >
-                        <HighlightOffOutlinedIcon />
-                    </IconButton>
-                </Tooltip>
+                    <Tooltip title="Close" placement="left">
+                        <IconButton
+                            onClick={handleClose}
+                            size="small"
+                            sx={{
+                                color: 'text.secondary',
+                                bgcolor: 'action.hover',
+                                borderRadius: 2,
+                                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                            }}
+                        >
+                            <HighlightOffOutlinedIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
             </DialogTitle>
 
             <DialogContent
@@ -914,7 +941,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             >
                 <Box sx={{ p: 3 }}>
                     {/* Event Details Card */}
-                    <Card sx={{ p: 3, mb: 3, backgroundColor: 'white' }}>
+                    <Card sx={{ p: 3, mb: 3, backgroundColor: 'white', transition: 'none', '&:hover': { transform: 'none', boxShadow: '0px 2px 8px rgba(100,116,139,0.04)', borderColor: 'rgba(241,245,249,1)' } }}>
                         <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', color: '#333' }}>
                             Event Details
                         </Typography>
@@ -972,7 +999,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                     </Card>
 
                     {/* Trigger Setup Card */}
-                    <Card sx={{ p: 3, mb: 3, backgroundColor: 'white' }}>
+                    <Card sx={{ p: 3, mb: 3, backgroundColor: 'white', transition: 'none', '&:hover': { transform: 'none', boxShadow: '0px 2px 8px rgba(100,116,139,0.04)', borderColor: 'rgba(241,245,249,1)' } }}>
                         <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', color: '#333' }}>
                             Trigger Setup
                         </Typography>
@@ -1066,7 +1093,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                     </Card>
 
                     {/* Source Mapping Configuration Card */}
-                    <Card sx={{ p: 3, backgroundColor: 'white' }}>
+                    <Card sx={{ p: 3, backgroundColor: 'white', transition: 'none', '&:hover': { transform: 'none', boxShadow: '0px 2px 8px rgba(100,116,139,0.04)', borderColor: 'rgba(241,245,249,1)' } }}>
                         {/* UPDATE: Hide this header for both Custom Data Trigger AND Transaction Post */}
                         {eventData.triggerType !== 'ON_CUSTOM_DATA_TRIGGER' && eventData.triggerType !== 'ON_TRANSACTION_POST' && (
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -1131,7 +1158,16 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                         </Select>
                                                     </FormControl>
                                                 ) : (
-                                                    <Chip label={row.sourceTable} size="small" variant="outlined" sx={{ fontWeight: 'medium' }} />
+                                                    <Chip
+                                                        label={row.sourceTable}
+                                                        size="small"
+                                                        sx={{
+                                                            fontWeight: 600,
+                                                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                                            color: theme.palette.primary.main,
+                                                            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                                                        }}
+                                                    />
                                                 )}
                                             </TableCell>
                                             <TableCell>
@@ -1161,8 +1197,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                                 key={idx}
                                                                 label={label}
                                                                 size="small"
-                                                                variant="filled"
-                                                                sx={{ backgroundColor: '#38B6FF', color: 'white' }}
+                                                                sx={{
+                                                                    bgcolor: alpha(theme.palette.primary.main, 0.12),
+                                                                    color: theme.palette.primary.dark,
+                                                                    fontWeight: 500,
+                                                                }}
                                                             />
                                                         ))}
                                                     </Box>
@@ -1200,7 +1239,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                                 label={label}
                                                                 size="small"
                                                                 variant="filled"
-                                                                sx={{ backgroundColor: '#FCA311', color: 'white' }}
+                                                                sx={{
+                                                                    bgcolor: alpha(theme.palette.warning.main, 0.12),
+                                                                    color: theme.palette.warning.dark,
+                                                                    fontWeight: 500,
+                                                                }}
                                                             />
                                                         ))}
                                                         {!isVersionTypeEnabled(row.sourceTable) && row.versionType.length === 0 && (
@@ -1243,7 +1286,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                                 label={label}
                                                                 size="small"
                                                                 variant="filled"
-                                                                sx={{ backgroundColor: '#0097B2', color: 'white' }}
+                                                                sx={{
+                                                                    bgcolor: alpha(theme.palette.secondary.main, 0.12),
+                                                                    color: theme.palette.secondary.dark,
+                                                                    fontWeight: 500,
+                                                                }}
                                                             />
                                                         ))}
                                                         {!isDataMappingEnabled(row.sourceTable) && row.dataMapping.length === 0 && (
@@ -1409,7 +1456,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 onClose={closeAlert}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-                <Alert onClose={closeAlert} severity={alert.severity} sx={{ width: '100%' }} variant="filled">
+                <Alert onClose={closeAlert} severity={alert.severity} sx={{ width: '100%', bgcolor: alert.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)', border: alert.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)', color: alert.severity === 'success' ? '#15803d' : '#dc2626', '& .MuiAlert-icon': { color: alert.severity === 'success' ? '#16a34a' : '#dc2626' } }} variant="standard">
                     {alert.message}
                 </Alert>
             </Snackbar>

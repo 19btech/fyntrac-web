@@ -88,9 +88,9 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
   };
 
   return (
-    <Box sx={{ width: "30%" }}>
+    <Box sx={{ width: "100%" }}>
       <Autocomplete
-        size="medium"
+        size="small"
         options={tables}
         value={selectedValue}
         onChange={handleChange}
@@ -124,7 +124,7 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
                 },
               }}
             >
-              <Typography variant="subtitle2" fontWeight={600}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: '0.9rem' }}>
                 {option.tableName}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -135,22 +135,23 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
                 >
                   Reference Column: {option.referenceColumn}
                 </Typography>
-
               </Box>
-
             </Box>
           );
         }}
         renderInput={(params) => (
           <TextField
             {...params}
-            size="medium"
+            size="small"
             label="Select Reference Table"
             placeholder="Search table..."
             variant="outlined"
+            inputProps={{ ...params.inputProps, style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+            InputLabelProps={{ ...params.InputLabelProps, style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
+                borderRadius: 2.5,
+                bgcolor: 'background.paper',
               },
             }}
           />
@@ -163,23 +164,6 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
         clearOnBlur={false}
         blurOnSelect
       />
-      
-      {/* Debug info */}
-      {selectedValue && (
-        <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            Selected: {selectedValue.tableName}
-          </Typography>
-          {(() => {
-            const refColumnObj = getReferenceColumnObject(selectedValue);
-            return refColumnObj && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Column Details: {refColumnObj.columnName}
-              </Typography>
-            );
-          })()}
-        </Box>
-      )}
     </Box>
   );
 };

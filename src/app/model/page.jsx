@@ -24,10 +24,12 @@ import {
   Tooltip,
   Paper,
   Dialog,
-  DialogContent, DialogTitle,
+  DialogTitle,
+  DialogContent,
   CircularProgress,
   Snackbar,
-  Alert
+  Alert,
+  Slide
 } from '@mui/material';
 
 // Icons
@@ -43,7 +45,6 @@ import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import LayersIcon from '@mui/icons-material/Layers';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
 // API & Context
@@ -707,7 +708,18 @@ function Row({ row, onToggleStatus, onDownload, onExecute }) {
         <TableCell onClick={(e) => e.stopPropagation()} align="center">
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
             <Tooltip title={`Execute ${row.modelType || 'Model'}`}>
-              <IconButton size="small" color="primary" onClick={handleExecute} disabled={row.modelStatus !== 'ACTIVE'}>
+              <IconButton
+                size="small"
+                onClick={handleExecute}
+                disabled={row.modelStatus !== 'ACTIVE'}
+                sx={{
+                  bgcolor: 'rgba(22,163,74,0.1)',
+                  border: '1px solid rgba(21,128,61,0.35)',
+                  color: '#16a34a',
+                  '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d' },
+                  '&.Mui-disabled': { bgcolor: 'rgba(0,0,0,0.04)', borderColor: 'transparent', color: 'action.disabled' },
+                }}
+              >
                 <PlayArrowIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -978,10 +990,25 @@ export default function ModelPage() {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-
+            <Tooltip title="Run Model (select a model row to pick type)">
+              <IconButton
+                sx={{
+                  bgcolor: 'rgba(22,163,74,0.1)',
+                  border: '1px solid rgba(21,128,61,0.35)',
+                  color: '#16a34a',
+                  boxShadow: 1,
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' },
+                  '&:active': { transform: 'scale(0.94)' },
+                }}
+                onClick={() => handleExecuteOpen(null)}
+              >
+                <PlayCircleOutlineIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Upload Model">
               <IconButton
-                sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
+                sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 onClick={() => setUploadOpen(true)}
               >
                 <UploadIcon color="action" />
@@ -989,7 +1016,7 @@ export default function ModelPage() {
             </Tooltip>
             <Tooltip title="Refresh">
               <IconButton
-                sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}
+                sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 onClick={handleRefresh}
               >
                 <RefreshIcon color="action" />
@@ -1086,65 +1113,79 @@ export default function ModelPage() {
         onClose={handleUploadClose}
         maxWidth="md"
         fullWidth
+        slots={{ transition: Slide }}
+        slotProps={{ transition: { direction: 'up' } }}
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+          }
+        }}
       >
-        <DialogTitle>
+        <DialogTitle sx={{ p: 0 }}>
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'start',
+              alignItems: 'center',
+              px: 3,
+              pt: 3,
+              pb: 2.5,
+              background: 'linear-gradient(135deg, rgba(30,64,175,0.05) 0%, rgba(99,102,241,0.04) 100%)',
+              borderBottom: '1px solid',
+              borderColor: 'divider',
             }}
           >
-            {/* Top Left: Logo and Title */}
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: 1,
-                width: 'fit-content'
-              }}
-            >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <img
                 src="fyntrac.png"
-                alt="Logo"
-                style={{
-                  width: '100px', // Slightly larger for the 'md' dialog
-                  height: 'auto',
-                  maxWidth: '100%'
-                }}
+                alt="Fyntrac"
+                style={{ width: 72, height: 'auto' }}
               />
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
-                Model Upload
-              </Typography>
+              <Box>
+                <Chip
+                  label="Model Management"
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    letterSpacing: 0.8,
+                    textTransform: 'uppercase',
+                    bgcolor: alpha('#3f51b5', 0.1),
+                    color: '#3f51b5',
+                    mb: 0.5,
+                    borderRadius: 1,
+                  }}
+                />
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                  Model Upload
+                </Typography>
+              </Box>
             </Box>
-
-            {/* Top Right: Close Button */}
-            <Tooltip title="Close">
+            <Tooltip title="Close" placement="left">
               <IconButton
                 onClick={handleUploadClose}
-                edge="end"
-                aria-label="close"
+                size="small"
                 sx={{
-                  color: 'grey.500',
-                  '&:hover': { color: 'error.main' },
+                  color: 'text.secondary',
+                  bgcolor: 'action.hover',
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: alpha('#ef4444', 0.1), color: 'error.main' },
                 }}
               >
-                <HighlightOffOutlinedIcon fontSize="large" />
+                <HighlightOffOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
         </DialogTitle>
-
-        <DialogContent dividers sx={{ p: 4 }}>
-          <ModelUploadComponent
-            onDrop={() => { }} // You can pass handleUploadClose here if you want it to close after drop
-            text="Drag and drop model file here or click to browse"
-            // Assuming your component supports these based on your reference code
-            iconColor="#3f51b5"
-            borderColor="#3f51b5"
-          />
-        </DialogContent>
+        <ModelUploadComponent
+          onDrop={() => { }}
+          text="Drag and drop model file here or click to browse"
+        />
       </Dialog>
 
       {/* Execute Dialog */}
@@ -1160,8 +1201,14 @@ export default function ModelPage() {
         <Alert
           onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
           severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
+          variant="standard"
+          sx={{
+            width: '100%',
+            bgcolor: snackbar.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
+            border: snackbar.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)',
+            color: snackbar.severity === 'success' ? '#15803d' : '#dc2626',
+            '& .MuiAlert-icon': { color: snackbar.severity === 'success' ? '#16a34a' : '#dc2626' },
+          }}
         >
           {snackbar.message}
         </Alert>

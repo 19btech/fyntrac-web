@@ -15,6 +15,9 @@ import {
   InputAdornment,
   Tabs,
   Tab,
+  Snackbar,
+  Alert,
+  Slide,
 } from "@mui/material";
 import { DeleteOutlineOutlined } from "@mui/icons-material";
 import CachedRoundedIcon from "@mui/icons-material/CachedRounded";
@@ -23,7 +26,7 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
-import { Grid } from "@mui/material";
+import Grid from "@mui/material/Grid"; 
 import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
@@ -44,6 +47,9 @@ const GLEReportPage = () => {
 
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+  const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
   const [isAttribuesFetched, setIsAttribuesFetched] = React.useState(false);
   // Attribute options
@@ -101,11 +107,13 @@ const GLEReportPage = () => {
         }));
 
         setReportData(dataWithIds);
+        showToast('Report data loaded successfully.');
       })
       .catch(error => {
         console.error('Error fetching data:', error);
         setErrorMessage(error.message);
         setShowErrorMessage(true);
+        showToast('Failed to execute report. Please try again.', 'error');
       });
   };
 
@@ -117,6 +125,34 @@ const GLEReportPage = () => {
   const executeFiler = () => {
     executeReport();
   }
+
+  const downloadReport = () => {
+    const filteredCriteriaList = criteriaList.filter(c => c.filters.length > 0);
+    reportingApi.post('/jeReport/download', filteredCriteriaList, {
+      headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      responseType: 'blob',
+    })
+      .then(response => {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const disposition = response.headers['content-disposition'];
+        let fileName = 'gle-report.xlsx';
+        if (disposition && disposition.includes('filename=')) {
+          fileName = disposition.split('filename=')[1].replace(/"/g, '');
+        }
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('Report downloaded successfully.');
+      })
+      .catch(error => {
+        console.error('Download error:', error);
+        showToast('Failed to download report.', 'error');
+      });
+  };
 
   const handleChange = (index, field, value) => {
     setCriteriaList((prevCriteria) => {
@@ -215,16 +251,16 @@ const GLEReportPage = () => {
                 <IconButton
                   aria-label="add"
                   onClick={handleAddCriteria}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
-                  <AddOutlinedIcon />
+                  <AddOutlinedIcon color="action" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Execute filter" arrow>
                 <IconButton
                   aria-label="execute"
                   onClick={executeFiler}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  sx={{ bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
                   <PlayCircleOutlineOutlinedIcon />
                 </IconButton>
@@ -232,9 +268,10 @@ const GLEReportPage = () => {
               <Tooltip title="Download report data" arrow>
                 <IconButton
                   aria-label="Download file"
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  onClick={downloadReport}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
-                  <FileDownloadOutlinedIcon />
+                  <FileDownloadOutlinedIcon color="action" />
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -436,6 +473,29 @@ const GLEReportPage = () => {
           </Box>
         </Box>
       </CustomTabPanel>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+      >
+        <Alert
+          onClose={handleToastClose}
+          severity={toast.severity}
+          variant="standard"
+          sx={{
+            borderRadius: 3, fontWeight: 600, fontSize: '0.85rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: 280,
+            bgcolor: toast.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
+            border: toast.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)',
+            color: toast.severity === 'success' ? '#15803d' : '#dc2626',
+            '& .MuiAlert-icon': { color: toast.severity === 'success' ? '#16a34a' : '#dc2626' },
+          }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

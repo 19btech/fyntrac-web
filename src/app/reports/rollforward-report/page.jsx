@@ -15,7 +15,9 @@ import {
   InputAdornment,
   Tabs,
   Tab,
-  Autocomplete,
+  Snackbar,
+  Alert,
+  Slide,
 } from "@mui/material";
 import { DeleteOutlineOutlined } from "@mui/icons-material";
 import CachedRoundedIcon from "@mui/icons-material/CachedRounded";
@@ -24,7 +26,7 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
-import { Grid } from "@mui/material";
+import Grid from "@mui/material/Grid"; 
 import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
@@ -45,6 +47,9 @@ const RollforwardReportPage = () => {
 
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+  const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
   const [isAttribuesFetched, setIsAttribuesFetched] = React.useState(false);
   // Attribute options
@@ -104,11 +109,13 @@ const RollforwardReportPage = () => {
     reportingApi.post(executeReportAPI, filteredCriteriaList)
       .then(response => {
         setReportData(response.data);
+        showToast('Report data loaded successfully.');
       })
       .catch(error => {
         console.error('Error fetching data:', error);
         setErrorMessage(error.message);
         setShowErrorMessage(true);
+        showToast('Failed to execute report. Please try again.', 'error');
       });
   };
 
@@ -120,6 +127,34 @@ const RollforwardReportPage = () => {
   const executeFiler = () => {
     executeReport();
   }
+
+  const downloadReport = () => {
+    const filteredCriteriaList = criteriaList.filter(c => c.filters.length > 0);
+    reportingApi.post(`/${reportSource.value}/download`, filteredCriteriaList, {
+      headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      responseType: 'blob',
+    })
+      .then(response => {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const disposition = response.headers['content-disposition'];
+        let fileName = 'rollforward-report.xlsx';
+        if (disposition && disposition.includes('filename=')) {
+          fileName = disposition.split('filename=')[1].replace(/"/g, '');
+        }
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('Report downloaded successfully.');
+      })
+      .catch(error => {
+        console.error('Download error:', error);
+        showToast('Failed to download report.', 'error');
+      });
+  };
 
   const handleChange = (index, field, value) => {
     setCriteriaList((prevCriteria) => {
@@ -212,52 +247,46 @@ const RollforwardReportPage = () => {
         <Grid size="grow">
           <div className="right">
             <Stack direction="row" spacing={1}>
-              <Box sx={{ width: '260px', paddingBottom: 1 }}>
-                <Autocomplete
-                  sx={{
-                    width: '250px',
-                    '& .MuiInputBase-root': {
-                      height: 30,
-                      fontSize: '0.85rem'
-                    }
-                  }}
-                  disablePortal
-                  id="widget-1"
-                  options={reportSources}
-                  getOptionLabel={(option) => option?.label || ''}
-                  value={reportSource}
-                  onChange={(event, newValue) => updateReportSource(newValue || null)}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label={reportSource ? '' : 'Select source'} // hide label if selected
-                      variant="standard"
+              <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                {reportSources.map((source) => {
+                  const selected = reportSource?.value === source.value;
+                  return (
+                    <Chip
+                      key={source.value}
+                      label={source.label}
+                      onClick={() => updateReportSource(source)}
                       size="small"
-                      slotProps={{
-                        input: {
-                          ...params.InputProps,
-                          sx: { height: 36 }
-                        }
+                      sx={{
+                        fontWeight: selected ? 700 : 500,
+                        fontSize: '0.78rem',
+                        bgcolor: selected ? 'rgba(59,130,246,0.15)' : 'rgba(219,234,254,0.5)',
+                        color: selected ? '#1d4ed8' : '#3b82f6',
+                        border: selected ? '1.5px solid rgba(59,130,246,0.5)' : '1px solid rgba(147,197,253,0.6)',
+                        transition: 'all 0.18s ease',
+                        '&:hover': {
+                          bgcolor: 'rgba(59,130,246,0.22)',
+                          borderColor: 'rgba(59,130,246,0.6)',
+                          transform: 'scale(1.04)',
+                        },
                       }}
                     />
-                  )}
-                />
-
+                  );
+                })}
               </Box>
               <Tooltip title="Add filter" arrow>
                 <IconButton
                   aria-label="add"
                   onClick={handleAddCriteria}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
-                  <AddOutlinedIcon />
+                  <AddOutlinedIcon color="action" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Execute filter" arrow>
                 <IconButton
                   aria-label="execute"
                   onClick={executeFiler}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  sx={{ bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
                   <PlayCircleOutlineOutlinedIcon />
                 </IconButton>
@@ -265,9 +294,10 @@ const RollforwardReportPage = () => {
               <Tooltip title="Download report data" arrow>
                 <IconButton
                   aria-label="Download file"
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  onClick={downloadReport}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
-                  <FileDownloadOutlinedIcon />
+                  <FileDownloadOutlinedIcon color="action" />
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -469,6 +499,29 @@ const RollforwardReportPage = () => {
           </Box>
         </Box>
       </CustomTabPanel>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+      >
+        <Alert
+          onClose={handleToastClose}
+          severity={toast.severity}
+          variant="standard"
+          sx={{
+            borderRadius: 3, fontWeight: 600, fontSize: '0.85rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: 280,
+            bgcolor: toast.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
+            border: toast.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)',
+            color: toast.severity === 'success' ? '#15803d' : '#dc2626',
+            '& .MuiAlert-icon': { color: toast.severity === 'success' ? '#16a34a' : '#dc2626' },
+          }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

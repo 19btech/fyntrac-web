@@ -18,7 +18,6 @@ import {
   ArrowForward,
   AssessmentOutlined,
   ArrowBack, // Standard 'Back' icon
-  KeyboardBackspace // Alternative sleek back icon
 } from '@mui/icons-material';
 
 // Import your actual report pages
@@ -77,39 +76,6 @@ export default function ReportDashboard() {
       <Container maxWidth={false} sx={{ py: 1, px: { xs: 2, md: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Fade in={true}>
           <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-
-            {/* Header Area */}
-            <Box
-              sx={{
-                mb: 2, // Added margin bottom for spacing
-                pb: 0,
-                display: 'flex',
-                alignItems: 'left',
-                justifyContent: 'flex-end', // Pushes button to right
-                borderColor: 'divider',
-                paddingRight: 2.5
-              }}
-            >
-
-              {/* Right: Back Link Button */}
-              <Button
-                onClick={() => setSelectedReport(null)}
-                startIcon={<KeyboardBackspace fontSize="small" />} // Sleek back arrow
-                sx={{
-                  textTransform: 'none',
-                  color: 'text.secondary',
-                  fontWeight: 600,
-                  fontSize: '0.654rem',
-                  '&:hover': {
-                    bgcolor: 'transparent',
-                    color: 'primary.main',
-                    textDecoration: 'underline'
-                  }
-                }}
-              >
-                Back to Settings
-              </Button>
-            </Box>
 
             {/* The Actual Component Rendered Here */}
             <Box sx={{ flexGrow: 1, width: '100%', minHeight: '95vh' }}>

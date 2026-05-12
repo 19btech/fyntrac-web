@@ -21,7 +21,8 @@ import {
   useTheme,
   alpha,
   Container,
-  Divider
+  Divider,
+  Slide
 } from '@mui/material';
 
 // Icons
@@ -333,12 +334,12 @@ export default function IngestPage() {
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Upload Activity Files">
-              <IconButton onClick={handleOpenFileUpload} sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}>
+              <IconButton onClick={handleOpenFileUpload} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
                 <FileUploadOutlinedIcon color="action" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Refresh">
-              <IconButton onClick={fetchUploadActivitiyLogs} sx={{ bgcolor: 'white', boxShadow: 1, '&:hover': { bgcolor: 'grey.50' } }}>
+              <IconButton onClick={fetchUploadActivitiyLogs} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
                 <RefreshIcon color="action" />
               </IconButton>
             </Tooltip>
@@ -421,59 +422,89 @@ export default function IngestPage() {
       </Container>
 
       {/* File Upload Dialog */}
-      <Dialog open={openFileUpload} onClose={handleCloseFileUpload}>
-        <DialogTitle>
+      <Dialog
+        open={openFileUpload}
+        onClose={handleCloseFileUpload}
+        maxWidth="sm"
+        fullWidth
+        slots={{ transition: Slide }}
+        slotProps={{ transition: { direction: 'up' } }}
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+          }
+        }}
+      >
+        <DialogTitle sx={{ p: 0 }}>
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'start',
+              alignItems: 'center',
+              px: 3,
+              pt: 3,
+              pb: 2.5,
+              background: 'linear-gradient(135deg, rgba(30,64,175,0.05) 0%, rgba(99,102,241,0.04) 100%)',
+              borderBottom: '1px solid',
+              borderColor: 'divider',
             }}
           >
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: 1,
-                width: 'fit-content'
-              }}
-            >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <img
                 src="fyntrac.png"
-                alt="Logo"
-                style={{
-                  width: '100px',
-                  height: 'auto',
-                  maxWidth: '100%'
-                }}
+                alt="Fyntrac"
+                style={{ width: 72, height: 'auto' }}
               />
-              <Typography variant="h6">Activity Upload</Typography>
+              <Box>
+                <Chip
+                  label="Data Ingestion"
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    letterSpacing: 0.8,
+                    textTransform: 'uppercase',
+                    bgcolor: alpha('#3f51b5', 0.1),
+                    color: '#3f51b5',
+                    mb: 0.5,
+                    borderRadius: 1,
+                  }}
+                />
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                  Activity Data Load
+                </Typography>
+              </Box>
             </Box>
-            <Tooltip title='Close'>
+            <Tooltip title="Close" placement="left">
               <IconButton
                 onClick={handleCloseFileUpload}
-                edge="end"
-                aria-label="close"
+                size="small"
                 sx={{
-                  color: 'grey.500',
-                  '&:hover': { color: 'black' },
+                  color: 'text.secondary',
+                  bgcolor: 'action.hover',
+                  borderRadius: 2,
+                  '&:hover': { bgcolor: alpha('#ef4444', 0.1), color: 'error.main' },
                 }}
               >
-                <HighlightOffOutlinedIcon />
+                <HighlightOffOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: 3 }}>
           <FileUploadComponent
             onDrop={handleCloseFileUpload}
             showActivitySelector={true}
-            headerMessage={"Select an activity type and upload activity files for secure validation, ingestion, and processing."}
+            showLoadModeSelector={true}
+            headerMessage={""}
             filesLimit={5}
           />
         </DialogContent>
-
       </Dialog>
 
     </Box>

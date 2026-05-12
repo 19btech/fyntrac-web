@@ -15,14 +15,16 @@ import {
   Tooltip,
   Paper,
   MenuItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Divider,
+  Slide,
+  Stack,
+  Switch,
+  Select,
+  FormControl,
+  InputLabel,
+  InputAdornment,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   Add as AddIcon,
   DeleteOutline as DeleteOutlineIcon,
@@ -30,6 +32,10 @@ import {
   InfoOutlined as InfoIcon,
   ErrorOutline as ErrorIcon,
   Key as KeyIcon,
+  TableChartOutlined as TableIcon,
+  ViewColumnOutlined as ColumnsIcon,
+  TuneOutlined as TuneIcon,
+  LockOutlined as LockIcon,
 } from '@mui/icons-material';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
@@ -55,8 +61,69 @@ const validateColumnName = (columnName) => {
   return null;
 };
 
+// Section wrapper for the dialog body — gives each block a numbered badge,
+// icon, title, optional description and a slot for an action button.
+const SectionCard = ({ theme, step, icon, title, description, action, children }) => (
+  <Box
+    sx={{
+      borderRadius: 3,
+      border: '1px solid',
+      borderColor: alpha(theme.palette.divider, 0.7),
+      bgcolor: 'background.paper',
+      overflow: 'hidden',
+      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+    }}
+  >
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        px: 2.5,
+        py: 1.5,
+        borderBottom: '1px solid',
+        borderColor: alpha(theme.palette.divider, 0.6),
+        bgcolor: alpha(theme.palette.primary.main, 0.025),
+      }}
+    >
+      <Box
+        sx={{
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          bgcolor: alpha(theme.palette.primary.main, 0.12),
+          color: theme.palette.primary.main,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          flexShrink: 0,
+          border: `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+        }}
+      >
+        {step}
+      </Box>
+      <Box sx={{ color: theme.palette.primary.main, display: 'flex' }}>{icon}</Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+          {title}
+        </Typography>
+        {description && (
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
+            {description}
+          </Typography>
+        )}
+      </Box>
+      {action}
+    </Box>
+    <Box sx={{ p: 2.5 }}>{children}</Box>
+  </Box>
+);
+
 const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], editData = null }) => {
   // Debug: Log received props
+  const theme = useTheme();
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({ tableName: '', description: '' });
@@ -661,295 +728,626 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
 
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth
-      slotProps={{ sx: { borderRadius: 2, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', height: '90vh', maxHeight: '900px', display: 'flex', flexDirection: 'column' } }}>
-
-      <DialogTitle sx={{ flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, width: 'fit-content' }}>
-            <img src="fyntrac.png" alt="Logo" style={{ width: '100px', height: 'auto', maxWidth: '100%' }} />
-            <Box display="flex" alignItems="flex-start" gap={0.5}>
-              <Typography variant="h6">
-                {isEditMode ? 'Edit' : 'Create'} {currentTableType === 'REFERENCE' ? 'Reference' : 'Operational'} Table
-                {isEditMode && <Chip label="Edit Mode" size="small" color="primary" sx={{ ml: 1 }} />}
-              </Typography>
-              <Tooltip
-                title={
-                  currentTableType === 'REFERENCE'
-                    ? 'A user-defined table for static or slowly changing data used as reference inputs in calculations.'
-                    : 'A user-defined activity table designed to record dynamic, period-by-period operational data.'
-                }
-                arrow
-              >
-                <InfoIcon color="action" fontSize="small" sx={{ mt: 0.3, cursor: 'pointer' }} />
-              </Tooltip>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="lg"
+      fullWidth
+      slots={{ transition: Slide }}
+      slotProps={{ transition: { direction: 'up' } }}
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
+          overflow: 'hidden',
+          border: '1px solid',
+          borderColor: 'divider',
+          height: '90vh',
+          maxHeight: '900px',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & .MuiMenuItem-root, & .MuiInputLabel-root, & .MuiFormHelperText-root, & .MuiSelect-root, & .MuiAlert-root': {
+            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          },
+        }
+      }}
+    >
+      {/* ── HEADER ── */}
+      <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: 3,
+            pt: 3,
+            pb: 2.5,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Chip
+                  label={currentTableType === 'REFERENCE' ? 'Reference Table' : 'Operational Table'}
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    letterSpacing: 0.8,
+                    textTransform: 'uppercase',
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main,
+                    borderRadius: 1,
+                  }}
+                />
+                {isEditMode && (
+                  <Chip
+                    label="Edit Mode"
+                    size="small"
+                    sx={{
+                      height: 18,
+                      fontSize: '0.6rem',
+                      fontWeight: 700,
+                      letterSpacing: 0.8,
+                      textTransform: 'uppercase',
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                      color: theme.palette.warning.dark,
+                      borderRadius: 1,
+                    }}
+                  />
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                  {isEditMode ? 'Edit' : 'Create'} {currentTableType === 'REFERENCE' ? 'Reference' : 'Operational'} Table
+                </Typography>
+                <Tooltip
+                  title={
+                    currentTableType === 'REFERENCE'
+                      ? 'A user-defined table for static or slowly changing data used as reference inputs in calculations.'
+                      : 'A user-defined activity table designed to record dynamic, period-by-period operational data.'
+                  }
+                  arrow
+                >
+                  <InfoIcon sx={{ fontSize: 16, color: 'text.disabled', cursor: 'pointer', mt: 0.2 }} />
+                </Tooltip>
+              </Box>
             </Box>
           </Box>
-          <Tooltip title='Close'>
-            <IconButton onClick={handleClose} edge="end" aria-label="close" sx={{ color: 'grey.500', '&:hover': { color: 'black' } }}>
-              <HighlightOffOutlinedIcon />
+
+          <Tooltip title="Close" placement="left">
+            <IconButton
+              onClick={handleClose}
+              size="small"
+              sx={{
+                color: 'text.secondary',
+                bgcolor: 'action.hover',
+                borderRadius: 2,
+                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+              }}
+            >
+              <HighlightOffOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
       </DialogTitle>
-      <Divider />
 
-      <DialogContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', gap: 3, p: 3 }}>
-        {errors.submit && <Alert severity="error" icon={<ErrorIcon />} sx={{ flexShrink: 0 }}>{errors.submit}</Alert>}
+      {/* ── BODY ── */}
+      <DialogContent
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'auto',
+          p: 0,
+          bgcolor: alpha(theme.palette.grey[500], 0.03),
+        }}
+      >
+        <Box sx={{ px: 4, py: 3.5, display: 'flex', flexDirection: 'column', gap: 3.5 }}>
 
-        <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' }, flexShrink: 0 }}>
-          <TextField
-            fullWidth
-            label="Table Name"
-            value={formData.tableName}
-            onChange={(e) => setFormData({ ...formData, tableName: e.target.value })}
-            error={!!errors.tableName}
-            helperText={errors.tableName}
-            size="small"
-            required
-            disabled={isEditMode}
-            slotProps={{
-              readOnly: isEditMode,
-            }}
-          />
-          <TextField
-            fullWidth
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            size="small"
-          />
-        </Box>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, gap: 1 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ flexShrink: 0 }}>
-            <Typography variant="subtitle2" fontWeight={600} display="flex" alignItems="center" gap={1}>
-              Table Columns {isEditMode && <Chip label="Edit Mode" size="small" color="primary" />}
-
-            </Typography>
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={addColumn}
-              variant="contained"
-              sx={{ textTransform: 'none' }}
+          {errors.submit && (
+            <Alert
+              severity="error"
+              variant="outlined"
+              sx={{ borderRadius: 2.5, '.MuiAlert-message': { fontWeight: 500 } }}
             >
-              Add Column
-            </Button>
-          </Box>
+              {errors.submit}
+            </Alert>
+          )}
 
-          {errors.columns && <Alert severity="error" icon={<ErrorIcon />} sx={{ flexShrink: 0 }}>{errors.columns}</Alert>}
+          {/* ─── SECTION 1: TABLE INFO ─── */}
+          <SectionCard
+            theme={theme}
+            step="1"
+            icon={<TableIcon fontSize="small" />}
+            title="Table Identity"
+            description="Give your table a unique name and a short description."
+          >
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Table Name"
+                placeholder="e.g. customer_accounts"
+                value={formData.tableName}
+                onChange={(e) => setFormData({ ...formData, tableName: e.target.value })}
+                error={!!errors.tableName}
+                helperText={errors.tableName || ' '}
+                size="small"
+                required
+                disabled={isEditMode}
+                InputProps={{
+                  endAdornment: isEditMode ? (
+                    <InputAdornment position="end">
+                      <LockIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                    </InputAdornment>
+                  ) : null,
+                }}
+                inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
+              />
+              <TextField
+                fullWidth
+                label="Description"
+                placeholder="Optional"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                size="small"
+                helperText=" "
+                inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
+              />
+            </Stack>
+          </SectionCard>
 
-          <TableContainer component={Paper} variant="outlined" sx={{ flex: 1, overflowY: 'auto' }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell width="35%" sx={{ backgroundColor: 'background.paper' }}>Column Name</TableCell>
-                  <TableCell width="25%" sx={{ backgroundColor: 'background.paper' }}>Data Type</TableCell>
-                  <TableCell width="15%" sx={{ backgroundColor: 'background.paper' }}>Nullable</TableCell>
-                  <TableCell width="15%" align="center" sx={{ backgroundColor: 'background.paper' }}>Primary Key</TableCell>
-                  <TableCell width="10%" align="right" sx={{ backgroundColor: 'background.paper' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {columns.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ height: 100 }}>
-                      <Typography color="text.secondary">No columns defined. Click "Add Column" to start.</Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  columns.map((col) => {
-                    const hasError = !!columnErrors[col.id];
-                    const isPrimaryKey = primaryKeys.includes(col.columnName);
-                    // For default columns, PK button is enabled only if canBePrimaryKey is true
-                    const canBePrimaryKey = col.canBePrimaryKey === true;
+          {/* ─── SECTION 2: COLUMNS ─── */}
+          <SectionCard
+            theme={theme}
+            step="2"
+            icon={<ColumnsIcon fontSize="small" />}
+            title="Columns"
+            description="Define the schema. Locked rows are system-managed and cannot be edited."
+            action={
+              <Tooltip title="Add Column">
+                <IconButton
+                  onClick={addColumn}
+                  size="small"
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    background: theme.palette.primary.main,
+                    color: '#fff',
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.35)}`,
+                    '&:hover': {
+                      background: theme.palette.primary.dark,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.dark, 0.4)}`,
+                      transform: 'scale(1.1)',
+                    },
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  <AddIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            }
+          >
+            {errors.columns && (
+              <Alert
+                severity="error"
+                variant="outlined"
+                sx={{ borderRadius: 2, mb: 1.5, py: 0.25 }}
+              >
+                {errors.columns}
+              </Alert>
+            )}
 
-                    return (
-                      <TableRow key={col.id} hover>
-                        <TableCell>
-                          <TextField
-                            value={col.columnName}
-                            onChange={(e) => updateColumnField(col.id, 'columnName', e.target.value)}
-                            error={hasError}
-                            helperText={hasError ? columnErrors[col.id] : ''}
-                            size="small"
-                            fullWidth
-                            placeholder="e.g. user_id"
-                            variant="standard"
-                            disabled={col.editable === false} // Disabled for default columns
-                            slotProps={{ disableUnderline: !hasError }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            select
-                            value={col.dataType}
-                            onChange={(e) => updateColumnField(col.id, 'dataType', e.target.value)}
-                            size="small"
-                            fullWidth
-                            variant="standard"
-                            disabled={col.typeEditable === false} // Disabled for default columns
-                            slotProps={{ disableUnderline: true }}
-                          >
-                            <MenuItem value="STRING">STRING</MenuItem>
-                            <MenuItem value="NUMBER">NUMBER</MenuItem>
-                            <MenuItem value="DATE">DATE</MenuItem>
-                            <MenuItem value="BOOLEAN">BOOLEAN</MenuItem>
-                          </TextField>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={col.nullable ? 'NULL' : 'NOT NULL'}
-                            size="small"
-                            onClick={() => col.nullableEditable !== false && updateColumnField(col.id, 'nullable', !col.nullable)}
-                            color={col.nullable ? 'default' : 'primary'}
-                            variant={col.nullable ? 'outlined' : 'filled'}
-                            sx={{
-                              cursor: col.nullableEditable !== false ? 'pointer' : 'default',
-                              width: 80,
-                              opacity: col.nullableEditable === false ? 0.6 : 1
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title={
-                            !canBePrimaryKey ? "This column cannot be a primary key" :
-                              isPrimaryKey ? "Remove PK" : "Set PK"
-                          }>
-                            <span>
-                              <IconButton
-                                size="small"
-                                disabled={!canBePrimaryKey} // Only enabled for accountingPeriod
-                                onClick={() => handleTogglePrimaryKey(col.columnName)}
-                                color={isPrimaryKey ? 'warning' : 'default'}
-                                sx={{
-                                  opacity: canBePrimaryKey ? 1 : 0.5,
-                                }}
-                              >
-                                {isPrimaryKey ? <KeyIcon fontSize="small" /> : <KeyOutlineIcon fontSize="small" />}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteColumn(col.id)}
-                            disabled={col.deletable === false} // Disabled for default columns
-                            sx={{ opacity: col.deletable === false ? 0.5 : 1 }}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 3, pt: 2, borderTop: '1px dashed', borderColor: 'divider', flexShrink: 0 }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" gutterBottom sx={{ color: 'text.secondary', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
-              Selected Primary Keys
-
-            </Typography>
-            {primaryKeys.length > 0 ? (
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {primaryKeys.map((pk) => (
-                  <Chip
-                    key={pk}
-                    icon={<KeyIcon sx={{ fontSize: '14px !important' }} />}
-                    label={pk}
-                    onDelete={() => handleTogglePrimaryKey(pk)}
-                    color="warning"
-                    variant="outlined"
-                    size="small"
-                  />
-                ))}
+            {columns.length === 0 ? (
+              <Box
+                sx={{
+                  py: 6,
+                  textAlign: 'center',
+                  borderRadius: 2.5,
+                  border: '1.5px dashed',
+                  borderColor: alpha(theme.palette.text.secondary, 0.2),
+                  bgcolor: alpha(theme.palette.background.paper, 0.5),
+                }}
+              >
+                <ColumnsIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 1 }} />
+                <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                  No columns yet
+                </Typography>
+                <Typography variant="caption" color="text.disabled">
+                  Click "Add Column" above to define your first column.
+                </Typography>
               </Box>
             ) : (
-              <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                This table needs a primary key. Select one using the key icon above.
+              <Stack spacing={1.25}>
+                {/* Column-row header */}
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.7fr 1fr 110px 60px 60px',
+                    columnGap: 1.5,
+                    px: 2,
+                    py: 0.5,
+                  }}
+                >
+                  {['Column Name', 'Data Type', 'Nullable', 'PK', ''].map((h, i) => (
+                    <Typography
+                      key={h + i}
+                      variant="caption"
+                      sx={{
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.6,
+                        color: 'text.disabled',
+                        fontSize: '0.65rem',
+                        textAlign: i >= 3 ? 'center' : 'left',
+                      }}
+                    >
+                      {h}
+                    </Typography>
+                  ))}
+                </Box>
 
-              </Typography>
+                {columns.map((col) => {
+                  const hasError = !!columnErrors[col.id];
+                  const isPrimaryKey = primaryKeys.includes(col.columnName);
+                  const canBePrimaryKey = col.canBePrimaryKey === true;
+                  const isLocked = col.editable === false;
+
+                  return (
+                    <Paper
+                      key={col.id}
+                      elevation={0}
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.7fr 1fr 110px 60px 60px',
+                        columnGap: 1.5,
+                        alignItems: 'center',
+                        px: 2,
+                        py: 1,
+                        borderRadius: 2.5,
+                        border: '1px solid',
+                        borderColor: hasError
+                          ? 'error.light'
+                          : isPrimaryKey
+                            ? alpha(theme.palette.warning.main, 0.4)
+                            : alpha(theme.palette.divider, 0.8),
+                        bgcolor: isLocked
+                          ? alpha(theme.palette.grey[500], 0.04)
+                          : 'background.paper',
+                        transition: 'all 0.18s ease',
+                        '&:hover': {
+                          borderColor: hasError
+                            ? 'error.main'
+                            : isLocked
+                              ? alpha(theme.palette.divider, 0.8)
+                              : alpha(theme.palette.primary.main, 0.4),
+                          boxShadow: isLocked
+                            ? 'none'
+                            : `0 2px 8px ${alpha(theme.palette.primary.main, 0.06)}`,
+                        },
+                      }}
+                    >
+                      {/* Column name */}
+                      <TextField
+                        value={col.columnName}
+                        onChange={(e) => updateColumnField(col.id, 'columnName', e.target.value)}
+                        error={hasError}
+                        helperText={hasError ? columnErrors[col.id] : ''}
+                        size="small"
+                        fullWidth
+                        placeholder="column_name"
+                        disabled={isLocked}
+                        InputProps={{
+                          endAdornment: isLocked ? (
+                            <InputAdornment position="end">
+                              <LockIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+                            </InputAdornment>
+                          ) : null,
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            fontSize: '0.9rem',
+                            bgcolor: isLocked ? 'transparent' : 'background.paper',
+                            '& fieldset': { borderColor: 'transparent' },
+                            '&:hover fieldset': { borderColor: isLocked ? 'transparent' : alpha(theme.palette.primary.main, 0.3) },
+                            '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                          },
+                          '& .MuiFormHelperText-root': { mt: 0.25, ml: 0.5, fontSize: '0.7rem' },
+                        }}
+                      />
+
+                      {/* Data type */}
+                      <FormControl size="small" fullWidth disabled={col.typeEditable === false}>
+                        <Select
+                          value={col.dataType}
+                          onChange={(e) => updateColumnField(col.id, 'dataType', e.target.value)}
+                          sx={{
+                            borderRadius: 2,
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            bgcolor: alpha(theme.palette.primary.main, 0.06),
+                            color: theme.palette.primary.main,
+                            '& fieldset': { borderColor: 'transparent' },
+                            '&:hover fieldset': { borderColor: 'transparent' },
+                            '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                            '&.Mui-disabled': { bgcolor: alpha(theme.palette.grey[500], 0.06), color: 'text.secondary' },
+                          }}
+                        >
+                          <MenuItem value="STRING">STRING</MenuItem>
+                          <MenuItem value="NUMBER">NUMBER</MenuItem>
+                          <MenuItem value="DATE">DATE</MenuItem>
+                          <MenuItem value="BOOLEAN">BOOLEAN</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      {/* Nullable switch */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Switch
+                          size="small"
+                          checked={!col.nullable}
+                          disabled={col.nullableEditable === false}
+                          onChange={() => updateColumnField(col.id, 'nullable', !col.nullable)}
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': { color: '#14213d' },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#14213d' },
+                            '& .MuiSwitch-switchBase.Mui-checked.Mui-disabled': { color: '#94a3b8' },
+                            '& .MuiSwitch-switchBase.Mui-checked.Mui-disabled + .MuiSwitch-track': { bgcolor: '#94a3b8', opacity: 0.5 },
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.65rem',
+                            color: !col.nullable ? '#14213d' : 'text.disabled',
+                            letterSpacing: 0.4,
+                          }}
+                        >
+                          {col.nullable ? 'NULL' : 'NOT NULL'}
+                        </Typography>
+                      </Box>
+
+                      {/* PK toggle */}
+                      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                        <Tooltip title={!canBePrimaryKey ? 'Cannot be PK' : isPrimaryKey ? 'Remove PK' : 'Set as PK'}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!canBePrimaryKey}
+                              onClick={() => handleTogglePrimaryKey(col.columnName)}
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 2,
+                                color: isPrimaryKey ? '#fff' : 'text.disabled',
+                                bgcolor: isPrimaryKey ? theme.palette.warning.main : 'transparent',
+                                border: '1.5px solid',
+                                borderColor: isPrimaryKey ? theme.palette.warning.main : alpha(theme.palette.text.secondary, 0.2),
+                                opacity: canBePrimaryKey ? 1 : 0.35,
+                                transition: 'all 0.15s',
+                                '&:hover': {
+                                  bgcolor: isPrimaryKey ? theme.palette.warning.dark : alpha(theme.palette.warning.main, 0.1),
+                                  borderColor: theme.palette.warning.main,
+                                  color: isPrimaryKey ? '#fff' : theme.palette.warning.main,
+                                },
+                              }}
+                            >
+                              {isPrimaryKey ? <KeyIcon sx={{ fontSize: 16 }} /> : <KeyOutlineIcon sx={{ fontSize: 16 }} />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+
+                      {/* Delete */}
+                      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                        <Tooltip title={col.deletable === false ? 'Locked column' : 'Delete column'}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteColumn(col.id)}
+                              disabled={col.deletable === false}
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 2,
+                                color: 'text.disabled',
+                                opacity: col.deletable === false ? 0.3 : 1,
+                                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                              }}
+                            >
+                              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Stack>
             )}
-            {errors.primaryKeys && (
-              <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-                {errors.primaryKeys}
-              </Typography>
-            )}
-          </Box>
+          </SectionCard>
 
-          {currentTableType === 'REFERENCE' && (
-            <Box sx={{ width: '40%' }}>
-              <TextField
-                select
-                label="Reference Column"
-                value={referenceColumn}
-                onChange={(e) => setReferenceColumn(e.target.value)}
-                error={!!errors.referenceColumn}
-                helperText={errors.referenceColumn || "Select the reference column used for lookups"}
-                size="small"
-                fullWidth
-                required
-              >
-                <MenuItem value="" disabled>Select Reference Column</MenuItem>
-                {columns.map((col) => (
-                  <MenuItem
-                    key={col.id}
-                    value={col.columnName}
-                    disabled={!col.columnName || !!columnErrors[col.id]}
-                  >
-                    {col.columnName || '(Unnamed)'}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Box>
-          )}
+          {/* ─── SECTION 3: CONFIGURATION ─── */}
+          <SectionCard
+            theme={theme}
+            step="3"
+            icon={<TuneIcon fontSize="small" />}
+            title="Configuration"
+            description={
+              currentTableType === 'REFERENCE'
+                ? 'Pick the column used to look up records from this reference table.'
+                : 'Link a reference table to enrich this operational dataset.'
+            }
+          >
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
+              {/* Primary keys */}
+              <Box sx={{ flex: 1, width: '100%' }}>
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'text.secondary', display: 'block', mb: 1 }}
+                >
+                  Primary Keys
+                </Typography>
+                {primaryKeys.length > 0 ? (
+                  <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                    {primaryKeys.map((pk) => (
+                      <Chip
+                        key={pk}
+                        icon={<KeyIcon sx={{ fontSize: '13px !important' }} />}
+                        label={pk}
+                        onDelete={() => handleTogglePrimaryKey(pk)}
+                        size="small"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.72rem',
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                          borderRadius: 1.5,
+                          bgcolor: alpha(theme.palette.warning.main, 0.12),
+                          color: theme.palette.warning.dark,
+                          border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                          '& .MuiChip-deleteIcon': {
+                            color: theme.palette.warning.dark,
+                            '&:hover': { color: theme.palette.warning.main },
+                          },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', fontSize: '0.8rem' }}>
+                    No primary key selected — toggle the key icon on a column above.
+                  </Typography>
+                )}
+                {errors.primaryKeys && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                    {errors.primaryKeys}
+                  </Typography>
+                )}
+              </Box>
 
-          {currentTableType === 'OPERATIONAL' && (
-            <ReferenceColumnAutocomplete
-              tables={referenceTables}
-              value={selectedReferenceTable}
-              onSelect={onReferenceColumnSelect}
-            />
-          )}
+              {/* Reference column / autocomplete */}
+              {currentTableType === 'REFERENCE' && (
+                <Box sx={{ width: { xs: '100%', md: 320 } }}>
+                  <FormControl size="small" fullWidth required error={!!errors.referenceColumn}>
+                    <InputLabel>Reference Column</InputLabel>
+                    <Select
+                      label="Reference Column"
+                      value={referenceColumn}
+                      onChange={(e) => setReferenceColumn(e.target.value)}
+                      sx={{
+                        borderRadius: 2.5,
+                        bgcolor: 'background.paper',
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      <MenuItem value="" disabled>Select Reference Column</MenuItem>
+                      {columns.map((col) => (
+                        <MenuItem
+                          key={col.id}
+                          value={col.columnName}
+                          disabled={!col.columnName || !!columnErrors[col.id]}
+                          sx={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.9rem' }}
+                        >
+                          {col.columnName || '(Unnamed)'}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" sx={{ mt: 0.5, ml: 1.5, color: errors.referenceColumn ? 'error.main' : 'text.disabled' }}>
+                      {errors.referenceColumn || 'Used by other tables for lookups.'}
+                    </Typography>
+                  </FormControl>
+                </Box>
+              )}
+
+              {currentTableType === 'OPERATIONAL' && (
+                <Box sx={{ width: { xs: '100%', md: 320 } }}>
+                  <ReferenceColumnAutocomplete
+                    tables={referenceTables}
+                    value={selectedReferenceTable}
+                    onSelect={onReferenceColumnSelect}
+                  />
+                </Box>
+              )}
+            </Stack>
+          </SectionCard>
+
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider', justifyContent: 'center' }}>
-        <Button
-          // 1. Use your main form submit function, not the column update function
-          onClick={handleSubmit}
-
-          // 2. Standard Primary style for a main action button
-          variant="contained"
-          color="primary"
-
-          // 3. Disable based on form validity or loading state
-          disabled={!canSubmit() || loading}
-
-          // 4. Custom Styling (Lighter shade on disable)
-          sx={{
-            minWidth: 120,
-            // Fix: Override the default grey disabled style
-            '&.Mui-disabled': {
-              // This is the lighter version of your primary color
-              bgcolor: 'rgba(20, 33, 61, 0.5)',
-              color: '#ffffff'
-            }
-          }}
-        >
-          {loading
-            ? (isEditMode ? 'Updating...' : 'Creating...')
-            : (isEditMode ? 'Update Table' : 'Create Table')
-          }
-        </Button>
+      {/* ── FOOTER ── */}
+      <DialogActions
+        sx={{
+          px: 4,
+          py: 2.25,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          justifyContent: 'space-between',
+          gap: 1.5,
+        }}
+      >
+        <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 500 }}>
+          {columns.length} column{columns.length !== 1 ? 's' : ''} · {primaryKeys.length} primary key{primaryKeys.length !== 1 ? 's' : ''}
+        </Typography>
+        <Stack direction="row" spacing={1.25}>
+          <Button
+            onClick={handleClose}
+            variant="text"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'text.secondary',
+              px: 2.5,
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={!canSubmit() || loading}
+            startIcon={loading ? <CircularProgress size={14} color="inherit" /> : null}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 700,
+              minWidth: 150,
+              px: 3,
+              background: '#14213d',
+              color: '#fff',
+              boxShadow: `0 6px 16px ${alpha('#14213d', 0.35)}`,
+              '&:hover': {
+                background: '#0d1628',
+                boxShadow: `0 8px 22px ${alpha('#14213d', 0.45)}`,
+              },
+              '&.Mui-disabled': {
+                background: alpha('#14213d', 0.4),
+                color: '#fff',
+                boxShadow: 'none',
+              },
+            }}
+          >
+            {loading
+              ? (isEditMode ? 'Updating…' : 'Creating…')
+              : (isEditMode ? 'Update Table' : 'Create Table')}
+          </Button>
+        </Stack>
       </DialogActions>
     </Dialog>
   );

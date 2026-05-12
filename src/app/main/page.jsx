@@ -26,7 +26,9 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Tooltip
+  Tooltip,
+  Chip,
+  Slide,
 } from '@mui/material';
 import { useTenant } from "../tenant-context";
 import PageContent from '../component/pageContent';
@@ -34,6 +36,8 @@ import fyntracTheme from "../theme/fyntrac-theme";
 // Icons
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -46,13 +50,37 @@ import TroubleshootIcon from '@mui/icons-material/Troubleshoot';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import CloseIcon from '@mui/icons-material/Close';
 
 // ----------------------------------------------------------------------
 // 🔧 CONFIGURATION
 // ----------------------------------------------------------------------
-const DRAWER_WIDTH = 256; // Slightly wider for elegance
-const COLLAPSED_WIDTH = 60;
-const HEADER_HEIGHT = 56; // Slightly taller header
+const DRAWER_WIDTH = 252;
+const COLLAPSED_WIDTH = 72;
+const HEADER_HEIGHT = 64;
+
+// 🎨 DESIGN TOKENS — matching theme.ts / Sidebar reference
+const INDIGO       = '#6366f1';
+const INDIGO_DARK  = '#4f46e5';
+const INDIGO_BG    = '#eef2ff';
+const SLATE_50     = '#f8fafc';
+const SLATE_100    = '#f1f5f9';
+const SLATE_200    = '#e2e8f0';
+const SLATE_500    = '#64748b';
+const SLATE_700    = '#334155';
+const SLATE_BLACK  = '#14213d';
+
+// 📍 Page title map
+const PAGE_TITLES = {
+  getstarted:         'Get Started',
+  main:               'Dashboard',
+  diagnostic:         'Diagnostic',
+  model:              'Model',
+  sync:               'Ingest',
+  'report-dashboard': 'Reports',
+  'settings-dashboard': 'Settings',
+};
+
 
 // 🎨 ELEGANT THEME
 // const fyntracTheme = createTheme({
@@ -139,46 +167,41 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
           onClick={handleClick}
           selected={isSelected}
           sx={{
-            pl: isCollapsed ? 2.5 : (2 + (depth * 2)),
+            borderRadius: '12px',
+            mb: '2px',
+            pl: isCollapsed ? '10px' : `${14 + depth * 16}px`,
+            pr: isCollapsed ? '10px' : '14px',
             justifyContent: isCollapsed ? 'center' : 'flex-start',
-            minHeight: 48,
-            color: 'text.secondary',
-
-            // Hover State
-            '&:hover': {
-              bgcolor: 'rgba(145, 158, 171, 0.08)',
-              color: 'text.primary',
+            minHeight: 42,
+            bgcolor: isSelected ? '#eef2ff' : 'transparent',
+            transition: 'background-color 160ms, color 160ms',
+            // Text label — high specificity to prevent theme overrides
+            '& .MuiListItemText-primary': {
+              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif !important',
+              fontSize: '0.875rem !important',
+              fontStyle: 'normal',
+              fontWeight: `${isSelected ? 700 : 500} !important`,
+              color: `${isSelected ? '#4f46e5' : '#334155'} !important`,
             },
 
-            // Selected State (Modern "Glow")
+            '&:hover': {
+              bgcolor: isSelected ? '#eef2ff' : '#f1f5f9',
+              '& .MuiListItemText-primary': { color: `${isSelected ? '#4f46e5' : '#14213d'} !important` },
+            },
+
             '&.Mui-selected': {
-              bgcolor: alpha('#2563EB', 0.08), // Soft blue bg
-              color: 'primary.main',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: alpha('#2563EB', 0.16),
-              },
-              // The left accent bar
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                left: 0,
-                top: 8,
-                bottom: 8,
-                width: 3,
-                borderRadius: '0 4px 4px 0',
-                backgroundColor: isCollapsed ? 'transparent' : 'primary.main',
-                display: isCollapsed ? 'none' : 'block'
-              }
-            }
+              bgcolor: '#eef2ff',
+              '& .MuiListItemText-primary': { color: '#4f46e5 !important', fontWeight: '700 !important' },
+              '& .MuiListItemIcon-root, & .MuiSvgIcon-root': { color: '#6366f1' },
+              '&:hover': { bgcolor: '#eef2ff' },
+            },
           }}
         >
           <ListItemIcon sx={{
-            minWidth: isCollapsed ? 0 : 36,
-            mr: isCollapsed ? 'auto' : 1.5,
+            minWidth: isCollapsed ? 0 : 32,
+            mr: isCollapsed ? 'auto' : 1,
             justifyContent: 'center',
-            color: 'inherit', // Inherit color from parent (handles selected state automatically)
-            transition: 'all 0.2s',
+            color: isSelected ? '#6366f1' : '#64748b',
           }}>
             {item.icon}
           </ListItemIcon>
@@ -186,10 +209,10 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
           {!isCollapsed && (
             <ListItemText
               primary={item.title}
-              slotProps={{
+              primaryTypographyProps={{
                 fontSize: '0.875rem',
-                fontWeight: isSelected ? 600 : 500, // Medium weight for better readability
-                whiteSpace: 'nowrap',
+                fontWeight: isSelected ? 700 : 500,
+                sx: { color: isSelected ? '#4f46e5' : '#334155' },
               }}
             />
           )}
@@ -239,12 +262,58 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      pt: `${HEADER_HEIGHT}px`
     }}>
 
+      {/* Logo / Brand */}
+      <Box sx={{
+        p: isCollapsed ? 2 : 2.5,
+        pb: 2.5,
+        pt: isCollapsed ? 2 : 4.5,
+        pl: isCollapsed ? 2 : 3.5,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: isCollapsed ? 'center' : 'flex-start',
+        minHeight: HEADER_HEIGHT,
+        borderBottom: `1px solid ${SLATE_200}`,
+      }}>
+        <Box
+          component="img"
+          src={isCollapsed ? '/fyntrac-small.png' : '/fyntrac.png'}
+          alt="Fyntrac"
+          sx={{
+            width: isCollapsed ? 36 : '80%',
+            height: isCollapsed ? 36 : 'auto',
+            maxHeight: isCollapsed ? 36 : 48,
+            objectFit: 'contain',
+            flexShrink: 0,
+            transition: 'width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        />
+      </Box>
+
+      {/* WORKSPACE label */}
+      {!isCollapsed && (
+        <Typography variant="overline" sx={{
+          px: 2.5,
+          mt: 2,
+          mb: 0.5,
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          fontSize: '0.625rem',
+          fontWeight: 700,
+          fontStyle: 'normal',
+          color: '#64748b',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          lineHeight: 1.1,
+          display: 'block',
+        }}>
+          Workspace
+        </Typography>
+      )}
+
       {/* 1. Main Navigation */}
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', py: 2 }}>
-        <List component="nav" sx={{ px: 1 }}>
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
+        <List component="nav" sx={{ px: 1.5 }}>
           {NAVIGATION.map((item, index) => (
             <NavItem
               key={index}
@@ -259,15 +328,13 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
       </Box>
 
       {/* 2. Bottom Section */}
-      <Box sx={{ p: 1 }}>
-        <Divider sx={{ mb: 1, borderStyle: 'dashed', borderColor: 'rgba(145, 158, 171, 0.24)' }} />
+      <Box sx={{ p: 1, borderTop: `1px solid ${SLATE_200}`, bgcolor: SLATE_50 }}>
         <NavItem
           item={{
             segment: "logout",
             title: "Sign Out",
-            icon: <LogoutIcon />, // Alert color for logout
+            icon: <LogoutIcon />,
             onClick: onLogout,
-            fontSize: 'fontSize: "14px !important"',
           }}
           pathname={pathname}
           onNavigate={onNavigate}
@@ -290,6 +357,7 @@ export default function DashboardLayoutModern() {
   const [pathname, setPathname] = React.useState('/main');
   const [openDialog, setOpenDialog] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
+  const [settingsKey, setSettingsKey] = React.useState(0);
 
   React.useEffect(() => setMounted(true), []);
 
@@ -302,6 +370,7 @@ export default function DashboardLayoutModern() {
     } else if (segment === "getstarted") {
       window.open("https://fyntrac.gitbook.io/fyntrac-docs", "_blank");
     } else if (segment) {
+      if (segment === 'settings-dashboard') setSettingsKey(k => k + 1);
       setPathname(`/${segment}`);
       setMobileOpen(false);
     }
@@ -313,85 +382,23 @@ export default function DashboardLayoutModern() {
   };
 
   const currentDrawerWidth = isCollapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
+  const currentPageTitle = PAGE_TITLES[pathname.replace('/', '')] || 'Dashboard';
 
   if (!mounted) return null;
 
   return (
     <ThemeProvider theme={fyntracTheme}>
-      <Box sx={{ display: 'flex', minHeight: '100vh', }}>
+      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
           <CssBaseline />
 
-          {/* 1. APPBAR */}
-          <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-            <Toolbar sx={{ height: HEADER_HEIGHT }}>
-              {/* Mobile Toggle */}
-              <IconButton
-                color="inherit"
-                edge="start"
-                onClick={handleDrawerToggle}
-                sx={{ mr: 2, display: { sm: 'none' } }}
-              >
-                <MenuIcon />
-              </IconButton>
-
-              {/* Desktop Toggle */}
-              <IconButton
-                onClick={handleCollapseToggle}
-                sx={{
-                  mr: 2,
-                  display: { xs: 'none', sm: 'inline-flex' },
-                  color: 'text.secondary'
-                }}
-              >
-                {isCollapsed ? <MenuIcon /> : <MenuOpenIcon />}
-              </IconButton>
-
-              {/* LOGO */}
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <img src="fyntrac-small.png" alt="Fyntrac" style={{ maxHeight: 30 }} />
-              </Box>
-
-              <Box sx={{ flexGrow: 1 }} />
-
-              {/* USER PROFILE */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                {tenant && (
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    bgcolor: alpha('#919EAB', 0.12),
-                    py: 0.5,
-                    px: 1.5,
-                    borderRadius: 3
-                  }}>
-                    {/* Resolve display name: user.firstName → user.name → user.email → tenant */}
-                    {(() => {
-                      const displayName = user?.firstName || user?.name || user?.email || tenant || '';
-                      const initial = displayName?.[0]?.toUpperCase();
-                      return (
-                        <>
-                          <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, fontSize: 14, fontWeight: 700 }}>
-                            {initial}
-                          </Avatar>
-                          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                            <Typography variant="subtitle2" sx={{ color: 'text.primary', lineHeight: 1 }}>
-                              {displayName} / {tenant}
-                            </Typography>
-                          </Box>
-                        </>
-                      );
-                    })()}
-                  </Box>
-                )}
-              </Box>
-            </Toolbar>
-          </AppBar>
-
-          {/* 2. SIDEBAR */}
+          {/* 1. SIDEBAR */}
           <Box
             component="nav"
-            sx={{ width: { sm: currentDrawerWidth }, flexShrink: { sm: 0 }, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+            sx={{
+              width: { sm: currentDrawerWidth },
+              flexShrink: { sm: 0 },
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
           >
             {/* Mobile Drawer */}
             <Drawer
@@ -422,11 +429,35 @@ export default function DashboardLayoutModern() {
                   boxSizing: 'border-box',
                   width: currentDrawerWidth,
                   transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  overflowX: 'hidden'
+                  overflow: 'visible',
+                  borderRight: `1px solid ${SLATE_200}`,
+                  bgcolor: '#ffffff',
                 },
               }}
               open
             >
+              {/* Floating expand/collapse pill */}
+              <Tooltip title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right">
+                <IconButton
+                  onClick={handleCollapseToggle}
+                  size="small"
+                  sx={{
+                    position: 'absolute',
+                    top: HEADER_HEIGHT - 12,
+                    right: -12,
+                    zIndex: (t) => t.zIndex.drawer + 2,
+                    width: 24,
+                    height: 24,
+                    bgcolor: '#fff',
+                    border: `1px solid ${SLATE_200}`,
+                    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
+                    color: SLATE_700,
+                    '&:hover': { bgcolor: INDIGO, color: '#fff', borderColor: INDIGO },
+                  }}
+                >
+                  {isCollapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
               <DrawerContent
                 isCollapsed={isCollapsed}
                 onExpandSidebar={() => setIsCollapsed(false)}
@@ -437,21 +468,117 @@ export default function DashboardLayoutModern() {
             </Drawer>
           </Box>
 
-          {/* 3. MAIN CONTENT */}
-          <Box
-            component="main"
-            sx={{
-              flexGrow: 1,
-              p: 0,
-              width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
-              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            <Toolbar sx={{ height: HEADER_HEIGHT }} />
+          {/* Right column: AppBar + Content stacked in flex-column */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
 
-            {/* Added container for content padding */}
-            <Box sx={{ p: 0, height: '100%' }}>
-              <PageContent pathname={pathname} />
+            {/* 2. APPBAR — static, no gap */}
+            <AppBar
+              position="static"
+              elevation={0}
+              sx={{
+                bgcolor: 'background.paper',
+                borderBottom: `1px solid ${SLATE_200}`,
+                color: 'text.primary',
+                flexShrink: 0,
+              }}
+            >
+              <Toolbar sx={{ height: HEADER_HEIGHT, pl: 0, pr: { sm: 2.5 }, gap: 2, minHeight: `${HEADER_HEIGHT}px !important` }}>
+                {/* Mobile hamburger */}
+                <IconButton
+                  color="inherit"
+                  edge="start"
+                  size="small"
+                  onClick={handleDrawerToggle}
+                  sx={{ display: { sm: 'none' }, width: 32, height: 32 }}
+                >
+                  <MenuIcon sx={{ fontSize: 26 }} />
+                </IconButton>
+
+                {/* Desktop expand/collapse toggle */}
+                <IconButton
+                  edge="start"
+                  onClick={handleCollapseToggle}
+                  size="small"
+                  sx={{
+                    display: { xs: 'none', sm: 'inline-flex' },
+                    color: SLATE_500,
+                    '&:hover': { bgcolor: SLATE_100, color: SLATE_BLACK },
+                  }}
+                >
+                  <MenuIcon sx={{ fontSize: 26 }} />
+                </IconButton>
+
+                {/* Page title block */}
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography component="span" sx={{
+                    fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif !important',
+                    fontSize: '0.6875rem !important',
+                    fontWeight: '700 !important',
+                    fontStyle: 'normal !important',
+                    color: '#64748b !important',
+                    textTransform: 'uppercase !important',
+                    letterSpacing: '0.08em !important',
+                    lineHeight: '1.1 !important',
+                    display: 'block',
+                  }}>
+                    Workspace
+                  </Typography>
+                  <Typography sx={{
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    color: SLATE_BLACK,
+                    lineHeight: 1.3,
+                    mt: 0,
+                    fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                  }}>
+                    {currentPageTitle}
+                  </Typography>
+                </Box>
+
+                {/* USER PROFILE */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {tenant && (
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      bgcolor: alpha('#919EAB', 0.12),
+                      py: 0.5,
+                      px: 1.5,
+                      borderRadius: 3
+                    }}>
+                      {(() => {
+                        const displayName = user?.firstName || user?.name || user?.email || tenant || '';
+                        const initial = displayName?.[0]?.toUpperCase();
+                        return (
+                          <>
+                            <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, fontSize: 14, fontWeight: 700 }}>
+                              {initial}
+                            </Avatar>
+                            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                              <Typography variant="subtitle2" sx={{ color: 'text.primary', lineHeight: 1 }}>
+                                {displayName} / {tenant}
+                              </Typography>
+                            </Box>
+                          </>
+                        );
+                      })()}
+                    </Box>
+                  )}
+                </Box>
+              </Toolbar>
+            </AppBar>
+
+            {/* 3. MAIN CONTENT — scrolls independently, no top gap */}
+            <Box
+              component="main"
+              sx={{
+                flexGrow: 1,
+                overflow: 'auto',
+                bgcolor: 'background.default',
+              }}
+            >
+              <PageContent pathname={pathname} settingsKey={settingsKey} />
             </Box>
           </Box>
 
@@ -461,23 +588,77 @@ export default function DashboardLayoutModern() {
             onClose={() => setOpenDialog(false)}
             maxWidth="sm"
             fullWidth
-            slotProps={{
-              paper: { sx: { borderRadius: 3, boxShadow: '0 24px 48px -12px rgba(0,0,0,0.1)' } },
-              backdrop: { sx: { backdropFilter: 'blur(3px)' } }
+            slots={{ transition: Slide }}
+            slotProps={{ transition: { direction: 'up' } }}
+            PaperProps={{
+              sx: {
+                borderRadius: 4,
+                boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
+                overflow: 'hidden',
+                border: '1px solid',
+                borderColor: 'divider',
+              }
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 3, pt: 3, pb: 1 }}>
-              <Avatar sx={{ bgcolor: alpha('#FF5630', 0.16), color: '#FF5630' }}>
-                <WarningAmberIcon />
-              </Avatar>
-              <DialogTitle sx={{ p: 0, fontWeight: 700 }}>Sign Out</DialogTitle>
-            </Box>
-            <DialogContent sx={{ px: 3, py: 2 }}>
+            <DialogTitle sx={{ p: 0 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  px: 3,
+                  pt: 3,
+                  pb: 2.5,
+                  background: 'linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(239,68,68,0.03) 100%)',
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+                  <Box>
+                    <Chip
+                      label="Account"
+                      size="small"
+                      sx={{
+                        height: 18,
+                        fontSize: '0.6rem',
+                        fontWeight: 700,
+                        letterSpacing: 0.8,
+                        textTransform: 'uppercase',
+                        bgcolor: alpha('#dc2626', 0.1),
+                        color: '#dc2626',
+                        mb: 0.5,
+                        borderRadius: 1,
+                      }}
+                    />
+                    <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                      Sign Out
+                    </Typography>
+                  </Box>
+                </Box>
+                <Tooltip title="Close" placement="left">
+                  <IconButton
+                    onClick={() => setOpenDialog(false)}
+                    size="small"
+                    sx={{
+                      color: 'text.secondary',
+                      bgcolor: 'action.hover',
+                      borderRadius: 2,
+                      '&:hover': { bgcolor: alpha('#dc2626', 0.08), color: '#dc2626' },
+                    }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </DialogTitle>
+            <DialogContent sx={{ px: 3, py: 3 }}>
               <Typography color="text.secondary">
                 Are you sure you want to log out? Unsaved changes may be lost.
               </Typography>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, pt: 2 }}>
+            <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
               <Button
                 onClick={() => setOpenDialog(false)}
                 variant="outlined"
@@ -491,7 +672,7 @@ export default function DashboardLayoutModern() {
                 variant="contained"
                 color="error"
                 disableElevation
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, ml: 2 }}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, bgcolor: '#14213d', '&:hover': { bgcolor: '#1e2f52' } }}
               >
                 Log Out
               </Button>

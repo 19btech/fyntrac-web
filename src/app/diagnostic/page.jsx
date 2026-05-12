@@ -2,23 +2,26 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
+  Container,
   MenuItem,
   TextField,
   IconButton,
   Divider,
-  Stack,
   Tooltip,
   Tabs,
   Tab,
-  ReturnType,
   FormControl,
   InputLabel,
   Select,
+  Snackbar,
+  Alert,
+  Slide,
+  Typography,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
-import GridHeader from "../component/gridHeader";
-import { Grid } from "@mui/material";
+import Grid from "@mui/material/Grid"; 
 import { dataloaderApi, reportingApi } from '../services/api-client';
 import CustomTabPanel from '../component/custom-tab-panel';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -30,6 +33,7 @@ import { useTenant } from "../tenant-context";
 import EnhancedDataGridTabs from "../component/map-tabs";
 
 const InstrumentDiagnosticPage = () => {
+  const theme = useTheme();
   const { tenant } = useTenant();
   // State to manage the list of criteria
   const [criteriaList, setCriteriaList] = useState([
@@ -44,6 +48,9 @@ const InstrumentDiagnosticPage = () => {
 
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+  const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
   // Attribute options
   const [attributeOptions, setAttributeOptions] = useState([]);
@@ -53,7 +60,7 @@ const InstrumentDiagnosticPage = () => {
   const [model, setModel] = useState(models.length > 0 ? models[0]._id : "");
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
-  const timer = React.useRef < ReturnType < typeof setTimeout >> (undefined);
+  const timer = React.useRef(undefined);
   const [postingDates, setPostingDates] = React.useState([]);
   const [postingDate, setPostingDate] = React.useState('');
   const [diagnosticData, setDiagnosticData] = React.useState({});
@@ -152,9 +159,11 @@ const InstrumentDiagnosticPage = () => {
         // cleanup
         link.remove();
         window.URL.revokeObjectURL(url);
+        showToast('Diagnostic file downloaded successfully.');
       })
       .catch(error => {
         console.error('Error downloading Excel file:', error);
+        showToast('Failed to download diagnostic file.', 'error');
       });
   };
 
@@ -197,13 +206,15 @@ const InstrumentDiagnosticPage = () => {
         setDiagnosticData(data.valueMapList);
         setSuccess(true);
         setLoading(false);
-
         console.log('Full Response:', data);
+        showToast('Diagnostic report loaded successfully.');
       })
       .catch(error => {
         console.error('Error fetching data:', error);
         setErrorMessage(error.message);
         setShowErrorMessage(true);
+        setLoading(false);
+        showToast('Failed to run diagnostic. Please check your filters.', 'error');
       });
   };
 
@@ -238,58 +249,61 @@ const InstrumentDiagnosticPage = () => {
   };
 
   return (
-    <div>
-      <Grid container spacing={3}>
-        <Grid size="auto">
-          <div className="left">
-            <GridHeader>Diagnostic Report</GridHeader>
-          </div>
-        </Grid>
-        <Grid size={6} />
-        <Grid size="grow">
-          <div className="right">
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="Execute filter" arrow>
-                <IconButton
-                  aria-label="execute"
-                  onClick={executeFiler}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
-                >
-                  <PlayCircleOutlineOutlinedIcon />
+    <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
+      <Container maxWidth={false} sx={{ py: 1, px: 2 }}>
 
-                  {loading && (
-                    <CircularProgress
-                      size={24}
-                      sx={{
-                        color: green[500],
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        marginTop: '-12px',
-                        marginLeft: '-12px',
-                        size: 'small',
-                      }}
-                    />
-                  )}
-
-
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Download Diagnostic" arrow>
-                <IconButton
-                  onClick={downloadDiagnostic}
-                  aria-label="Download file"
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
-                >
-                  <FileDownloadOutlinedIcon />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          </div>
-        </Grid>
-      </Grid>
-
-      <Divider />
+        {/* Header Section */}
+        <Box sx={{
+          p: 1.5,
+          borderBottom: '1.5px solid',
+          borderColor: (t) => alpha(t.palette.divider, 0.2),
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { sm: 'center' },
+          gap: 2,
+          mb: 4,
+        }}>
+          <Box>
+            <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
+              Diagnostic Report
+            </Typography>
+          </Box>
+          <Divider />
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Execute filter" arrow>
+              <IconButton
+                aria-label="execute"
+                onClick={executeFiler}
+                sx={{ bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
+              >
+                <PlayCircleOutlineOutlinedIcon />
+                {loading && (
+                  <CircularProgress
+                    size={24}
+                    sx={{
+                      color: green[500],
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      marginTop: '-12px',
+                      marginLeft: '-12px',
+                    }}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download Diagnostic" arrow>
+              <IconButton
+                onClick={downloadDiagnostic}
+                aria-label="Download file"
+                sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
+              >
+                <FileDownloadOutlinedIcon color="action" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
       <Box sx={{ width: '100%', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
         <Tabs sx={{ width: '90rem' }} value={0} aria-label="Filter">
           <Tab label="Filter" sx={{ textTransform: 'none' }} />
@@ -416,7 +430,31 @@ const InstrumentDiagnosticPage = () => {
         </Box>
       </CustomTabPanel>
 
-    </div>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+      >
+        <Alert
+          onClose={handleToastClose}
+          severity={toast.severity}
+          variant="standard"
+          sx={{
+            borderRadius: 3, fontWeight: 600, fontSize: '0.85rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: 280,
+            bgcolor: toast.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
+            border: toast.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)',
+            color: toast.severity === 'success' ? '#15803d' : '#dc2626',
+            '& .MuiAlert-icon': { color: toast.severity === 'success' ? '#16a34a' : '#dc2626' },
+          }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
+      </Container>
+    </Box>
   );
 };
 
