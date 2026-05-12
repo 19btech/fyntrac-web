@@ -15,7 +15,7 @@ import {
   IconButton,
 } from "@mui/material";
 import { DeleteOutlineOutlined } from '@mui/icons-material';
-import Grid from "@mui/material/Grid2"; // Import stable Grid2
+import { Grid } from "@mui/material";
 
 const GLEReportPage = () => {
   // State to manage the list of criteria

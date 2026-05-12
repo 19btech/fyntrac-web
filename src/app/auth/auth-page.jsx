@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authApi } from "../services/api-client";
 // Ensure you have configured Grid2 in your project
-import Grid from "@mui/material/Grid2";
+import { Grid } from "@mui/material";
 import { useTenant } from "../tenant-context";
 import {
   Box,

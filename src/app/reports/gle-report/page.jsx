@@ -23,7 +23,7 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
-import Grid from "@mui/material/Grid2"; // Import stable Grid2
+import { Grid } from "@mui/material";
 import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';

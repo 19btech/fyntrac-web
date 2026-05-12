@@ -8,7 +8,7 @@ import {
   Typography,
   Card,
   CardActionArea,
-  Grid2 as Grid,
+  Grid,
   Dialog,
   DialogTitle,
   DialogContent,

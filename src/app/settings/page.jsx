@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Paper, Autocomplete, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import Grid from '@mui/material/Grid2';
+import { Grid } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';

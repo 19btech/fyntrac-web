@@ -14,7 +14,7 @@ import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import RocketLaunchOutlinedIcon from '@mui/icons-material/RocketLaunchOutlined';
 import ArrowBackIosNewOutlinedIcon from '@mui/icons-material/ArrowBackIosNewOutlined';
 import { Paper, Box, IconButton, Tooltip } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import { Grid } from "@mui/material";
 import { Chat } from "@mui/icons-material";
 import { Settings } from "@mui/icons-material";
 import { Code } from "@mui/icons-material";

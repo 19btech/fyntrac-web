@@ -18,7 +18,7 @@ import {
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import GridHeader from "../component/gridHeader";
-import Grid from "@mui/material/Grid2"; // Import stable Grid2
+import { Grid } from "@mui/material";
 import { dataloaderApi, reportingApi } from '../services/api-client';
 import CustomTabPanel from '../component/custom-tab-panel';
 import CircularProgress from '@mui/material/CircularProgress';

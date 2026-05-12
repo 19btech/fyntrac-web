@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid2';
+import { Grid } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import { styled } from '@mui/material/styles';

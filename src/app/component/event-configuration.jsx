@@ -25,7 +25,7 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Grid2 as Grid,
+    Grid,
     Alert,
     Snackbar,
 } from '@mui/material';

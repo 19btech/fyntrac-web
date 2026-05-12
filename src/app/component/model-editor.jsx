@@ -14,7 +14,7 @@ import {
     Tooltip,
     IconButton,
 } from "@mui/material";
-import Grid from '@mui/material/Grid2';
+import { Grid } from '@mui/material';
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
