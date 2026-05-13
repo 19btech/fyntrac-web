@@ -53,7 +53,8 @@ export default function AccountingPage() {
   const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
   const handleRefresh = () => {
-    localStorage.removeItem('attributeMetadata');
+    // Clear tenant-scoped attribute metadata cache
+    localStorage.removeItem(`attributeMetadata_${tenant}`);
     if (panelIndex === 0) {
       setRefreshAccountTypeKey(prevKey => prevKey + 1);
     } else if (panelIndex === 1) {

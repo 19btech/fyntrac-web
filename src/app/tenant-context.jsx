@@ -70,12 +70,10 @@ export const TenantProvider = ({ children }) => {
     setTenantState(null);
     setUserState(null);
     if (typeof window !== "undefined") {
-      localStorage.removeItem("selectedTenant");
-      localStorage.removeItem("user");
-      // Clear the 401 redirect guard so the login page doesn't get stuck
-      sessionStorage.removeItem("_401_redirecting");
-      // Signal to the login page that this was an explicit logout
-      // so it does NOT auto-redirect even if gateway session lingers
+      // Nuclear cleanup: wipe ALL browser storage to prevent tenant data leakage
+      localStorage.clear();
+      sessionStorage.clear();
+      // Re-set the logout signal AFTER clearing (so the login page knows)
       sessionStorage.setItem("just_logged_out", "true");
     }
     // Redirect to gateway's OIDC logout → Zitadel → back to frontend login page

@@ -23,15 +23,16 @@ function ChartOfAccount({ refreshData }) {
   const [rowsPerPage] = useState(10);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const cachedMetadata = localStorage.getItem('attributeMetadata');
+    if (typeof window !== 'undefined' && tenant) {
+      const cacheKey = `attributeMetadata_${tenant}`;
+      const cachedMetadata = localStorage.getItem(cacheKey);
       if (cachedMetadata) {
         generateColumns(JSON.parse(cachedMetadata));
       } else {
         fetchAttributeMetadata();
       }
     }
-  }, []);
+  }, [tenant]);
 
   useEffect(() => {
     fetchChartOfAccountData();
@@ -47,7 +48,8 @@ function ChartOfAccount({ refreshData }) {
       .then(response => {
         const metadata = response.data;
         if (typeof window !== 'undefined') {
-          localStorage.setItem('attributeMetadata', JSON.stringify(metadata));
+          const cacheKey = `attributeMetadata_${tenant}`;
+          localStorage.setItem(cacheKey, JSON.stringify(metadata));
         }
         generateColumns(metadata);
       })

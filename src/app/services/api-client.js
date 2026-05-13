@@ -40,8 +40,8 @@ apiClient.interceptors.response.use(
                 if (!alreadyRedirecting && !isOnLoginPage) {
                     sessionStorage.setItem("_401_redirecting", "true");
                     console.error("Redirecting to / due to 401");
-                    localStorage.removeItem("selectedTenant");
-                    localStorage.removeItem("user");
+                    // Full wipe to prevent cross-tenant data leakage
+                    localStorage.clear();
                     window.location.href = "/";
                 }
             }

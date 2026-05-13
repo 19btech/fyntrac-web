@@ -147,6 +147,8 @@ export default function LoginPage() {
 
   // --- 4. Redirect to Zitadel login ---
   const handleSignIn = () => {
+    // Clear any residual data from a previous tenant session
+    localStorage.clear();
     // Clear the logout flag so next session check can auto-redirect normally
     sessionStorage.removeItem("just_logged_out");
     window.location.href = authApi.getLoginUrl();
@@ -162,6 +164,16 @@ export default function LoginPage() {
     }
 
     try {
+      // Clear any cached data from a previous tenant before setting the new one
+      localStorage.removeItem("attributeMetadata");
+      localStorage.removeItem("authToken");
+      // Also clear any tenant-scoped cache keys from previous sessions
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("attributeMetadata_")) {
+          localStorage.removeItem(key);
+        }
+      });
+
       // Tell the gateway which tenant was selected (stored in session)
       await authApi.selectTenant(selectedTenant.tenantCode);
 
