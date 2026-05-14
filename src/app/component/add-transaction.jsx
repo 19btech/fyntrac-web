@@ -63,10 +63,25 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         onClose(false);
       }, 3000);
     } catch (error) {
-      // Handle error if needed
-      setErrorMessage(error);
-      setShowErrorMessage(true);
+      console.log('Submission failed:', error);
 
+      // 1. Check if the backend sent a list of validation errors
+      if (error.response && error.response.status === 400) {
+        const errorList = error.response.data; // This is your 'errors' list from Java
+
+        // 2. Map the errors to a readable format
+        // Assuming ValidationError has a 'message' property
+        const formattedMessage = Array.isArray(errorList)
+          ? errorList.map(err => err.message).join(' | ')
+          : "Invalid input. Please check your data.";
+
+        setErrorMessage(formattedMessage);
+      } else {
+        // 3. Fallback for network errors or 500s
+        setErrorMessage("Server error. Please try again later.");
+      }
+
+      setShowErrorMessage(true);
     }
   };
 
