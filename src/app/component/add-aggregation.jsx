@@ -71,10 +71,20 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
         onClose(false);
       }, 3000);
     } catch (error) {
-      // Handle error if needed
-      setErrorMessage(error);
+      console.error('Submission failed:', error);
+      
+      if (error.response && error.response.status === 400) {
+        const errorList = error.response.data;
+        
+        const formattedMessage = Array.isArray(errorList)
+          ? errorList.map(err => err.message).join(' | ')
+          : "Invalid input. Please check your data.";
+          
+        setErrorMessage(formattedMessage);
+      } else {
+        setErrorMessage("Server error. Please try again later.");
+      }
       setShowErrorMessage(true);
-
     }
   };
 
