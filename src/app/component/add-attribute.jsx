@@ -40,9 +40,9 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   React.useEffect(() => {
     if (editData) {
       // Populate form fields with editData if provided
-      setAttributeName(editData.attributeName);
-      setUserField(editData.userField);
-      setDataType(editData.dataType);
+      setAttributeName(editData.attributeName || '');
+      setUserField(editData.userField || '');
+      setDataType(editData.dataType || 'STRING');
       setIsReclassable(editData.isReclassable === 1 ? true : false);
       setIsVersionable(editData.isVersionable === 1 ? true : false);
       setIsNullable(editData.isNullable === 1 ? true : false);
@@ -55,35 +55,55 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
       setIsVersionable(false);
       setIsNullable(false);
       setDataType('STRING');
-
+      setId(null);
     }
-  }, [editData]);
+    // Reset error and success state on dataset shift
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
+  }, [editData, open]);
+
+  // Logical Linking Handler: Versionable must be TRUE if Reclassable is TRUE
+  const handleToggleReclassable = (checked) => {
+    setIsReclassable(checked);
+    if (checked) {
+      setIsVersionable(true);
+    }
+  };
+
+  const handleToggleVersionable = (checked) => {
+    setIsVersionable(checked);
+    if (!checked) {
+      setIsReclassable(false);
+    }
+  };
 
   const handleAddAttribute = async () => {
     console.log('Tenant...', tenant);
+    setShowErrorMessage(false);
     try {
       const response = await dataloaderApi.post('/attribute/add', {
-        userField: userField,
-        attributeName: attributeName,
+        userField: userField.trim(),
+        attributeName: attributeName.trim(),
         dataType: dataType,
         isReclassable: isReclassable ? 1 : 0,
         isVersionable: isVersionable ? 1 : 0,
         isNullable: isNullable ? 1 : 0,
         id: id
       });
-      setSuccessMessage(response.data);
+      setSuccessMessage('Attribute saved successfully.');
       setShowSuccessMessage(true);
 
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true); // Trigger parent refreshes upon successful action
+      }, 2000);
     } catch (error) {
-      // Handle error if needed
-      setErrorMessage(error);
+      console.error('Attribute save failed', error);
+      // Extract detailed server validation payload rather than raw Axios object stringify
+      const detailMessage = error.response?.data?.message || error.response?.data || error.message || 'Unable to save attribute config.';
+      setErrorMessage(detailMessage);
       setShowErrorMessage(true);
-
     }
   };
 
@@ -95,7 +115,11 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   };
 
   const isEditMode = !!editData;
-  const canSave = userField.trim() && attributeName.trim() && dataType;
+  // Front-end validation regex aligning with backend ErrorCode ALPHANUM_UNDERSCORE rules
+  const nameRegex = /^[a-zA-Z0-9_]+$/;
+  const isNameEmpty = !attributeName.trim();
+  const isNameFormatValid = isNameEmpty || nameRegex.test(attributeName.trim());
+  const canSave = userField.trim() && !isNameEmpty && dataType && isNameFormatValid;
 
   return (
     <Dialog
@@ -227,6 +251,8 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               size="small"
               value={attributeName}
               onChange={(e) => setAttributeName(e.target.value)}
+              error={!isNameFormatValid}
+              helperText={!isNameFormatValid ? "Only alphanumeric and underscores permitted. Spaces/special chars not allowed." : ""}
               inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -289,8 +315,8 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
             </Box>
             <Stack sx={{ px: 2.5, py: 1.5 }} divider={<Box sx={{ borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5) }} />}>
               {[
-                { label: 'Reclassable', desc: 'Allows this attribute to be reclassified.', value: isReclassable, onChange: setIsReclassable },
-                { label: 'Versionable', desc: 'Tracks historical versions of this attribute.', value: isVersionable, onChange: setIsVersionable },
+                { label: 'Reclassable', desc: 'Allows this attribute to be reclassified (forces versioning).', value: isReclassable, onChange: handleToggleReclassable },
+                { label: 'Versionable', desc: 'Tracks historical versions of this attribute.', value: isVersionable, onChange: handleToggleVersionable },
                 { label: 'Nullable', desc: 'Permits null values for this attribute.', value: isNullable, onChange: setIsNullable },
               ].map(({ label, desc, value, onChange }) => (
                 <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.25 }}>

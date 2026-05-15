@@ -33,15 +33,18 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
     }
     if (editData) {
       // Populate form fields with editData if provided
-      setTransactionName(editData.transactionName);
-      setMetricName(editData.metricName);
+      setTransactionName(editData.transactionName || '');
+      setMetricName(editData.metricName || '');
       setId(editData.id);
     } else {
       // Clear form fields if no editData (e.g., for adding new transaction)
       setTransactionName('');
       setMetricName('');
+      setId(null);
     }
-  }, [editData]);
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
+  }, [editData, open]);
 
   const fetchTransactionNames = () => {
 
@@ -55,21 +58,21 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   };
 
   const handleAddAggregation = async () => {
+    setShowErrorMessage(false);
     try {
       const response = await dataloaderApi.post(serviceURL, {
         transactionName: transactionName,
-        metricName: metricName,
+        metricName: metricName.trim(),
         id: id
-      }
-      );
-      setSuccessMessage(response.data);
+      });
+      setSuccessMessage('Balance saved successfully.');
       setShowSuccessMessage(true);
 
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true);
+      }, 2000);
     } catch (error) {
       console.error('Submission failed:', error);
       
@@ -96,7 +99,13 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   };
 
   const isEditMode = !!editData;
-  const canSave = transactionName && metricName.trim();
+  
+  // Strictly alphanumeric and underscores, NO SPACES (Matches backend AggregationValidator constraint)
+  const metricRegex = /^[a-zA-Z0-9_]+$/;
+  const isMetricEmpty = !metricName.trim();
+  const isMetricFormatValid = isMetricEmpty || metricRegex.test(metricName);
+  
+  const canSave = transactionName && !isMetricEmpty && isMetricFormatValid;
 
   return (
     <Dialog
@@ -235,6 +244,8 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
             size="small"
             value={metricName}
             onChange={(e) => setMetricName(e.target.value)}
+            error={!isMetricFormatValid}
+            helperText={!isMetricFormatValid ? "Only alphanumeric and underscores allowed. Spaces not permitted." : ""}
             inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}

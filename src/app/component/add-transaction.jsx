@@ -31,11 +31,11 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
   React.useEffect(() => {
     if (editData) {
       // Populate form fields with editData if provided
-      setTransactionName(editData.name);
+      setTransactionName(editData.name || '');
       setIsExclusive(editData.exclusive === 1 ? true : false);
       setIsGL(editData.isGL === 1 ? true : false);
       setId(editData.id);
-      setIsReplayable(editData.isReplayable);
+      setIsReplayable(editData.isReplayable === 1 ? true : false);
     } else {
       // Clear form fields if no editData (e.g., for adding new transaction)
       setTransactionName('');
@@ -43,25 +43,28 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
       setIsGL(false);
       setIsReplayable(false);
     }
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
   }, [editData]);
 
   const handleAddTransaction = async () => {
+    setShowErrorMessage(false);
     try {
       const response = await dataloaderApi.post('/transaction/add', {
-        name: transactionName,
+        name: transactionName.trim(),
         exclusive: isExclusive ? 1 : 0,
         isGL: isGL ? 1 : 0,
         isReplayable: isReplayable ? 1 : 0,
         id: id
       });
-      setSuccessMessage(response.data);
+      setSuccessMessage('Transaction saved successfully.');
       setShowSuccessMessage(true);
 
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true);
+      }, 2000);
     } catch (error) {
       console.log('Submission failed:', error);
 
@@ -92,6 +95,14 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
   };
 
   const isEditMode = !!editData;
+  // Align with backend TransactionValidator constraints (allows spaces, but blocks leading/trailing/double-spaces)
+  const txNameRegex = /^[a-zA-Z0-9_ ]+$/;
+  const isTxNameEmpty = !transactionName.trim();
+  const hasDoubleSpace = transactionName.includes('  ');
+  const hasEdgeSpaces = transactionName.length > 0 && transactionName.trim() !== transactionName;
+  const isTxFormatValid = isTxNameEmpty || (txNameRegex.test(transactionName) && !hasDoubleSpace && !hasEdgeSpaces);
+  
+  const canSave = !isTxNameEmpty && isTxFormatValid;
 
   return (
     <Dialog
@@ -210,6 +221,10 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
             required
             value={transactionName}
             onChange={(e) => setTransactionName(e.target.value)}
+            error={!isTxFormatValid}
+            helperText={!isTxFormatValid 
+              ? (hasDoubleSpace ? "Double spacing is not allowed." : hasEdgeSpaces ? "Leading or trailing spaces are not allowed." : "Only alphanumeric, spaces, and underscores allowed.")
+              : ""}
             size="small"
             inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
@@ -296,7 +311,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         <Button
           onClick={handleAddTransaction}
           variant="contained"
-          disabled={!transactionName.trim()}
+          disabled={!canSave}
           sx={{
             borderRadius: 2,
             textTransform: 'none',
