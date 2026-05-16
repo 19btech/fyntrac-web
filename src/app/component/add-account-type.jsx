@@ -39,25 +39,41 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
     } else {
       setAccountSubType('');
       setAccountType('BALANCESHEET');
+      setId(null);
     }
-  }, [editData]);
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
+  }, [editData, open]);
 
   const handleAccountType = async () => {
+    setShowErrorMessage(false);
     try {
       const response = await dataloaderApi.post(serviceURL, {
-        accountSubType,
+        accountSubType: accountSubType.trim(),
         accountType,
         id,
       });
-      setSuccessMessage(response.data);
+      setSuccessMessage('Account type saved successfully.');
       setShowSuccessMessage(true);
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true);
+      }, 2000);
     } catch (error) {
-      setErrorMessage(error);
+      console.error('Submission failed:', error);
+      
+      if (error.response && error.response.status === 400) {
+        const errorList = error.response.data;
+        
+        const formattedMessage = Array.isArray(errorList)
+          ? errorList.map(err => err.message).join(' | ')
+          : "Invalid input. Please check your data.";
+          
+        setErrorMessage(formattedMessage);
+      } else {
+        setErrorMessage("Server error. Please try again later.");
+      }
       setShowErrorMessage(true);
     }
   };
@@ -69,7 +85,7 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
   };
 
   const isEditMode = !!editData;
-  const canSave = accountSubType.trim() && accountType;
+  const canSave = accountSubType.trim() && accountType && /^[a-zA-Z0-9_ ]+$/.test(accountSubType.trim());
 
   return (
     <Dialog
@@ -166,6 +182,8 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
             value={accountSubType}
             onChange={(e) => setAccountSubType(e.target.value)}
             placeholder="e.g. Equity, Revenue..."
+            error={accountSubType.trim() !== '' && !/^[a-zA-Z0-9_ ]+$/.test(accountSubType.trim())}
+            helperText={accountSubType.trim() !== '' && !/^[a-zA-Z0-9_ ]+$/.test(accountSubType.trim()) ? "Only alphanumeric, underscores and spaces allowed" : ""}
             inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
