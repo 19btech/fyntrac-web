@@ -1455,6 +1455,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 autoHideDuration={6000}
                 onClose={closeAlert}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
             >
                 <Alert onClose={closeAlert} severity={alert.severity} sx={{ width: '100%', bgcolor: alert.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)', border: alert.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)', color: alert.severity === 'success' ? '#15803d' : '#dc2626', '& .MuiAlert-icon': { color: alert.severity === 'success' ? '#16a34a' : '#dc2626' } }} variant="standard">
                     {alert.message}

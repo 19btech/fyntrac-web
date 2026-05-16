@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 
 // Icons
-import RefreshIcon from '@mui/icons-material/Refresh';
+import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -340,7 +340,7 @@ export default function IngestPage() {
             </Tooltip>
             <Tooltip title="Refresh">
               <IconButton onClick={fetchUploadActivitiyLogs} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
-                <RefreshIcon color="action" />
+                <CachedRoundedIcon color="action" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -427,8 +427,8 @@ export default function IngestPage() {
         onClose={handleCloseFileUpload}
         maxWidth="sm"
         fullWidth
-        slots={{ transition: Slide }}
-        slotProps={{ transition: { direction: 'up' } }}
+        TransitionComponent={Slide}
+        TransitionProps={{ direction: 'up' }}
         PaperProps={{
           sx: {
             borderRadius: 4,

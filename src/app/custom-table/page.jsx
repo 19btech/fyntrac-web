@@ -211,7 +211,8 @@ export default function CustomTablesMain() {
                 autoHideDuration={4000}
                 onClose={handleCloseSnackbar}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+                sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+                TransitionComponent={(props) => <Slide {...props} direction="left" />}
             >
                 <Alert
                     onClose={handleCloseSnackbar}

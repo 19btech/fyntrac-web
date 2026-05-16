@@ -733,8 +733,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
-      slots={{ transition: Slide }}
-      slotProps={{ transition: { direction: 'up' } }}
+      TransitionComponent={Slide}
+      TransitionProps={{ direction: 'up' }}
       PaperProps={{
         sx: {
           borderRadius: 4,

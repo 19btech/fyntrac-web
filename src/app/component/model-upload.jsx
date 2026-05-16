@@ -313,6 +313,7 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
         autoHideDuration={6000}
         onClose={handleSuccessClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
       >
         <Alert onClose={handleSuccessClose} severity="success" variant="standard" sx={{ width: '100%', bgcolor: 'rgba(22,163,74,0.12)', color: '#15803d', border: '1px solid rgba(22,163,74,0.3)', '& .MuiAlert-icon': { color: '#16a34a' } }}>
           Model uploaded successfully.

@@ -143,8 +143,8 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
-        slots={{ transition: Slide }}
-        slotProps={{ transition: { direction: 'up' } }}
+        TransitionComponent={Slide}
+        TransitionProps={{ direction: 'up' }}
         PaperProps={{
           sx: {
             borderRadius: 4,

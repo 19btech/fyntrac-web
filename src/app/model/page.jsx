@@ -33,8 +33,8 @@ import {
 } from '@mui/material';
 
 // Icons
-import RefreshIcon from '@mui/icons-material/Refresh';
-import UploadIcon from '@mui/icons-material/Upload';
+import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
+import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -991,13 +991,28 @@ export default function ModelPage() {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-
+            <Tooltip title="Run Model (select a model row to pick type)">
+              <IconButton
+                sx={{
+                  bgcolor: 'rgba(22,163,74,0.1)',
+                  border: '1px solid rgba(21,128,61,0.35)',
+                  color: '#16a34a',
+                  boxShadow: 1,
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' },
+                  '&:active': { transform: 'scale(0.94)' },
+                }}
+                onClick={() => handleExecuteOpen(null)}
+              >
+                <PlayCircleOutlineIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Upload Model">
               <IconButton
                 sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 onClick={() => setUploadOpen(true)}
               >
-                <UploadIcon color="action" />
+                <FileUploadOutlinedIcon color="action" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Refresh">
@@ -1005,7 +1020,7 @@ export default function ModelPage() {
                 sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 onClick={handleRefresh}
               >
-                <RefreshIcon color="action" />
+                <CachedRoundedIcon color="action" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -1099,8 +1114,8 @@ export default function ModelPage() {
         onClose={handleUploadClose}
         maxWidth="md"
         fullWidth
-        slots={{ transition: Slide }}
-        slotProps={{ transition: { direction: 'up' } }}
+        TransitionComponent={Slide}
+        TransitionProps={{ direction: 'up' }}
         PaperProps={{
           sx: {
             borderRadius: 4,
@@ -1183,6 +1198,7 @@ export default function ModelPage() {
         autoHideDuration={4000}
         onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
       >
         <Alert
           onClose={() => setSnackbar((s) => ({ ...s, open: false }))}

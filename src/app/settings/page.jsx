@@ -114,11 +114,11 @@ export default function SettingsPage() {
 
   // Reporting period
   const [reportingPeriod, setReportingPeriod] = useState('6');
-  const reportingPeriodList = ['6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
+  const reportingPeriodList = ['6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24'];
 
   // Reopen period
   const [reopenPeriod, setReopenPeriod] = useState('Nov-2022');
-  const reopenPriodList = ['Nov-2022', 'Oct-2022', 'Sep-2022', 'Aug-2022'];
+  const reopenPriodList = ['Nov-2022','Oct-2022','Sep-2022','Aug-2022'];
 
   // Delete entries
   const [deleteEntriesDate, setDeleteEntriesDate] = useState(null);
@@ -156,11 +156,8 @@ export default function SettingsPage() {
   // ── API calls ─────────────────────────────────────────────────────────────
   const fetchCurrencies = () => {
     dataloaderApi.get('/setting/get/currencies')
-      .then(response => {
-        console.log("Currency List: ", response.data);
-        setCurrencyList(response.data)
-      })
-      .catch(() => { });
+      .then(response => setCurrencyList(response.data))
+      .catch(() => {});
   };
 
   const fetchSettings = () => {
@@ -171,7 +168,7 @@ export default function SettingsPage() {
         setRestatementMode(response.data.restatementMode === 1);
         setCurrency(response.data.currency);
       })
-      .catch(() => { });
+      .catch(() => {});
   };
 
   React.useEffect(() => {
@@ -278,7 +275,8 @@ export default function SettingsPage() {
         autoHideDuration={4000}
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        TransitionComponent={(props) => <Slide {...props} direction="left" />}
       >
         <Alert
           onClose={handleToastClose}
@@ -303,7 +301,7 @@ export default function SettingsPage() {
         open={showDeleteConfirmDialog}
         onClose={() => setShowDeleteConfirmDialog(false)}
         maxWidth="xs" fullWidth
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'up' } }}
+        TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
         PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
       >
         <Box sx={{
@@ -354,7 +352,7 @@ export default function SettingsPage() {
         open={showSchemaRefreshDialog}
         onClose={() => setShowSchemaRefreshDialog(false)}
         maxWidth="xs" fullWidth
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'up' } }}
+        TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
         PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
       >
         <Box sx={{
@@ -402,7 +400,7 @@ export default function SettingsPage() {
         open={showRestatementDaialog}
         onClose={() => { setShowRestatementDaialog(false); setRestatementMode(false); }}
         maxWidth="xs" fullWidth
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'up' } }}
+        TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
         PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
       >
         <Box sx={{
@@ -501,7 +499,7 @@ export default function SettingsPage() {
             description="Choose the default currency for your environment."
           >
             <Autocomplete
-              size="small"
+              disablePortal size="small"
               options={currencyList || []}
               value={currency || null}
               getOptionLabel={(option) => option || ''}
@@ -531,7 +529,7 @@ export default function SettingsPage() {
             description="Set the number of recent posting periods to include in reports."
           >
             <Autocomplete
-              size="small"
+              disablePortal size="small"
               options={reportingPeriodList}
               value={reportingPeriod}
               getOptionLabel={(option) => option}
@@ -564,7 +562,7 @@ export default function SettingsPage() {
             description="Select a closed period to reopen for adjustments."
           >
             <Autocomplete
-              size="small"
+              disablePortal size="small"
               options={reopenPriodList}
               value={reopenPeriod}
               getOptionLabel={(option) => option}

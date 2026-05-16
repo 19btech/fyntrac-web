@@ -215,8 +215,8 @@ export default function RulePage() {
           onClose={handleCloseFileUpload}
           maxWidth="sm"
           fullWidth
-          slots={{ transition: Slide }}
-          slotProps={{ transition: { direction: 'up' } }}
+          TransitionComponent={Slide}
+          TransitionProps={{ direction: 'up' }}
           PaperProps={{
             sx: {
               borderRadius: 4,
@@ -306,7 +306,8 @@ export default function RulePage() {
         autoHideDuration={4000}
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        TransitionComponent={(props) => <Slide {...props} direction="left" />}
       >
         <Alert
           onClose={handleToastClose}

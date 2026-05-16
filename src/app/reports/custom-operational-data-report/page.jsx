@@ -259,7 +259,7 @@ const CustomOperationalDataReportPage = () => {
         <Grid size={6} />
         <Grid size="grow">
           <div className="right">
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center">
               <Box sx={{ width: '260px', paddingBottom: 1 }}>
                 <Autocomplete
                   sx={{
@@ -523,7 +523,8 @@ const CustomOperationalDataReportPage = () => {
         autoHideDuration={4000}
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        TransitionComponent={(props) => <Slide {...props} direction="left" />}
       >
         <Alert
           onClose={handleToastClose}

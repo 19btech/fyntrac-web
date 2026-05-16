@@ -435,7 +435,8 @@ const InstrumentDiagnosticPage = () => {
         autoHideDuration={4000}
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        TransitionComponent={(props) => <Slide {...props} direction="left" />}
       >
         <Alert
           onClose={handleToastClose}
