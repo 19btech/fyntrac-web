@@ -46,19 +46,22 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
 
     if (editData) {
       // Populate form fields with editData if provided
-      setTransactionName(editData.transactionName);
-      setSign(editData.sign);
-      setEntryType(editData.entryType);
-      setAccountSubType(editData.accountSubType);
-      setId(editData.id);
+      setTransactionName(editData.transactionName || '');
+      setSign(editData.sign || '');
+      setEntryType(editData.entryType || '');
+      setAccountSubType(editData.accountSubType || '');
+      setId(editData.id || null);
     } else {
-      // Clear form fields if no editData (eaccountSubtypes.g., for adding new transaction)
+      // Clear form fields if no editData
       setTransactionName('');
       setSign('');
       setEntryType('');
       setAccountSubType('');
+      setId(null);
     }
-  }, [editData]);
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
+  }, [editData, open]);
 
   const fetchAccountSubtypes = () => {
     console.log('Tenant...', tenant);
@@ -84,6 +87,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   };
 
   const handleAddSubledgerMapping = async () => {
+    setShowErrorMessage(false);
     try {
       const response = await dataloaderApi.post(serviceURL, {
         transactionName: transactionName,
@@ -91,21 +95,30 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
         entryType: entryType,
         accountSubType: accountSubType,
         id: id
-      }
-      );
-      setSuccessMessage(response.data);
+      });
+      setSuccessMessage('Mapping saved successfully.');
       setShowSuccessMessage(true);
 
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true);
+      }, 2000);
     } catch (error) {
-      // Handle error if needed
-      setErrorMessage(error);
+      console.error('Submission failed:', error);
+      
+      if (error.response && error.response.status === 400) {
+        const errorList = error.response.data;
+        
+        const formattedMessage = Array.isArray(errorList)
+          ? errorList.map(err => err.message).join(' | ')
+          : "Invalid input. Please check your data.";
+          
+        setErrorMessage(formattedMessage);
+      } else {
+        setErrorMessage("Server error. Please try again later.");
+      }
       setShowErrorMessage(true);
-
     }
   };
 
