@@ -47,7 +47,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
     if (editData) {
       // Populate form fields with editData if provided
       setTransactionName(editData.transactionName || '');
-      setSign(editData.sign || '');
+      setSign(editData.sign === 'POSITIVE' ? 'AMOUNT > 0' : (editData.sign === 'NEGATIVE' ? 'AMOUNT < 0' : (editData.sign || '')));
       setEntryType(editData.entryType || '');
       setAccountSubType(editData.accountSubType || '');
       setId(editData.id || null);
@@ -91,7 +91,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
     try {
       const response = await dataloaderApi.post(serviceURL, {
         transactionName: transactionName,
-        sign: sign,
+        sign: sign === 'AMOUNT > 0' ? 'POSITIVE' : (sign === 'AMOUNT < 0' ? 'NEGATIVE' : sign),
         entryType: entryType,
         accountSubType: accountSubType,
         id: id
@@ -106,14 +106,14 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
       }, 2000);
     } catch (error) {
       console.error('Submission failed:', error);
-      
+
       if (error.response && error.response.status === 400) {
         const errorList = error.response.data;
-        
+
         const formattedMessage = Array.isArray(errorList)
           ? errorList.map(err => err.message).join(' | ')
           : "Invalid input. Please check your data.";
-          
+
         setErrorMessage(formattedMessage);
       } else {
         setErrorMessage("Server error. Please try again later.");
@@ -226,9 +226,12 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
             value={transactionName}
             getOptionLabel={(option) => option}
             onChange={(event, newValue) => setTransactionName(newValue)}
-            renderOption={(props, option) => (
-              <Box component="li" {...props} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
-            )}
+            renderOption={(props, option) => {
+              const { key, ...otherProps } = props;
+              return (
+                <Box component="li" key={key} {...otherProps} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
+              );
+            }}
             renderInput={(params) => (
               <TextField {...params} label="Transaction Name" required size="small"
                 sx={{
@@ -352,9 +355,12 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
             value={accountSubType}
             getOptionLabel={(option) => option}
             onChange={(event, newValue) => setAccountSubType(newValue)}
-            renderOption={(props, option) => (
-              <Box component="li" {...props} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
-            )}
+            renderOption={(props, option) => {
+              const { key, ...otherProps } = props;
+              return (
+                <Box component="li" key={key} {...otherProps} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
+              );
+            }}
             renderInput={(params) => (
               <TextField {...params} label="Account Subtype" required size="small"
                 sx={{

@@ -291,9 +291,12 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
             value={accountSubtype}
             getOptionLabel={(option) => option}
             onChange={(event, newValue) => setAccountSubtype(newValue)}
-            renderOption={(props, option) => (
-              <Box component="li" {...props} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
-            )}
+            renderOption={(props, option) => {
+              const { key, ...otherProps } = props;
+              return (
+                <Box component="li" key={key} {...otherProps} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
+              );
+            }}
             renderInput={(params) => (
               <TextField {...params} label="Account Subtype" required size="small"
                 sx={{
