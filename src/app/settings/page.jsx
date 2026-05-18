@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import {
   Box, Typography, Autocomplete, TextField,
-  Dialog, DialogContent, DialogActions,
-  Button, IconButton, Switch, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, IconButton, Switch, Tooltip, Chip,
   Card, Snackbar, Alert, Slide, Link,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -16,6 +16,7 @@ import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import CustomTabPanel from '../component/custom-tab-panel';
 import AddDashboardConfiguration from '../component/add-update-dashboard-config';
 import { dataloaderApi } from '../services/api-client';
@@ -111,14 +112,17 @@ export default function SettingsPage() {
   // Currency
   const [currency, setCurrency] = useState('USD');
   const [currencyList, setCurrencyList] = useState([]);
+  const [isCurrencyButtonDisabled, setIsCurrencyButtonDisabled] = useState(true);
 
   // Reporting period
   const [reportingPeriod, setReportingPeriod] = useState('6');
   const reportingPeriodList = ['6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24'];
+  const [isReportingPeriodButtonDisabled, setIsReportingPeriodButtonDisabled] = useState(true);
 
   // Reopen period
-  const [reopenPeriod, setReopenPeriod] = useState('Nov-2022');
-  const reopenPriodList = ['Nov-2022','Oct-2022','Sep-2022','Aug-2022'];
+  const [reopenPeriod, setReopenPeriod] = useState(null);
+  const [closedPeriodsList, setClosedPeriodsList] = useState([]);
+  const [isReopenPeriodButtonDisabled, setIsReopenPeriodButtonDisabled] = useState(true);
 
   // Delete entries
   const [deleteEntriesDate, setDeleteEntriesDate] = useState(null);
@@ -129,6 +133,7 @@ export default function SettingsPage() {
 
   // Dialogs
   const [showSchemaRefreshDialog, setShowSchemaRefreshDialog] = React.useState(false);
+  const [isResetting, setIsResetting] = React.useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = React.useState(false);
   const [isDashboardConfigurationDialogOpen, setIsDashboardConfigurationDialogOpen] = React.useState(false);
 
@@ -160,22 +165,31 @@ export default function SettingsPage() {
       .catch(() => {});
   };
 
+  const fetchClosedAccountingPeriods = () => {
+    dataloaderApi.get('/setting/get/closed/accounting-periods')
+      .then(response => {
+        const last3 = (response.data || []).slice(0, 3);
+        setClosedPeriodsList(last3);
+      })
+      .catch(() => {});
+  };
+
   const fetchSettings = () => {
     dataloaderApi.get('/setting/get/settings')
       .then(response => {
         setSettings(response.data);
         setFiscalPeriodStaringDate(dayjs(new Date(response.data.fiscalPeriodStartDate)));
         setRestatementMode(response.data.restatementMode === 1);
-        setCurrency(response.data.currency);
+        setCurrency(response.data.currency || 'USD');
       })
       .catch(() => {});
   };
 
   React.useEffect(() => {
     fetchSettings();
-    setIsDataFetched(true);
     fetchCurrencies();
-  }, [isDataFetched]);
+    fetchClosedAccountingPeriods();
+  }, []);
 
   const saveCurrency = async () => {
     try {
@@ -183,6 +197,7 @@ export default function SettingsPage() {
         headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
       });
       showToast('Home currency saved successfully.');
+      setIsCurrencyButtonDisabled(true);
     } catch {
       showToast('Failed to save currency.', 'error');
     }
@@ -208,6 +223,7 @@ export default function SettingsPage() {
   const handleSaveReportingPeriod = async () => {
     try {
       showToast('Reporting period saved successfully.');
+      setIsReportingPeriodButtonDisabled(true);
     } catch {
       showToast('Failed to save reporting period.', 'error');
     }
@@ -215,7 +231,13 @@ export default function SettingsPage() {
 
   const handleReopenPeriod = async () => {
     try {
+      await dataloaderApi.post('/setting/reopen/accounting-periods', reopenPeriod, {
+        headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
+      });
       showToast(`Period ${reopenPeriod} reopened successfully.`);
+      setIsReopenPeriodButtonDisabled(true);
+      setReopenPeriod(null);
+      fetchClosedAccountingPeriods();
     } catch {
       showToast('Failed to reopen period.', 'error');
     }
@@ -250,18 +272,68 @@ export default function SettingsPage() {
   };
 
   const refreshEnvironment = async () => {
+    if (isResetting) return;
+    // Always do a fresh check immediately before resetting
+    let hasClosedPeriods = closedPeriodsList.length > 0;
     try {
-      const response = await dataloaderApi.post('/setting/refresh/schema', true, {
+      const checkRes = await dataloaderApi.get('/setting/get/closed/accounting-periods');
+      const raw = checkRes?.data;
+      const closed = Array.isArray(raw) ? raw : (raw ? [raw].flat() : []);
+      console.log('[reset] closed periods check:', raw);
+      hasClosedPeriods = closed.length > 0;
+      if (hasClosedPeriods) {
+        setClosedPeriodsList(closed.slice(0, 3));
+      }
+    } catch (err) {
+      console.warn('[reset] closed periods check failed, using cached state:', err);
+      // fall back to cached state value already set in hasClosedPeriods
+    }
+    if (hasClosedPeriods) {
+      setShowSchemaRefreshDialog(false);
+      showToast('You have closed accounting periods. Please use Restatement Mode to reset.', 'error');
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await dataloaderApi.post('/setting/refresh/schema', true, {
         headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
       });
-      showToast(`Environment [${tenant}] has been reset.`);
-      setTimeout(() => {
-        setFiscalPeriodStaringDate(dayjs(new Date(response.data.fiscalPeriodStartDate)));
-        setRestatementMode(response.data.restatementMode === 1);
-        setShowSchemaRefreshDialog(false);
-      }, 1500);
+
+      // After reset: set default fiscal period 01/01/2020 and home currency USD,
+      // and enable restatement mode so the freshly-reset tenant starts in restatement.
+      const defaultFiscalDate = new Date('2020-01-01T00:00:00.000Z');
+      const [fiscalRes] = await Promise.all([
+        dataloaderApi.post('/setting/fiscal-priod/save', {
+          homeCurrency: '', glamFields: '',
+          fiscalPeriodStartDate: defaultFiscalDate,
+          reportingPeriod: null, restatementMode: 1, id: null,
+        }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } }),
+        dataloaderApi.post('/setting/save/currency', 'USD', {
+          headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
+        }),
+      ]);
+
+      // Explicitly enable restatement mode after the schema reset
+      try {
+        await dataloaderApi.post('/setting/restatement-mode/save', {
+          homeCurrency: '', glamFields: '',
+          fiscalPeriodStartDate: defaultFiscalDate,
+          reportingPeriod: null, restatementMode: 1, id: null,
+        }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } });
+      } catch (e) {
+        console.warn('[reset] failed to enable restatement mode after reset:', e);
+      }
+
+      setFiscalPeriodStaringDate(dayjs(new Date(fiscalRes.data.fiscalPeriodStartDate)));
+      setCurrency('USD');
+      setRestatementMode(true);
+      setClosedPeriodsList([]);
+      setShowSchemaRefreshDialog(false);
+      showToast(`Environment [${tenant}] has been reset successfully.`);
     } catch {
-      showToast('Failed to reset environment.', 'error');
+      showToast(`Failed to reset environment [${tenant}]. Please try again.`, 'error');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -355,43 +427,60 @@ export default function SettingsPage() {
         TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
         PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
       >
-        <Box sx={{
-          px: 3, pt: 3, pb: 2,
-          background: `linear-gradient(135deg, ${alpha('#dc2626', 0.07)} 0%, ${alpha('#dc2626', 0.02)} 100%)`,
-          borderBottom: '1px solid', borderColor: 'divider',
-          display: 'flex', alignItems: 'center', gap: 2,
-        }}>
-          <Box sx={{ bgcolor: alpha('#dc2626', 0.1), borderRadius: 2, p: 1, display: 'flex' }}>
-            <WarningAmberIcon sx={{ color: '#dc2626', fontSize: 22 }} />
+        <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+          <Box sx={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            px: 3, pt: 3, pb: 2.5,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            borderBottom: '1px solid', borderColor: 'divider',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Chip
+                    icon={<RefreshOutlinedIcon sx={{ fontSize: '12px !important' }} />}
+                    label="Environment"
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: '0.6rem', fontWeight: 700,
+                      letterSpacing: 0.8, textTransform: 'uppercase',
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main, borderRadius: 1,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                  Reset Environment
+                </Typography>
+              </Box>
+            </Box>
+            <Tooltip title="Close" placement="left">
+              <IconButton onClick={() => setShowSchemaRefreshDialog(false)} size="small" sx={{
+                color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+              }}>
+                <HighlightOffOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
-          <Box>
-            <Typography variant="h6" fontWeight={700} sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', lineHeight: 1.2 }}>
-              Reset Environment
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
-              This action cannot be undone
-            </Typography>
-          </Box>
-        </Box>
-        <DialogContent sx={{ pt: 2.5, px: 3 }}>
-          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7 }}>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 5, px: 3 }}>
+          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
             Are you sure you want to reset <strong style={{ color: '#14213d' }}>[{tenant}]</strong>?
             This will <strong>permanently remove all current settings and data</strong>.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => setShowSchemaRefreshDialog(false)} variant="text" sx={{
-            borderRadius: 2, textTransform: 'none', fontWeight: 600,
-            color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-          }}>Cancel</Button>
-          <Button onClick={refreshEnvironment} variant="contained" sx={{
+          <Button onClick={refreshEnvironment} variant="contained" disabled={isResetting} sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700,
             fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
-            background: '#dc2626', color: '#fff',
-            boxShadow: '0 4px 12px rgba(220,38,38,0.28)',
+            background: '#14213d', color: '#fff',
+            boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': { background: '#b91c1c', boxShadow: '0 6px 18px rgba(220,38,38,0.4)', transform: 'translateY(-1px)' },
-          }}>Reset Environment</Button>
+            '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
+            '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
+          }}>{isResetting ? 'Resetting…' : 'Reset Environment'}</Button>
         </DialogActions>
       </Dialog>
 
@@ -403,42 +492,58 @@ export default function SettingsPage() {
         TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
         PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
       >
-        <Box sx={{
-          px: 3, pt: 3, pb: 2,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.08)} 0%, ${alpha(theme.palette.warning.main, 0.02)} 100%)`,
-          borderBottom: '1px solid', borderColor: 'divider',
-          display: 'flex', alignItems: 'center', gap: 2,
-        }}>
-          <Box sx={{ bgcolor: alpha(theme.palette.warning.main, 0.12), borderRadius: 2, p: 1, display: 'flex' }}>
-            <WarningAmberIcon sx={{ color: theme.palette.warning.dark, fontSize: 22 }} />
+        <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+          <Box sx={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            px: 3, pt: 3, pb: 2.5,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            borderBottom: '1px solid', borderColor: 'divider',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Chip
+                    icon={<WarningAmberIcon sx={{ fontSize: '12px !important' }} />}
+                    label="Restatement"
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: '0.6rem', fontWeight: 700,
+                      letterSpacing: 0.8, textTransform: 'uppercase',
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                      color: theme.palette.warning.dark, borderRadius: 1,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                  Enable Restatement Mode
+                </Typography>
+              </Box>
+            </Box>
+            <Tooltip title="Close" placement="left">
+              <IconButton onClick={() => { setShowRestatementDaialog(false); setRestatementMode(false); }} size="small" sx={{
+                color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+              }}>
+                <HighlightOffOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
-          <Box>
-            <Typography variant="h6" fontWeight={700} sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', lineHeight: 1.2 }}>
-              Enable Restatement Mode
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
-              Reopens all previously closed accounting periods
-            </Typography>
-          </Box>
-        </Box>
-        <DialogContent sx={{ pt: 2.5, px: 3 }}>
-          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7 }}>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 5, px: 3 }}>
+          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
             Enabling restatement mode will reopen <strong>all previously closed accounting periods</strong> for{' '}
             <strong style={{ color: '#14213d' }}>[{tenant}]</strong>. Are you sure?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => { setShowRestatementDaialog(false); setRestatementMode(false); }} variant="text" sx={{
-            borderRadius: 2, textTransform: 'none', fontWeight: 600,
-            color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-          }}>Cancel</Button>
           <Button onClick={reopenAllClosedAccountingPeriods} variant="contained" sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700,
             fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
-            background: '#d97706', color: '#fff',
-            boxShadow: '0 4px 12px rgba(217,119,6,0.35)',
+            background: '#14213d', color: '#fff',
+            boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': { background: '#b45309', boxShadow: '0 6px 18px rgba(217,119,6,0.45)', transform: 'translateY(-1px)' },
+            '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
           }}>Confirm Restatement</Button>
         </DialogActions>
       </Dialog>
@@ -499,15 +604,15 @@ export default function SettingsPage() {
             description="Choose the default currency for your environment."
           >
             <Autocomplete
-              disablePortal size="small"
+              size="small"
               options={currencyList || []}
               value={currency || null}
               getOptionLabel={(option) => option || ''}
-              onChange={(_, newValue) => setCurrency(newValue || null)}
+              onChange={(_, newValue) => { setCurrency(newValue || null); setIsCurrencyButtonDisabled(false); }}
               sx={{ width: 160 }}
               renderInput={(params) => <TextField {...params} label="Currency" sx={tfSx} />}
             />
-            <ActionLink onClick={saveCurrency} disabled={false}>Save</ActionLink>
+            <ActionLink onClick={saveCurrency} disabled={isCurrencyButtonDisabled}>Save</ActionLink>
           </SettingRow>
 
           <SettingRow
@@ -529,15 +634,15 @@ export default function SettingsPage() {
             description="Set the number of recent posting periods to include in reports."
           >
             <Autocomplete
-              disablePortal size="small"
+              size="small"
               options={reportingPeriodList}
               value={reportingPeriod}
               getOptionLabel={(option) => option}
-              onChange={(_, newValue) => setReportingPeriod(newValue)}
+              onChange={(_, newValue) => { setReportingPeriod(newValue); setIsReportingPeriodButtonDisabled(false); }}
               sx={{ width: 160 }}
               renderInput={(params) => <TextField {...params} label="# Periods" sx={tfSx} />}
             />
-            <ActionLink onClick={handleSaveReportingPeriod} disabled={false}>Save</ActionLink>
+            <ActionLink onClick={handleSaveReportingPeriod} disabled={isReportingPeriodButtonDisabled}>Save</ActionLink>
           </SettingRow>
 
           {/* ── Section: Accounting Periods ── */}
@@ -557,21 +662,23 @@ export default function SettingsPage() {
             />
           </SettingRow>
 
+          {closedPeriodsList.length > 0 && (
           <SettingRow
             title="Re-Open Accounting Period"
             description="Select a closed period to reopen for adjustments."
           >
             <Autocomplete
-              disablePortal size="small"
-              options={reopenPriodList}
+              size="small"
+              options={closedPeriodsList}
               value={reopenPeriod}
               getOptionLabel={(option) => option}
-              onChange={(_, newValue) => setReopenPeriod(newValue)}
+              onChange={(_, newValue) => { setReopenPeriod(newValue); setIsReopenPeriodButtonDisabled(!newValue); }}
               sx={{ width: 160 }}
               renderInput={(params) => <TextField {...params} label="Period" sx={tfSx} />}
             />
-            <ActionLink onClick={handleReopenPeriod}>Reopen</ActionLink>
+            <ActionLink onClick={handleReopenPeriod} disabled={isReopenPeriodButtonDisabled}>Reopen</ActionLink>
           </SettingRow>
+          )}
 
           <SettingRow
             title="Delete Entries"

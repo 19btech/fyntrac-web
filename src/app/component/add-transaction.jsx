@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Switch, FormControlLabel,
   IconButton, Typography, Tooltip, Box, Stack,
-  Chip, Alert, Paper, Slide,
+  Chip, Alert, Paper, Slide, Collapse,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -19,16 +19,11 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
   const [isReplayable, setIsReplayable] = useState(false);
   const [isGL, setIsGL] = useState(false);
   const [id, setId] = useState(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showErrorMessage, setShowErrorMessage] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-
-
-
+  const [errorSnackbar, setErrorSnackbar] = useState({ open: false, message: '', severity: 'error' });
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false);
 
   React.useEffect(() => {
+    if (!open) return;
     if (editData) {
       // Populate form fields with editData if provided
       setTransactionName(editData.name || '');
@@ -42,56 +37,136 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
       setIsExclusive(false);
       setIsGL(false);
       setIsReplayable(false);
+      setId(null);
     }
-    setShowErrorMessage(false);
-    setShowSuccessMessage(false);
-  }, [editData]);
+    setErrorSnackbar({ open: false, message: '', severity: 'error' });
+    setSavedSuccessfully(false);
+  }, [open, editData]);
 
-  const handleAddTransaction = async () => {
-    setShowErrorMessage(false);
+  React.useEffect(() => {
+    if (!errorSnackbar.open || errorSnackbar.severity === 'warning') return;
+    const t = setTimeout(() => setErrorSnackbar(s => ({ ...s, open: false })), 5000);
+    return () => clearTimeout(t);
+  }, [errorSnackbar.open]);
+
+  // Clear any stale flag-warning when the user changes Reportable/Journal so the warn-then-confirm flow stays in sync
+  React.useEffect(() => {
+    if (!errorSnackbar.open || errorSnackbar.severity !== 'warning') return;
+    const msg = errorSnackbar.message;
+    if (msg === WARN_JOURNAL || msg === WARN_REPORTABLE || msg === WARN_BOTH) {
+      setErrorSnackbar(s => ({ ...s, open: false }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExclusive, isGL]);
+
+  const WARN_JOURNAL = 'Journal flag is not set. Defaulting value to true.';
+  const WARN_REPORTABLE = 'Reportable flag is not set. Defaulting value to true.';
+  const WARN_BOTH = 'Both reportable and journal are false. Transaction will not appear in reports or journals.';
+
+  const handleSaveClick = () => {
+    const reportableOff = !isExclusive;
+    const journalOff = !isGL;
+
+    let warningMsg = null;
+    if (reportableOff && journalOff) warningMsg = WARN_BOTH;
+    else if (journalOff) warningMsg = WARN_JOURNAL;
+    else if (reportableOff) warningMsg = WARN_REPORTABLE;
+
+    // First click with a warning condition: show the warning and wait for confirmation.
+    if (warningMsg && errorSnackbar.message !== warningMsg) {
+      setErrorSnackbar({ open: true, message: warningMsg, severity: 'warning' });
+      return;
+    }
+
+    // Second click (or no warning): proceed. Apply documented defaults.
+    const effectiveReportable = (warningMsg === WARN_REPORTABLE) ? 1 : (isExclusive ? 1 : 0);
+    const effectiveJournal = (warningMsg === WARN_JOURNAL) ? 1 : (isGL ? 1 : 0);
+    handleAddTransaction(effectiveReportable, effectiveJournal);
+  };
+
+  const handleAddTransaction = async (effectiveReportable, effectiveJournal) => {
+    const oldName = editData ? editData.name : null;
+    const newName = transactionName.trim();
+    const nameChanged = !!editData && oldName && oldName !== newName;
+
     try {
-      const response = await dataloaderApi.post('/transaction/add', {
-        name: transactionName.trim(),
-        exclusive: isExclusive ? 1 : 0,
-        isGL: isGL ? 1 : 0,
+      await dataloaderApi.post('/transaction/add', {
+        name: newName,
+        exclusive: effectiveReportable,
+        isGL: effectiveJournal,
         isReplayable: isReplayable ? 1 : 0,
         id: id
       });
-      setSuccessMessage('Transaction saved successfully.');
-      setShowSuccessMessage(true);
+      setSavedSuccessfully(true);
 
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        setShowErrorMessage(false);
+      if (nameChanged) {
+        // Cascade-update aggregation (balance) AND subledger mapping entries that reference the old transaction name
+        try {
+          const [aggRes, smlRes] = await Promise.all([
+            dataloaderApi.get('/aggregation/get/all'),
+            dataloaderApi.get('/subledgermapping/get/all'),
+          ]);
+
+          const oldNameLower = oldName.toLowerCase();
+
+          const aggUpdates = (aggRes.data || [])
+            .filter(a => a.transactionName?.toLowerCase() === oldNameLower)
+            .map(agg => dataloaderApi.post('/aggregation/add', {
+              transactionName: newName,
+              metricName: agg.metricName,
+              id: agg.id,
+            }));
+
+          const smlUpdates = (smlRes.data || [])
+            .filter(s => s.transactionName?.toLowerCase() === oldNameLower)
+            .map(sml => dataloaderApi.post('/subledgermapping/add', {
+              transactionName: newName,
+              sign: sml.sign,
+              entryType: sml.entryType,
+              accountSubType: sml.accountSubType,
+              id: sml.id,
+            }));
+
+          await Promise.all([...aggUpdates, ...smlUpdates]);
+          onClose(true);
+        } catch (cascadeErr) {
+          console.error('Cascade update failed:', cascadeErr);
+          setErrorSnackbar({
+            open: true,
+            message: 'Transaction saved, but related balance/subledger references could not be updated automatically. Please update them manually.',
+            severity: 'warning',
+          });
+          // Don't close — user closes via X which will trigger refresh (savedSuccessfully=true)
+        }
+      } else {
         onClose(true);
-      }, 2000);
+      }
     } catch (error) {
       console.log('Submission failed:', error);
+      const status = error.response?.status;
+      const responseText = JSON.stringify(error.response?.data ?? '').toLowerCase();
+      const isDuplicate =
+        status === 409 ||
+        responseText.includes('duplicate') ||
+        responseText.includes('already exists') ||
+        responseText.includes('unique');
 
-      // 1. Check if the backend sent a list of validation errors
-      if (error.response && error.response.status === 400) {
-        const errorList = error.response.data; // This is your 'errors' list from Java
-
-        // 2. Map the errors to a readable format
-        // Assuming ValidationError has a 'message' property
+      if (isDuplicate) {
+        setErrorSnackbar({ open: true, message: 'Duplicate transaction name found. Transaction names must be unique.', severity: 'error' });
+      } else if (status === 400) {
+        const errorList = error.response.data;
         const formattedMessage = Array.isArray(errorList)
           ? errorList.map(err => err.message).join(' | ')
-          : "Invalid input. Please check your data.";
-
-        setErrorMessage(formattedMessage);
+          : 'Invalid input. Please check your data.';
+        setErrorSnackbar({ open: true, message: formattedMessage, severity: 'error' });
       } else {
-        // 3. Fallback for network errors or 500s
-        setErrorMessage("Server error. Please try again later.");
+        setErrorSnackbar({ open: true, message: 'Server error. Please try again later.', severity: 'error' });
       }
-
-      setShowErrorMessage(true);
     }
   };
 
   const handleClose = () => {
-    setShowErrorMessage(false);
-    setShowSuccessMessage(false);
-    onClose(false);
+    onClose(savedSuccessfully);
   };
 
   const isEditMode = !!editData;
@@ -199,20 +274,29 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         </Box>
       </DialogTitle>
 
+      {/* ── Inline error alert ── */}
+      <Collapse in={errorSnackbar.open}>
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Alert
+            severity={errorSnackbar.severity || 'error'}
+            variant="standard"
+            onClose={() => setErrorSnackbar(s => ({ ...s, open: false }))}
+            sx={{
+              borderRadius: 2, fontSize: '0.85rem', fontWeight: 600,
+              bgcolor: errorSnackbar.severity === 'warning' ? 'rgba(245,158,11,0.10)' : 'rgba(220,38,38,0.10)',
+              border: errorSnackbar.severity === 'warning' ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(220,38,38,0.3)',
+              color: errorSnackbar.severity === 'warning' ? '#b45309' : '#dc2626',
+              '& .MuiAlert-icon': { color: errorSnackbar.severity === 'warning' ? '#d97706' : '#dc2626' },
+            }}
+          >
+            {errorSnackbar.message}
+          </Alert>
+        </Box>
+      </Collapse>
+
       {/* ── BODY ── */}
       <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03) }}>
         <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 3 }}>
-
-          {showSuccessMessage && (
-            <Alert severity="success" variant="outlined" sx={{ borderRadius: 2.5, bgcolor: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.35)' }}>
-              {successMessage || 'Transaction saved successfully.'}
-            </Alert>
-          )}
-          {showErrorMessage && (
-            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2.5, bgcolor: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.35)' }}>
-              {String(errorMessage) || 'An error occurred.'}
-            </Alert>
-          )}
 
           {/* Name field */}
           <TextField
@@ -223,7 +307,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
             onChange={(e) => setTransactionName(e.target.value)}
             error={!isTxFormatValid}
             helperText={!isTxFormatValid 
-              ? (hasDoubleSpace ? "Double spacing is not allowed." : hasEdgeSpaces ? "Leading or trailing spaces are not allowed." : "Only alphanumeric, spaces, and underscores allowed.")
+              ? (hasDoubleSpace ? "Double spacing is not allowed." : hasEdgeSpaces ? "Leading or trailing spaces are not allowed." : "Special characters are not allowed.")
               : ""}
             size="small"
             inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
@@ -295,21 +379,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         }}
       >
         <Button
-          onClick={handleClose}
-          variant="text"
-          sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 600,
-            color: 'text.secondary',
-            px: 2.5,
-            '&:hover': { bgcolor: 'action.hover' },
-          }}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleAddTransaction}
+          onClick={handleSaveClick}
           variant="contained"
           disabled={!canSave}
           sx={{

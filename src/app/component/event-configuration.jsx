@@ -551,6 +551,24 @@ export default function EventConfiguration({ open, onClose, editData }) {
             return;
         }
 
+        // All enabled fields are mandatory. Source Columns is always enabled,
+        // Version Type is required when applicable to the selected source,
+        // and Map Fields is required when applicable to the selected source.
+        if (!Array.isArray(newSource.sourceColumns) || newSource.sourceColumns.length === 0) {
+            showAlert("Please select at least one Source Column", 'error');
+            return;
+        }
+        if (isVersionTypeEnabled(newSource.sourceTable) &&
+            (!Array.isArray(newSource.versionType) || newSource.versionType.length === 0)) {
+            showAlert("Please select at least one Version Type", 'error');
+            return;
+        }
+        if (isDataMappingEnabled(newSource.sourceTable) &&
+            (!Array.isArray(newSource.dataMapping) || newSource.dataMapping.length === 0)) {
+            showAlert("Please select at least one Map Field", 'error');
+            return;
+        }
+
         console.log('➕ Adding New Source:', newSource);
 
         const newRow = {
@@ -585,7 +603,31 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const handleEditRow = (row) => setEditingRow(row.id);
-    const handleSaveRow = (rowId) => setEditingRow(null);
+    // Validate a mapping row before exiting edit mode. Enabled fields are mandatory.
+    const validateMappingRow = (row) => {
+        if (!row?.sourceTable) return "Please select a source table";
+        if (!Array.isArray(row.sourceColumns) || row.sourceColumns.length === 0) {
+            return "Please select at least one Source Column";
+        }
+        if (isVersionTypeEnabled(row.sourceTable) &&
+            (!Array.isArray(row.versionType) || row.versionType.length === 0)) {
+            return "Please select at least one Version Type";
+        }
+        if (isDataMappingEnabled(row.sourceTable) &&
+            (!Array.isArray(row.dataMapping) || row.dataMapping.length === 0)) {
+            return "Please select at least one Map Field";
+        }
+        return null;
+    };
+    const handleSaveRow = (rowId) => {
+        const row = sourceMappings.find(r => r.id === rowId);
+        const error = validateMappingRow(row);
+        if (error) {
+            showAlert(error, 'error');
+            return;
+        }
+        setEditingRow(null);
+    };
     const handleCancelEdit = () => setEditingRow(null);
 
     const handleCellChange = (rowId, field, value) => {
@@ -666,6 +708,15 @@ export default function EventConfiguration({ open, onClose, editData }) {
         if (sourceMappings.length === 0) {
             showAlert("Please add at least one source mapping", 'error');
             return;
+        }
+
+        // Re-validate every saved mapping row so enabled fields are mandatory.
+        for (let i = 0; i < sourceMappings.length; i++) {
+            const rowError = validateMappingRow(sourceMappings[i]);
+            if (rowError) {
+                showAlert(`Source mapping #${i + 1}: ${rowError}`, 'error');
+                return;
+            }
         }
 
         setLoading(true);
@@ -764,12 +815,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 ? "Event configuration updated successfully!"
                 : "Event configuration created successfully!";
 
-            showAlert(successMessage, 'success');
             setLoading(false);
 
-            setTimeout(() => {
-                if (onClose) onClose(true);
-            }, 1000);
+            // Close the modal and signal the parent to refresh the grid and show the
+            // success toast (parent owns the snackbar so it remains visible after unmount).
+            if (onClose) onClose(true, successMessage);
 
         } catch (error) {
             console.error('❌ ERROR in save function:');
@@ -851,6 +901,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
         }
     }, [eventData?.triggerType]);
 
+    // When editing an existing event only the source mappings should be editable.
+    // Event Details and Trigger Setup fields are locked in edit mode.
+    const isEditMode = Boolean(editData);
 
     return (
         <Dialog
@@ -954,8 +1007,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     value={eventData.eventId}
                                     onChange={(e) => handleChange('eventId', e.target.value)}
                                     required
-                                    error={!eventData.eventId}
-                                    helperText={!eventData.eventId ? "Event ID is required" : ""}
+                                    disabled={isEditMode}
+                                    error={!isEditMode && !eventData.eventId}
+                                    helperText={!isEditMode && !eventData.eventId ? "Event ID is required" : ""}
                                 />
                             </Grid>
                             <Grid size={6}>
@@ -966,8 +1020,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     value={eventData.eventName}
                                     onChange={(e) => handleChange('eventName', e.target.value)}
                                     required
-                                    error={!eventData.eventName}
-                                    helperText={!eventData.eventName ? "Event Name is required" : ""}
+                                    disabled={isEditMode}
+                                    error={!isEditMode && !eventData.eventName}
+                                    helperText={!isEditMode && !eventData.eventName ? "Event Name is required" : ""}
                                 />
                             </Grid>
                             <Grid size={6}>
@@ -979,8 +1034,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     value={eventData.priority}
                                     onChange={(e) => handleChange('priority', e.target.value)}
                                     required
-                                    error={!eventData.priority}
-                                    helperText={!eventData.priority ? "Priority is required" : ""}
+                                    disabled={isEditMode}
+                                    error={!isEditMode && !eventData.priority}
+                                    helperText={!isEditMode && !eventData.priority ? "Priority is required" : ""}
                                     slotProps={{ min: 1 }}
                                 />
                             </Grid>
@@ -993,6 +1049,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     size="small"
                                     value={eventData.description}
                                     onChange={(e) => handleChange('description', e.target.value)}
+                                    disabled={isEditMode}
                                 />
                             </Grid>
                         </Grid>
@@ -1005,12 +1062,13 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         </Typography>
                         <Grid container spacing={2}>
                             <Grid size={6}>
-                                <FormControl fullWidth size="small" required error={!eventData.triggerType}>
+                                <FormControl fullWidth size="small" required disabled={isEditMode} error={!isEditMode && !eventData.triggerType}>
                                     <InputLabel>Trigger Type *</InputLabel>
                                     <Select
                                         value={eventData.triggerType}
                                         onChange={(e) => handleChange('triggerType', e.target.value)}
                                         label="Trigger Type *"
+                                        disabled={isEditMode}
                                     >
                                         <MenuItem value="ON_MODEL_EXECUTION">On Model Execution</MenuItem>
                                         <MenuItem value="ON_INSTRUMENT_ADD">On Instrument Add</MenuItem>
@@ -1028,6 +1086,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                 <Autocomplete
                                     multiple={eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER'}
                                     size="small"
+                                    disabled={isEditMode}
                                     options={triggerSourceOptions[eventData.triggerType] || []}
                                     getOptionLabel={(option) => option.label || option}
                                     value={
@@ -1431,11 +1490,19 @@ export default function EventConfiguration({ open, onClose, editData }) {
             </DialogContent>
 
             <DialogActions sx={{ justifyContent: 'center', py: 2, backgroundColor: '#f5f5f5' }}>
-                <Tooltip title={loading ? 'Saving...' : 'Save Configuration'}>
+                <Tooltip
+                    title={
+                        loading
+                            ? 'Saving...'
+                            : (isAddingNew || editingRow !== null)
+                                ? 'Save the source mapping row first'
+                                : 'Save Configuration'
+                    }
+                >
                     <span>
                         <Button
                             onClick={handleSaveConfiguration}
-                            disabled={loading}
+                            disabled={loading || isAddingNew || editingRow !== null}
                             sx={{
                                 bgcolor: '#14213d',
                                 color: 'white',

@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Switch, Autocomplete,
   IconButton, Typography, Tooltip, Box, Stack,
-  Chip, Alert, Paper, Slide,
+  Chip, Alert, Paper, Slide, Collapse,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -21,10 +21,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   const [dataType, setDataType] = useState('String');
   const [isNullable, setIsNullable] = useState(false);
   const [id, setId] = useState(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showErrorMessage, setShowErrorMessage] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorSnackbar, setErrorSnackbar] = useState({ open: false, message: '' });
   const dataTypes = [{ label: 'STRING' },
   { label: 'NUMBER' },
   { label: 'DATE' },
@@ -38,8 +35,8 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
 
 
   React.useEffect(() => {
+    if (!open) return;
     if (editData) {
-      // Populate form fields with editData if provided
       setAttributeName(editData.attributeName || '');
       setUserField(editData.userField || '');
       setDataType(editData.dataType || 'STRING');
@@ -48,38 +45,40 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
       setIsNullable(editData.isNullable === 1 ? true : false);
       setId(editData.id);
     } else {
-      // Clear form fields if no editData (e.g., for adding new transaction)
-      setUserField('');
       setAttributeName('');
       setIsReclassable(false);
       setIsVersionable(false);
       setIsNullable(false);
       setDataType('STRING');
       setId(null);
+      setUserField('');
+      // Auto-compute next USERFIELD value from existing attributes
+      dataloaderApi.get('/attribute/get/all')
+        .then(res => {
+          const attrs = res.data || [];
+          const maxNum = attrs.reduce((max, attr) => {
+            const match = attr.userField?.match(/^USERFIELD(\d+)$/i);
+            return match ? Math.max(max, parseInt(match[1], 10)) : max;
+          }, 0);
+          setUserField(`USERFIELD${String(maxNum + 1).padStart(2, '0')}`);
+        })
+        .catch(() => setUserField('USERFIELD01'));
     }
-    // Reset error and success state on dataset shift
-    setShowErrorMessage(false);
-    setShowSuccessMessage(false);
+    setErrorSnackbar({ open: false, message: '' });
   }, [editData, open]);
 
-  // Logical Linking Handler: Versionable must be TRUE if Reclassable is TRUE
-  const handleToggleReclassable = (checked) => {
-    setIsReclassable(checked);
-    if (checked) {
-      setIsVersionable(true);
-    }
-  };
-
-  const handleToggleVersionable = (checked) => {
-    setIsVersionable(checked);
-    if (!checked) {
-      setIsReclassable(false);
-    }
-  };
+  React.useEffect(() => {
+    if (!errorSnackbar.open) return;
+    const t = setTimeout(() => setErrorSnackbar(s => ({ ...s, open: false })), 5000);
+    return () => clearTimeout(t);
+  }, [errorSnackbar.open]);
 
   const handleAddAttribute = async () => {
     console.log('Tenant...', tenant);
-    setShowErrorMessage(false);
+    if (isReclassable && !isVersionable) {
+      setErrorSnackbar({ open: true, message: 'Reclassable requires Versionable to be enabled.' });
+      return;
+    }
     try {
       const response = await dataloaderApi.post('/attribute/add', {
         userField: userField.trim(),
@@ -90,35 +89,26 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         isNullable: isNullable ? 1 : 0,
         id: id
       });
-      setSuccessMessage('Attribute saved successfully.');
-      setShowSuccessMessage(true);
-
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        setShowErrorMessage(false);
-        onClose(true); // Trigger parent refreshes upon successful action
-      }, 2000);
+      onClose(true);
     } catch (error) {
       console.error('Attribute save failed', error);
-      // Extract detailed server validation payload rather than raw Axios object stringify
-      const detailMessage = error.response?.data?.message || error.response?.data || error.message || 'Unable to save attribute config.';
-      setErrorMessage(detailMessage);
-      setShowErrorMessage(true);
+      const raw = error.response?.data?.message || error.response?.data || error.message || 'Unable to save attribute config.';
+      const detailMessage = String(raw).replace(/^\[ERR_[A-Z0-9_]+\]\s*/, '');
+      setErrorSnackbar({ open: true, message: detailMessage });
     }
   };
 
 
   const handleClose = () => {
-    setShowErrorMessage(false);
-    setShowSuccessMessage(false);
     onClose(false);
   };
 
   const isEditMode = !!editData;
-  // Front-end validation regex aligning with backend ErrorCode ALPHANUM_UNDERSCORE rules
+  // Front-end validation: no spaces anywhere, only alphanumeric + underscores
   const nameRegex = /^[a-zA-Z0-9_]+$/;
   const isNameEmpty = !attributeName.trim();
-  const isNameFormatValid = isNameEmpty || nameRegex.test(attributeName.trim());
+  const hasAnySpace = attributeName.includes(' ');
+  const isNameFormatValid = isNameEmpty || nameRegex.test(attributeName);
   const canSave = userField.trim() && !isNameEmpty && dataType && isNameFormatValid;
 
   return (
@@ -216,20 +206,29 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         </Box>
       </DialogTitle>
 
+      {/* ── Inline error alert ── */}
+      <Collapse in={errorSnackbar.open}>
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Alert
+            severity="error"
+            variant="standard"
+            onClose={() => setErrorSnackbar(s => ({ ...s, open: false }))}
+            sx={{
+              borderRadius: 2, fontSize: '0.85rem', fontWeight: 600,
+              bgcolor: 'rgba(220,38,38,0.10)',
+              border: '1px solid rgba(220,38,38,0.3)',
+              color: '#dc2626',
+              '& .MuiAlert-icon': { color: '#dc2626' },
+            }}
+          >
+            {errorSnackbar.message}
+          </Alert>
+        </Box>
+      </Collapse>
+
       {/* ── BODY ── */}
       <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03) }}>
         <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 3 }}>
-
-          {showSuccessMessage && (
-            <Alert severity="success" variant="outlined" sx={{ borderRadius: 2.5, bgcolor: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.35)' }}>
-              {successMessage || 'Attribute saved successfully.'}
-            </Alert>
-          )}
-          {showErrorMessage && (
-            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2.5, bgcolor: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.35)' }}>
-              {String(errorMessage) || 'An error occurred.'}
-            </Alert>
-          )}
 
           {/* Identity fields */}
           <Stack spacing={2}>
@@ -238,8 +237,8 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               fullWidth
               required
               size="small"
+              disabled
               value={userField}
-              onChange={(e) => setUserField(e.target.value)}
               inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -252,7 +251,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               value={attributeName}
               onChange={(e) => setAttributeName(e.target.value)}
               error={!isNameFormatValid}
-              helperText={!isNameFormatValid ? "Only alphanumeric and underscores permitted. Spaces/special chars not allowed." : ""}
+              helperText={!isNameFormatValid ? (hasAnySpace ? "Leading or trailing spaces are not allowed." : "Only alphanumeric characters and underscores are permitted.") : ""}
               inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -315,8 +314,8 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
             </Box>
             <Stack sx={{ px: 2.5, py: 1.5 }} divider={<Box sx={{ borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5) }} />}>
               {[
-                { label: 'Reclassable', desc: 'Allows this attribute to be reclassified (forces versioning).', value: isReclassable, onChange: handleToggleReclassable },
-                { label: 'Versionable', desc: 'Tracks historical versions of this attribute.', value: isVersionable, onChange: handleToggleVersionable },
+                { label: 'Reclassable', desc: 'Allows this attribute to be reclassified. Requires Versionable to also be enabled.', value: isReclassable, onChange: setIsReclassable },
+                { label: 'Versionable', desc: 'Tracks historical versions of this attribute.', value: isVersionable, onChange: setIsVersionable },
                 { label: 'Nullable', desc: 'Permits null values for this attribute.', value: isNullable, onChange: setIsNullable },
               ].map(({ label, desc, value, onChange }) => (
                 <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.25 }}>
@@ -352,20 +351,6 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
           gap: 1.25,
         }}
       >
-        <Button
-          onClick={handleClose}
-          variant="text"
-          sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 600,
-            color: 'text.secondary',
-            px: 2.5,
-            '&:hover': { bgcolor: 'action.hover' },
-          }}
-        >
-          Cancel
-        </Button>
         <Button
           onClick={handleAddAttribute}
           variant="contained"

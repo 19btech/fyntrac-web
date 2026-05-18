@@ -64,23 +64,32 @@ const formatDate = (isoString) => {
 };
 
 const StatusChip = ({ status }) => {
-  const isSuccess = status === 'ACTIVE' || status === 'COMPLETED';
+  const isSuccess = status === 'ACTIVE' || status === 'COMPLETED' || status === 'SUCCESS';
   const isError = status === 'FAILED';
-  const isIdle = status === 'IDLE' || status === 'INACTIVE' || status === 'CONFIGURE';
+  const isWarning = status === 'IN_PROGRESS';
+  const isIdle = status === 'IDLE' || status === 'INACTIVE' || status === 'CONFIGURE' || status === 'NOT_EXECUTED';
 
   let bg = alpha('#22c55e', 0.1);
   let color = '#166534';
   let border = alpha('#22c55e', 0.2);
+  let label = status || '—';
+
+  if (status === 'NOT_EXECUTED') label = 'NOT EXECUTED';
+  else if (status === 'IN_PROGRESS') label = 'IN PROGRESS';
 
   if (isError) {
     bg = alpha('#ef4444', 0.1);
     color = '#991b1b';
     border = alpha('#ef4444', 0.2);
+  } else if (isWarning) {
+    bg = alpha('#3b82f6', 0.1);
+    color = '#1e40af';
+    border = alpha('#3b82f6', 0.2);
   } else if (isIdle) {
     bg = alpha('#64748b', 0.1);
     color = '#334155';
     border = alpha('#64748b', 0.2);
-  } else if (!isSuccess && !isError) {
+  } else if (!isSuccess) {
     bg = alpha('#3b82f6', 0.1);
     color = '#1e40af';
     border = alpha('#3b82f6', 0.2);
@@ -88,7 +97,7 @@ const StatusChip = ({ status }) => {
 
   return (
     <Chip
-      label={status || '—'}
+      label={label}
       size="small"
       sx={{
         fontWeight: 700,
@@ -615,7 +624,7 @@ const FyntracCard = ({ title, children, action, sx }) => {
 };
 
 // Row Component
-function Row({ row, onToggleStatus, onDownload, onExecute }) {
+function Row({ row, onToggleStatus, onDownload, onExecute, executionStatus, execRefreshKey }) {
   const [open, setOpen] = useState(false);
   const theme = useTheme();
   const { tenant } = useTenant();
@@ -625,10 +634,33 @@ function Row({ row, onToggleStatus, onDownload, onExecute }) {
   const [rowSummaryLoading, setRowSummaryLoading] = useState(false);
   const [fetchedFor, setFetchedFor] = useState(null);
 
+  // Reset cached summary whenever a new execution is triggered; re-fetch if row is already open
+  useEffect(() => {
+    if (execRefreshKey === 0) return; // skip initial mount
+    setFetchedFor(null);
+    setRowSummary(null);
+    if (!open || !tenant) return;
+    setRowSummaryLoading(true);
+    const modelType = row.modelType === 'DSL' ? 'PYTHON' : row.modelType;
+    dataloaderApi.get(
+      `/model/execution-summary${modelType ? `?modelType=${modelType}` : ''}`,
+      { headers: { 'X-Tenant': tenant } }
+    ).then(res => {
+      const data = res.data;
+      setRowSummary(Array.isArray(data) ? data[0] : data);
+      setFetchedFor(row.id);
+    }).catch(() => {
+      setRowSummary(null);
+    }).finally(() => {
+      setRowSummaryLoading(false);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [execRefreshKey]);
+
   const handleExpand = async () => {
     const next = !open;
     setOpen(next);
-    // Only fetch once per row (keyed by model id)
+    // Fetch summary on expand; cache is cleared after each execution
     if (next && fetchedFor !== row.id && tenant) {
       setRowSummaryLoading(true);
       const modelType = row.modelType === 'DSL' ? 'PYTHON' : row.modelType;
@@ -703,7 +735,7 @@ function Row({ row, onToggleStatus, onDownload, onExecute }) {
         <TableCell sx={{ color: 'text.secondary' }}>{row.modelType || '—'}</TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{formatDate(row.uploadDate)}</TableCell>
         <TableCell><StatusChip status={row.modelStatus} /></TableCell>
-        <TableCell><StatusChip status={null} /></TableCell>
+        <TableCell><StatusChip status={executionStatus ?? null} /></TableCell>
         <TableCell sx={{ color: 'text.secondary' }}>{row.uploadedBy || '—'}</TableCell>
 
         <TableCell onClick={(e) => e.stopPropagation()} align="center">
@@ -861,13 +893,74 @@ export default function ModelPage() {
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // Incremented after each execution so Row components reset their cached summaries
+  const [execRefreshKey, setExecRefreshKey] = useState(0);
+
+  // Execution status map: modelType -> 'NOT_EXECUTED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED'
+  const [executionStatusMap, setExecutionStatusMap] = useState({});
+  const rowsRef = useRef([]);
+
+  // Fetch last execution status for all unique model types in the loaded rows
+  const refreshExecutionStatuses = useCallback(async (modelRows) => {
+    if (!modelRows?.length) return;
+    const types = [...new Set(modelRows.map(r => r.modelType === 'DSL' ? 'PYTHON' : r.modelType).filter(Boolean))];
+    if (!types.length) return;
+
+    // Check which model types currently have a run in progress
+    let inProgressTypes = new Set();
+    try {
+      const progRes = await dataloaderApi.get('/model/execution-progress');
+      const prog = progRes.data;
+      if (prog && !prog.isComplete) {
+        const batches = prog.batches || [];
+        batches.forEach(b => { if (b.modelType) inProgressTypes.add(b.modelType); });
+        // If no per-batch type info but a run is active, treat all types as in progress
+        if (inProgressTypes.size === 0 && (prog.completedBatches > 0 || prog.totalExpectedBatches > 0)) {
+          types.forEach(t => inProgressTypes.add(t));
+        }
+      }
+    } catch { /* silent */ }
+
+    const results = await Promise.allSettled(
+      types.map(type =>
+        dataloaderApi.get(`/model/execution-summary?modelType=${type}`)
+          .then(res => ({ type, data: res.data }))
+      )
+    );
+
+    const map = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled') {
+        const { type, data: summaryData } = r.value;
+        const summary = Array.isArray(summaryData) ? summaryData[0] : summaryData;
+        if (inProgressTypes.has(type)) {
+          map[type] = 'IN_PROGRESS';
+        } else if (!summary || (!summary.totalBatches && !summary.totalInstruments)) {
+          map[type] = 'NOT_EXECUTED';
+        } else {
+          const success = summary.statusCounts?.SUCCESS ?? summary.totalSuccess ?? 0;
+          const failed = summary.statusCounts?.FAILED ?? summary.totalFailed ?? 0;
+          map[type] = failed === 0 ? 'SUCCESS' : 'FAILED';
+        }
+      }
+    });
+    // Fallback for any type whose summary fetch errored
+    types.forEach(type => {
+      if (!(type in map)) map[type] = inProgressTypes.has(type) ? 'IN_PROGRESS' : 'NOT_EXECUTED';
+    });
+    setExecutionStatusMap(map);
+  }, []);
+
   // --- Data fetching ---
   const fetchModels = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await dataloaderApi.get('/model/get/all');
-      setRows(response.data || []);
+      const data = response.data || [];
+      setRows(data);
+      rowsRef.current = data;
+      refreshExecutionStatuses(data);
     } catch (err) {
       console.error('Failed to fetch models:', err);
       setError('Failed to load models. Please try again.');
@@ -875,11 +968,24 @@ export default function ModelPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshExecutionStatuses]);
 
   useEffect(() => {
     fetchModels();
   }, [fetchModels]);
+
+  // Keep rowsRef in sync with state so the polling interval always reads latest rows
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
+
+  // Real-time polling: 3s while IN_PROGRESS, 8s otherwise
+  useEffect(() => {
+    const poll = () => refreshExecutionStatuses(rowsRef.current);
+    const getInterval = () =>
+      Object.values(executionStatusMap).includes('IN_PROGRESS') ? 3000 : 8000;
+    let timer = setInterval(poll, getInterval());
+    // Restart interval whenever the interval duration should change
+    return () => clearInterval(timer);
+  }, [refreshExecutionStatuses, executionStatusMap]);
 
   // --- Action handlers ---
 
@@ -951,6 +1057,7 @@ export default function ModelPage() {
   const handleExecuteClose = (val) => {
     setExecuteOpen(false);
     setSelectedModelType(null);
+    setExecRefreshKey(k => k + 1); // Force all Row components to re-fetch their summaries
     fetchModels(); // Refresh after execute dialog closes
   };
 
@@ -991,22 +1098,6 @@ export default function ModelPage() {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Run Model (select a model row to pick type)">
-              <IconButton
-                sx={{
-                  bgcolor: 'rgba(22,163,74,0.1)',
-                  border: '1px solid rgba(21,128,61,0.35)',
-                  color: '#16a34a',
-                  boxShadow: 1,
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' },
-                  '&:active': { transform: 'scale(0.94)' },
-                }}
-                onClick={() => handleExecuteOpen(null)}
-              >
-                <PlayCircleOutlineIcon />
-              </IconButton>
-            </Tooltip>
             <Tooltip title="Upload Model">
               <IconButton
                 sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
@@ -1081,6 +1172,8 @@ export default function ModelPage() {
                             onToggleStatus={handleToggleStatus}
                             onDownload={handleDownload}
                             onExecute={handleExecuteOpen}
+                            executionStatus={executionStatusMap[row.modelType === 'DSL' ? 'PYTHON' : row.modelType]}
+                            execRefreshKey={execRefreshKey}
                           />
                         ))
                       )}
@@ -1184,7 +1277,7 @@ export default function ModelPage() {
           </Box>
         </DialogTitle>
         <ModelUploadComponent
-          onDrop={() => { }}
+          onDrop={handleUploadClose}
           text="Drag and drop model file here or click to browse"
         />
       </Dialog>
