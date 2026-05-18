@@ -608,7 +608,9 @@ const FyntracCard = ({ title, children, action, sx }) => {
           borderColor: alpha(theme.palette.divider, 0.5),
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          bgcolor: alpha(theme.palette.primary.main, 0.08),
+          borderRadius: '12px 12px 0 0'
         }}
       >
         <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 700, color: 'text.primary' }}>
