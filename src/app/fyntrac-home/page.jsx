@@ -20,6 +20,8 @@ import {
   Slide,
 } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
+import { BarChart } from '@mui/x-charts/BarChart';
+import { DataGrid } from '@mui/x-data-grid';
 import { dataloaderApi, reportingApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
@@ -30,8 +32,10 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 // Components
 import MetricWidget from '../component/metric-widget';
-import BarChartWidget from '../component/bar-chart-widget';
-import DynamicTable from '../component/dynamic-data-table';
+
+// Stable transition component – must be defined outside render to avoid remounting Snackbar on every re-render
+const SlideLeft = React.forwardRef((props, ref) => <Slide {...props} ref={ref} direction="left" />);
+SlideLeft.displayName = 'SlideLeft';
 
 // --- API CONFIGURATION ---
 const serviceGetOpenAccountingPeriodsURL = '/accounting-period/get/open-periods'
@@ -45,7 +49,7 @@ const serviceGetMomActivityDataURL = '/dashboard/get/mom-activity-data'
 // --- REUSABLE COMPONENTS ---
 
 // UPDATED: A unified card component with better contrast via soft shadows
-const DashboardCard = ({ children, title, action, sx, minHeight }) => {
+const DashboardCard = ({ children, title, action, sx, minHeight, noPadding, accentHeader }) => {
   const theme = useTheme();
 
 
@@ -73,7 +77,7 @@ const DashboardCard = ({ children, title, action, sx, minHeight }) => {
     >
       {(title || action) && (
         <>
-          <Box sx={{ p: 2.5, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ p: 2.5, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: accentHeader ? alpha(theme.palette.primary.main, 0.08) : 'transparent', borderRadius: '12px 12px 0 0' }}>
             {title && (
               <Typography variant="h6" sx={{ fontSize: '1.05rem', fontWeight: 700, color: 'text.primary' }}>
                 {title}
@@ -84,7 +88,7 @@ const DashboardCard = ({ children, title, action, sx, minHeight }) => {
           <Divider sx={{ opacity: 0.6 }} />
         </>
       )}
-      <Box sx={{ p: 2.5, flexGrow: 1, position: 'relative' }}>
+      <Box sx={{ p: noPadding ? 0 : 2.5, flexGrow: 1, position: 'relative' }}>
         {children}
       </Box>
     </Card>
@@ -106,46 +110,10 @@ const compactFormatter = (value) =>
     maximumFractionDigits: 2,
   }).format(value);
 
-const columns = [
-  { id: 'rank', label: 'Rank', align: 'center', width: 60 },
-  { id: 'metricName', label: 'Metric', align: 'left' },
-  {
-    id: 'balance',
-    label: 'Balance',
-    align: 'right',
-
-    // ✅ THIS is what makes formatting work
-    format: (value) =>
-      new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(Number(value) || 0),
-  },
-];
+const formatMetricName = (name) =>
+  (name || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 // Locate this section in your code (around line 118)
-const defaultChartSetting = {
-  yAxis: [
-    {
-      label: 'Activity',
-      labelPadding: 30,
-      width: 60,
-      // FIX: Move font settings into tickLabelStyle
-      tickLabelStyle: {
-        fontSize: 12,
-        fontWeight: 500, // This will now work
-      },
-      // Optional: If you wanted to style the word "Activity" instead
-      labelStyle: {
-        fontSize: 14,
-        fontWeight: 600,
-      },
-      valueFormatter: compactFormatter,
-    },
-  ],
-  height: 300,
-  margin: { top: 30, bottom: 30, left: 90, right: 70 },
-};
 
 export default function HomePage() {
   const { tenant } = useTenant();
@@ -167,6 +135,7 @@ export default function HomePage() {
   const [trendAnalysisData, setTrendAnalysisData] = React.useState([]);
   const [currentOpenAccountingPeriod, setCurrentOpenAccountingPeriod] = React.useState({ ...AccountingPeriodRecord, "period": "__ / __" });
   const [toast, setToast] = React.useState({ open: false, message: '', severity: 'success' });
+  const [currencyCode, setCurrencyCode] = React.useState('USD');
   const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
   const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
@@ -204,12 +173,17 @@ export default function HomePage() {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch current period first so we can pass its periodId to widget data
+        const periodRes = await dataloaderApi.get(serviceGetCurrentOpenAccountingPeriodURL);
+        const currentPeriod = periodRes.data;
+        setCurrentOpenAccountingPeriod(currentPeriod);
+
         fetchOpenAccountingPeriods();
-        fetchCurrentOpenAccountingPeriod();
-        fetchWidgetData();
+        fetchWidgetData(currentPeriod.periodId);
         fetchTrendAnalysisData();
         fetchRankedMetricData();
         fetchMoMActivityData();
+        fetchCurrencySettings();
         setIsDataFetched(true);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -220,6 +194,23 @@ export default function HomePage() {
 
   const handlecloseAccountingPeriod = async () => {
     try {
+      // If restatement mode is currently ON, disable it FIRST before closing the period.
+      try {
+        const settingsRes = await dataloaderApi.get('/setting/get/settings');
+        if (settingsRes?.data?.restatementMode === 1) {
+          await dataloaderApi.post('/setting/restatement-mode/save', {
+            homeCurrency: '',
+            glamFields: '',
+            fiscalPeriodStartDate: settingsRes.data.fiscalPeriodStartDate,
+            reportingPeriod: null,
+            restatementMode: 0,
+            id: settingsRes.data.id ?? null,
+          }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } });
+        }
+      } catch (e) {
+        console.warn('Failed to disable restatement mode before period close:', e);
+      }
+
       await dataloaderApi.post(serviceCloseAccountingPeriodURL, {
         ...AccountingPeriodRecord,
         "periodId": parseInt(year + month),
@@ -230,6 +221,7 @@ export default function HomePage() {
       });
 
       fetchOpenAccountingPeriods();
+      fetchCurrentOpenAccountingPeriod();
       handleClose();
       showToast('Accounting period closed successfully.');
     } catch (error) {
@@ -244,8 +236,9 @@ export default function HomePage() {
       .catch(error => { });
   };
 
-  const fetchWidgetData = () => {
-    reportingApi.get(serviceGetWidgetDataURL)
+  const fetchWidgetData = (periodId) => {
+    const config = periodId ? { params: { accountingPeriodId: periodId } } : {};
+    reportingApi.get(serviceGetWidgetDataURL, config)
       .then(response => { setWidgetDataList(response.data); })
       .catch(error => { });
   };
@@ -264,7 +257,16 @@ export default function HomePage() {
 
   const fetchMoMActivityData = () => {
     reportingApi.get(serviceGetMomActivityDataURL)
-      .then(response => { setMomData(response.data.momData); setMomMetricSeries(response.data.monthOverMonthSeries); })
+      .then(response => {
+        const sorted = [...(response.data.momData || [])].sort((a, b) =>
+          String(a.accountingPeriodId).localeCompare(String(b.accountingPeriodId))
+        );
+        setMomData(sorted);
+        setMomMetricSeries((response.data.monthOverMonthSeries || []).map((s, i) => {
+          const label = formatMetricName(s.label);
+          return { ...s, label, ...(i === 1 ? { color: '#fca311' } : {}) };
+        }));
+      })
       .catch(error => { });
   };
 
@@ -274,12 +276,25 @@ export default function HomePage() {
       .catch(error => { });
   };
 
+  const fetchCurrencySettings = () => {
+    dataloaderApi.get('/setting/get/settings')
+      .then(response => { if (response.data?.currency) setCurrencyCode(response.data.currency); })
+      .catch(() => {});
+  };
 
+
+
+  const currencySymbol = (() => {
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode })
+        .formatToParts(1).find(p => p.type === 'currency')?.value || currencyCode;
+    } catch { return currencyCode; }
+  })();
 
   const currencyFormatter = (value) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currencyCode,
       maximumFractionDigits: 2,
     }).format(value);
 
@@ -306,8 +321,8 @@ export default function HomePage() {
                   </Typography>
                 </Box>
 
-                <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                  <Typography variant="h4" fontWeight={800} color="primary.main" sx={{ letterSpacing: '-1px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography fontWeight={700} color="primary.main" sx={{ fontSize: '30px', letterSpacing: '-0.5px', flex: 1, textAlign: 'center' }}>
                     {currentOpenAccountingPeriod.period}
                   </Typography>
                   <IconButton size="small" onClick={handleClickOpen} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.100', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
@@ -351,10 +366,8 @@ export default function HomePage() {
           {/* B. Four Metric Widgets */}
           {widgetDataList.slice(0, 4).map((metric, index) => (
             <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={index}>
-              <DashboardCard sx={{ p: 0 }}>
-                <Box sx={{ height: '100%', p: 0 }}>
-                  <MetricWidget metric={metric} />
-                </Box>
+              <DashboardCard noPadding>
+                <MetricWidget metric={metric} currencyCode={currencyCode} />
               </DashboardCard>
             </Grid>
           ))}
@@ -365,77 +378,58 @@ export default function HomePage() {
 
           {/* Trend Analysis */}
           <Grid size={{ xs: 12, md: 8 }}>
-            <DashboardCard title={`${trendAnalysisData.metricName || 'Metric'} Trend Analysis`} minHeight={440}>
+            <DashboardCard accentHeader title={`${formatMetricName(trendAnalysisData.metricName || 'Metric')} Trend Analysis`} minHeight={440}>
               {trendAnalysisData?.accountingPeriods?.length > 0 && trendAnalysisData?.endingBalances?.length > 0 ? (
-                <Box sx={{ width: '100%', height: 340, mt: 5 }}>
+                <Box sx={{ width: '100%', height: 340, mt: 1 }}>
                   <LineChart
-                    xAxis={[
-                      {
-                        data: trendAnalysisData.accountingPeriods,
-                        scaleType: 'point',
-                        label: 'Accounting Period',
-                        labelPadding: 30,
-                        tickLabelStyle: {
-                          fontSize: 12,
-                          fontWeight: 500,
-                          // angle: -30,
-                          //  textAnchor: 'end',
-                        },
-                        labelStyle: {
-                          fontSize: 13,
-                          fontWeight: 600,
-                        },
-                      },
-                    ]}
-                    yAxis={[
-                      {
-                        label: 'Ending Balance ($)',
-                        labelPadding: 30,
-                        tickLabelStyle: {
-                          fontSize: 12,
-                          fontWeight: 500,
-                          scaleType: 'linear',
-                        },
-                        valueFormatter: compactFormatter, // ✅ KEY FIX
-                        labelStyle: {
-                          fontSize: 13,
-                          fontWeight: 600,
-
-                        },
-
-
-                      },
-                    ]}
-                    series={[
-                      {
-                        data: trendAnalysisData.endingBalances,
-                        label: 'Balance Trend',
-                        showMark: false,
-                        color: theme.palette.primary.main,
-                        area: true,
-                        valueFormatter: currencyFormatter, // ✅ Tooltip full value
-                        areaStyle: {
-                          fill: `url(#trendGradient)`,
-                          opacity: 0.3,
-                        },
-                      },
-                    ]}
-                    margin={{
-                      left: 20,
-                      right: 30,
-                      top: 30,
-                      bottom: 30,
-                    }}
+                    xAxis={[{
+                      data: trendAnalysisData.accountingPeriods,
+                      scaleType: 'point',
+                      label: 'Accounting Period',
+                      tickLabelStyle: { fontSize: 11, fill: '#475569', fontWeight: 700 },
+                      labelStyle: { fontSize: 12, fill: '#334155', fontWeight: 700 },
+                    }]}
+                    yAxis={[{
+                      label: 'Ending Balance',
+                      tickLabelStyle: { fontSize: 11, fill: '#475569', fontWeight: 700 },
+                      labelStyle: { fontSize: 12, fill: '#334155', fontWeight: 700 },
+                      valueFormatter: compactFormatter,
+                    }]}
+                    series={[{
+                      data: trendAnalysisData.endingBalances,
+                      label: formatMetricName(trendAnalysisData.metricName || 'Ending Balance'),
+                      area: true,
+                      showMark: true,
+                      curve: 'catmullRom',
+                      color: '#fca311',
+                      valueFormatter: currencyFormatter,
+                    }]}
+                    height={320}
+                    margin={{ top: 20, right: 30, bottom: 70, left: 90 }}
+                    grid={{ horizontal: true }}
                     sx={{
                       '& .MuiAreaElement-root': {
-                        fill: 'url(#trendGradient)',
+                        fill: `url(#trendAreaGradient)`,
+                      },
+                      '& .MuiLineElement-root': {
+                        strokeWidth: 2.5,
+                        filter: `drop-shadow(0 2px 6px ${alpha(theme.palette.primary.main, 0.35)})`,
+                      },
+                      '& .MuiMarkElement-root': {
+                        strokeWidth: 2,
+                        fill: '#fff',
+                        r: 3,
+                      },
+                      '& .MuiChartsGrid-line': {
+                        stroke: alpha(theme.palette.grey[300], 0.7),
+                        strokeDasharray: '4 4',
                       },
                     }}
                   >
                     <defs>
-                      <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0.05} />
+                      <linearGradient id="trendAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={theme.palette.primary.main} stopOpacity={0.22} />
+                        <stop offset="100%" stopColor={theme.palette.primary.main} stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                   </LineChart>
@@ -452,14 +446,87 @@ export default function HomePage() {
 
           {/* Top 5 Metrics */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <DashboardCard title="Top 5 Metrics" minHeight={440} action={<IconButton size="small" sx={{ color: 'text.secondary' }}></IconButton>}>
-              <Box sx={{ height: 340, overflow: 'auto', mt: 1 }}>
-                <DynamicTable
-                  columns={columns}
-                  rows={rankedMetrics}
-                  rowKey="rank"
-                />
-              </Box>
+            <DashboardCard accentHeader title="Top Metrics" minHeight={440}>
+              <DataGrid
+                rows={rankedMetrics.slice(0, 5).map(r => ({ ...r, id: r.rank }))}
+                columns={[
+                  {
+                    field: 'rank',
+                    headerName: '#',
+                    width: 52,
+                    align: 'center',
+                    headerAlign: 'center',
+                    sortable: true,
+                    renderCell: ({ value }) => {
+                      const tints = {
+                        1: { bg: alpha('#f59e0b', 0.15), color: '#b45309' },
+                        2: { bg: alpha('#94a3b8', 0.15), color: '#475569' },
+                        3: { bg: alpha('#b45309', 0.12), color: '#92400e' },
+                      };
+                      const t = tints[value] || { bg: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.dark };
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                          <Box sx={{ width: 26, height: 26, borderRadius: '50%', bgcolor: t.bg, color: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 700 }}>
+                            {value}
+                          </Box>
+                        </Box>
+                      );
+                    },
+                  },
+                  {
+                    field: 'metricName',
+                    headerName: 'Metric',
+                    flex: 1,
+                    sortable: true,
+                    renderCell: ({ value }) => (
+                      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', width: '100%' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMetricName(value)}</Typography>
+                      </Box>
+                    ),
+                  },
+                  {
+                    field: 'balance',
+                    headerName: 'Balance',
+                    width: 130,
+                    align: 'right',
+                    headerAlign: 'right',
+                    sortable: true,
+                    renderCell: ({ value }) => (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: '100%', width: '100%' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontFamily: 'Inter, sans-serif' }}>
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Number(value) || 0)}
+                        </Typography>
+                      </Box>
+                    ),
+                  },
+                ]}
+                hideFooter
+                disableColumnMenu
+                disableRowSelectionOnClick
+                density="comfortable"
+                sx={{
+                  border: 'none',
+                  '& .MuiDataGrid-columnHeaders': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    borderRadius: 2,
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'text.secondary',
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                  },
+                  '& .MuiDataGrid-row': {
+                    borderRadius: 1,
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+                    transition: 'background 0.15s',
+                  },
+                  '& .MuiDataGrid-cell': {
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.35)}`,
+                  },
+                  '& .MuiDataGrid-row:last-child .MuiDataGrid-cell': { borderBottom: 'none' },
+                }}
+              />
             </DashboardCard>
           </Grid>
         </Grid>
@@ -467,33 +534,50 @@ export default function HomePage() {
         {/* 4. Bottom Row: Month over Month */}
         <Grid container spacing={2.5}>
           <Grid size={12}>
-            <DashboardCard title="Month Over Month Activity" minHeight={450}>
+            <DashboardCard accentHeader title="Month Over Month Activity" minHeight={450}>
               {momData.length > 0 ? (
                 <Box sx={{ width: '100%', height: 380, mt: 2 }}>
-                  <BarChartWidget
+                  <BarChart
                     dataset={momData}
                     xAxis={[{
-                      label: 'Accounting Period',
                       dataKey: 'accountingPeriodId',
                       scaleType: 'band',
-                      tickLabelStyle: {
-                        fontSize: 12,
-                        fontWeight: 500, // This will now work
-                      },
-                      // Optional: If you wanted to style the word "Activity" instead
-                      labelStyle: {
-                        fontSize: 14,
-                        fontWeight: 600,
-                      },
-
-
+                      label: 'Accounting Period',
+                      tickLabelStyle: { fontSize: 11, fill: '#475569', fontWeight: 700 },
+                      labelStyle: { fontSize: 12, fill: '#334155', fontWeight: 700 },
                     }]}
-                    series={momMetricSeries}
-                    chartSetting={{
-                      ...defaultChartSetting,
-                      height: 380,
-                      // ✅ FIX: Override the margin here. Increase bottom to ~70px.
-                      margin: { top: 30, right: 70, left: 80, bottom: 30 }
+                    yAxis={[{
+                      label: 'Activity',
+                      tickLabelStyle: { fontSize: 11, fill: '#475569', fontWeight: 700 },
+                      labelStyle: { fontSize: 12, fill: '#334155', fontWeight: 700 },
+                      valueFormatter: compactFormatter,
+                    }]}
+                    series={momMetricSeries.map(s => ({ ...s, valueFormatter: currencyFormatter }))}
+                    colors={[
+                      '#A5B4FC', // indigo-300
+                      '#67E8F9', // cyan-300
+                      '#86EFAC', // green-300
+                      '#FCA5A5', // red-300
+                      '#FCD34D', // amber-300
+                      '#C4B5FD', // violet-300
+                      '#6EE7B7', // emerald-300
+                      '#FDA4AF', // rose-300
+                      '#93C5FD', // blue-300
+                      '#7DD3FC', // sky-300
+                    ]}
+                    borderRadius={7}
+                    height={350}
+                    margin={{ top: 20, right: 30, bottom: 70, left: 90 }}
+                    grid={{ horizontal: true }}
+                    sx={{
+                      '& .MuiChartsGrid-line': {
+                        stroke: alpha(theme.palette.grey[300], 0.7),
+                        strokeDasharray: '4 4',
+                      },
+                      '& .MuiBarElement-root': {
+                        transition: 'filter 0.15s ease',
+                        '&:hover': { filter: 'brightness(1.12)' },
+                      },
                     }}
                   />
                 </Box>
@@ -515,7 +599,7 @@ export default function HomePage() {
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
-        TransitionComponent={(props) => <Slide {...props} direction="left" />}
+        TransitionComponent={SlideLeft}
       >
         <Alert
           onClose={handleToastClose}

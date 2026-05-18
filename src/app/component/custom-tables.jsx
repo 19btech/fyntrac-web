@@ -149,6 +149,39 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     const handleConfirmDelete = async () => {
         if (!tableToDelete) return;
 
+        // Guard: a REFERENCE table cannot be deleted while any OPERATIONAL table
+        // is still pointing at it via `referenceTable`. Fetch the current operational
+        // tables and block the delete if a dependency exists.
+        if (tableType === 'REFERENCE') {
+            try {
+                const opResponse = await dataloaderApi.get('/fyntrac/custom-table/operational-tables');
+                const opTables = Array.isArray(opResponse.data?.data) ? opResponse.data.data : [];
+                const refName = tableToDelete.tableName;
+                const dependents = opTables.filter(
+                    t => t && !t.isDeleted && t.referenceTable && t.referenceTable === refName
+                );
+
+                if (dependents.length > 0) {
+                    const names = dependents.map(t => t.tableName).filter(Boolean).join(', ');
+                    setErrorMessage(
+                        `Cannot delete "${refName}" because its reference column is used by ` +
+                        `operational table${dependents.length > 1 ? 's' : ''}: ${names}.`
+                    );
+                    setShowErrorMessage(true);
+                    setDeleteDialogOpen(false);
+                    setTableToDelete(null);
+                    return;
+                }
+            } catch (depErr) {
+                console.error('Failed to check operational dependencies before delete:', depErr);
+                setErrorMessage('Unable to verify dependencies. Please try again.');
+                setShowErrorMessage(true);
+                setDeleteDialogOpen(false);
+                setTableToDelete(null);
+                return;
+            }
+        }
+
         try {
             const response = await deleteCustomTable(tableToDelete.id);
             tableToDelete.isDeleted = response.isDeleted;
@@ -185,6 +218,11 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     const refreshGridData = () => {
         fetchCustomTables();
         setRefreshTrigger(prev => prev + 1);
+        // Also bump the parent page key so the reference-table list (used by the
+        // operational tab's reference dropdown) refetches.
+        if (typeof refreshData === 'function') {
+            refreshData(prev => (typeof prev === 'number' ? prev + 1 : 1));
+        }
     };
 
     const handleViewData = (tableId) => {
@@ -394,12 +432,16 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             });
     };
 
-    // Fetch data when the component mounts or when refreshTrigger changes
+    // Fetch data when the component mounts or when refreshTrigger changes.
+    // For REFERENCE tab we seed from the `referenceTables` prop on first load, but on
+    // any subsequent refresh (refreshTrigger bump) we must fetch fresh data — otherwise
+    // newly created tables won't appear because we'd be overwriting with the stale prop.
     useEffect(() => {
-        if (tableType === 'REFERENCE' && referenceTables.length > 0) {
+        const isFirstLoad = refreshTrigger === 0;
+        if (tableType === 'REFERENCE' && isFirstLoad && referenceTables.length > 0) {
             setRows(referenceTables);
         } else {
-            console.log('tableType', tableType);
+            console.log('tableType', tableType, 'refreshTrigger', refreshTrigger);
             fetchCustomTables();
         }
         setIsDataFetched(true);

@@ -23,6 +23,8 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [accountSubtypes, setAccountSubtypes] = useState([]);
+  const [accountNameError, setAccountNameError] = useState('');
+  const [accountNumberError, setAccountNumberError] = useState('');
 
   const serviceURL = '/chartofaccount/add';
   const sericeGetSubTypeURL = '/accounttype/get/subtypes'
@@ -30,6 +32,30 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [attributeMetadata, setAttributeMetadata] = useState([]);
   const [formValues, setFormValues] = useState({});
   const [formErrors, setFormErrors] = useState({});
+
+  const accountNumberRegex = /^[a-zA-Z0-9_\-\.]+$/;
+  const accountNameRegex = /^[a-zA-Z0-9_\-\.\s\(\)\[\]&',/]+$/;
+
+  const validateAccountNumber = (value) => {
+    if (!value) return '';
+    if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
+    if (/\s/.test(value)) return 'Spaces are not permitted.';
+    if (!accountNumberRegex.test(value)) return 'Only alphanumeric characters, underscores, hyphens, and dots are allowed.';
+    return '';
+  };
+
+  const validateAccountName = (value) => {
+    if (!value) return '';
+    if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
+    if (!accountNameRegex.test(value)) return 'Contains invalid characters.';
+    return '';
+  };
+
+  const validateAttributeField = (value) => {
+    if (!value) return '';
+    if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
+    return '';
+  };
 
   React.useEffect(() => {
     // Fetch attribute metadata from backend on component mount
@@ -58,49 +84,27 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-    setFormValues({
-      ...formValues,
-      [name]: value
-    });
-
-    // Validate input based on attribute data type
+    setFormValues(prev => ({ ...prev, [name]: value }));
     validateInput(name, value);
   };
 
   const validateInput = (name, value) => {
     const attribute = attributeMetadata.find(attr => attr.attributeName === name);
-    if (attribute) {
-      const { dataType } = attribute;
-      let isValid = true;
+    if (!attribute) return;
+    const { dataType } = attribute;
+    let errMsg = '';
 
-      switch (dataType) {
-        case 'String':
-          // Example string validation logic
-          isValid = typeof value === 'string';
-          break;
-        case 'Number':
-          // Example number validation logic
-          isValid = !isNaN(value);
-          break;
-        case 'Date':
-          // Example date validation logic (you can use libraries like moment.js for date validation)
-          isValid = !isNaN(Date.parse(value));
-          break;
-        case 'Boolean':
-          // Example boolean validation logic
-          isValid = value === 'true' || value === 'false';
-          break;
-        default:
-          isValid = true;
-          break;
-      }
-
-      // Update form errors based on validation result
-      setFormErrors({
-        ...formErrors,
-        [name]: isValid ? '' : `Invalid ${dataType} value`
-      });
+    if (dataType === 'String' || !dataType) {
+      errMsg = validateAttributeField(value);
+    } else if (dataType === 'Number') {
+      if (value && isNaN(value)) errMsg = 'Invalid number value.';
+    } else if (dataType === 'Date') {
+      if (value && isNaN(Date.parse(value))) errMsg = 'Invalid date value.';
+    } else if (dataType === 'Boolean') {
+      if (value && value !== 'true' && value !== 'false') errMsg = 'Invalid boolean value.';
     }
+
+    setFormErrors(prev => ({ ...prev, [name]: errMsg }));
   };
 
   const handleSubmit = (event) => {
@@ -124,9 +128,14 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
       setAccountName('');
       setAccountNumber('');
       setAccountSubtype('');
-
+      setFormValues(attributeMetadata.reduce((acc, a) => ({ ...acc, [a.attributeName]: '' }), {}));
     }
-  }, [editData]);
+    setAccountNameError('');
+    setAccountNumberError('');
+    setFormErrors({});
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
+  }, [editData, open]);
 
   const fetchAccountSubtypes = () => {
 
@@ -142,6 +151,61 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
 
   const handleAddChartOfAccount = async () => {
+    setShowErrorMessage(false);
+
+    // ── Field-level validation ────────────────────────────────────────────
+    const nameErr = validateAccountName(accountName);
+    const numErr = validateAccountNumber(accountNumber);
+    if (nameErr) { setAccountNameError(nameErr); return; }
+    if (numErr) { setAccountNumberError(numErr); return; }
+    const hasAttrError = Object.values(formErrors).some(e => !!e);
+    if (hasAttrError) {
+      setErrorMessage('Please fix field errors before saving.');
+      setShowErrorMessage(true);
+      return;
+    }
+
+    // ── Duplicate validation ──────────────────────────────────────────────
+    try {
+      const allRes = await dataloaderApi.get('/chartofaccount/get/all');
+      const existing = (allRes.data || []).filter(r => !id || r.id !== id);
+
+      const myNumLower = accountNumber.trim().toLowerCase();
+      const myNameLower = accountName.trim().toLowerCase();
+      const mySubtypeLower = accountSubtype.toLowerCase();
+
+      // Build a comparable signature of all custom field values
+      const attrSignature = (attrs) =>
+        attributeMetadata.map(a => String(attrs?.[a.attributeName] ?? '').toLowerCase()).join('||');
+      const myAttrSig = attrSignature(formValues);
+
+      for (const r of existing) {
+        const rNumLower = String(r.accountNumber ?? '').toLowerCase();
+        const rNameLower = String(r.accountName ?? '').toLowerCase();
+        const rSubtypeLower = String(r.accountSubtype ?? '').toLowerCase();
+        const rAttrSig = attrSignature(r.attributes);
+
+        // Rule A: complete duplicate
+        if (rNumLower === myNumLower && rNameLower === myNameLower &&
+            rSubtypeLower === mySubtypeLower && rAttrSig === myAttrSig) {
+          setErrorMessage('Duplicate chart of account entry found. All fields match an existing record.');
+          setShowErrorMessage(true);
+          return;
+        }
+
+        // Rule B: same account subtype + custom fields combo exists with different account number or name
+        if (rSubtypeLower === mySubtypeLower && rAttrSig === myAttrSig &&
+            (rNumLower !== myNumLower || rNameLower !== myNameLower)) {
+          setErrorMessage('A record already exists with this account subtype and attribute combination. Account number and name must be unique per subtype and attribute set.');
+          setShowErrorMessage(true);
+          return;
+        }
+      }
+    } catch (validationErr) {
+      console.error('Pre-save validation fetch failed:', validationErr);
+      // Proceed rather than blocking if fetch fails
+    }
+
     try {
       const response = await dataloaderApi.post(serviceURL, {
         accountName: accountName,
@@ -149,21 +213,24 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
         accountNumber: accountNumber,
         id: id,
         attributes: formValues,
-      }
-      );
+      });
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true);
+      }, 600);
     } catch (error) {
-      // Handle error if needed
-      setErrorMessage(error);
+      const status = error.response?.status;
+      const responseText = JSON.stringify(error.response?.data ?? '').toLowerCase();
+      const isDuplicate = status === 409 || responseText.includes('duplicate') ||
+        responseText.includes('already exists') || responseText.includes('unique');
+      setErrorMessage(isDuplicate
+        ? 'Duplicate chart of account entry found. Please check your data.'
+        : 'Server error. Please try again later.');
       setShowErrorMessage(true);
-
     }
   };
 
@@ -175,7 +242,8 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   };
 
   const isEditMode = !!editData;
-  const canSave = accountNumber.trim() && accountName.trim() && accountSubtype;
+  const canSave = accountNumber.trim() && accountName.trim() && accountSubtype &&
+    !accountNameError && !accountNumberError && !Object.values(formErrors).some(e => !!e);
 
   return (
     <Dialog
@@ -268,7 +336,9 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
               label="Account Number"
               fullWidth required size="small"
               value={accountNumber}
-              onChange={(e) => setAccountNumber(e.target.value)}
+              onChange={(e) => { setAccountNumber(e.target.value); setAccountNumberError(validateAccountNumber(e.target.value)); }}
+              error={!!accountNumberError}
+              helperText={accountNumberError}
               sx={{
                 '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
                 '& .MuiInputLabel-root': { fontSize: '0.9rem' },
@@ -278,7 +348,9 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
               label="Account Name"
               fullWidth required size="small"
               value={accountName}
-              onChange={(e) => setAccountName(e.target.value)}
+              onChange={(e) => { setAccountName(e.target.value); setAccountNameError(validateAccountName(e.target.value)); }}
+              error={!!accountNameError}
+              helperText={accountNameError}
               sx={{
                 '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
                 '& .MuiInputLabel-root': { fontSize: '0.9rem' },

@@ -70,6 +70,14 @@ export default function RulePage() {
   const handleCloseFileUpload = () => {
     setOpenFileUpload(false);
   };
+  const handleFileUploadComplete = () => {
+    setOpenFileUpload(false);
+    setTransactionRefreshKey(k => k + 1);
+    setRefreshAttributeKey(k => k + 1);
+    setRefreshAggregationKey(k => k + 1);
+    setRefreshAccountTypeKey(k => k + 1);
+    showToast('Rules uploaded successfully — tables refreshed.');
+  };
 
   const handleFileDrop = () => {
 
@@ -119,19 +127,31 @@ export default function RulePage() {
     }
   }
 
-  const handleAddTransactionCloseDialog = () => {
+  const handleAddTransactionCloseDialog = (didSave) => {
     setIsAddTransactionDialogOpen(false);
+    if (didSave) {
+      setTransactionRefreshKey(k => k + 1);
+      showToast('Transaction saved successfully.');
+    }
   };
 
-  const handleAddAttributeCloseDialog = () => {
+  const handleAddAttributeCloseDialog = (didSave) => {
     setIsAddAttributeDialogOpen(false);
+    if (didSave) {
+      setRefreshAttributeKey(k => k + 1);
+      showToast('Attribute saved successfully.');
+    }
   };
 
-  const handleAddAggregationCloseDialog = () => {
+  const handleAddAggregationCloseDialog = (didSave) => {
     setIsAddAggregationDialogOpen(false);
+    if (didSave) {
+      setRefreshAggregationKey(k => k + 1);
+      showToast('Balance saved successfully.');
+    }
   };
 
-  const handleAddAccountTypeCloseDialog = () => {
+  const handleAddAccountTypeCloseDialog = (didSave) => {
     setIsAddAccountTypeDialogOpen(false);
   };
   return (
@@ -195,13 +215,13 @@ export default function RulePage() {
           </Tabs>
         </Box>
         <CustomTabPanel value={panelIndex} index={0}>
-          <Transaction refreshData={setTransactionRefreshKey} key={reTransactionfreshKey}></Transaction>
+          <Transaction refreshData={setTransactionRefreshKey} key={reTransactionfreshKey} onToast={showToast}></Transaction>
         </CustomTabPanel>
         <CustomTabPanel value={panelIndex} index={1}>
-          <Attribute refreshData={setRefreshAttributeKey} key={refreshAttributeKey}> </Attribute>
+          <Attribute refreshData={setRefreshAttributeKey} key={refreshAttributeKey} onToast={showToast}> </Attribute>
         </CustomTabPanel>
         <CustomTabPanel value={panelIndex} index={2}>
-          <Aggregation refreshData={setRefreshAggregationKey} key={refreshAggregationKey} />
+          <Aggregation refreshData={setRefreshAggregationKey} key={refreshAggregationKey} onToast={showToast} />
         </CustomTabPanel>
 
 
@@ -286,7 +306,7 @@ export default function RulePage() {
           </DialogTitle>
           <DialogContent sx={{ p: 3 }}>
             <FileUploadComponent
-              onDrop={handleCloseFileUpload}
+              onDrop={handleFileUploadComplete}
               text="Drag and drop your files here"
               iconColor="#3f51b5"
               borderColor="#3f51b5"
@@ -306,7 +326,7 @@ export default function RulePage() {
         autoHideDuration={4000}
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        style={{ top: '55px' }}
         TransitionComponent={(props) => <Slide {...props} direction="left" />}
       >
         <Alert

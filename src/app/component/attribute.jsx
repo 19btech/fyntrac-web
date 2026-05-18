@@ -1,37 +1,57 @@
 import React, { useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Checkbox, Box } from '@mui/material';
-import { EditOutlined } from '@mui/icons-material';
+import { IconButton, Tooltip, Box, Chip, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddAttributeDialog from '../component/add-attribute';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
-function Attribute({ refreshData }) {
+function Attribute({ refreshData, onToast }) {
   const { tenant } = useTenant();
   const [rowsPerPage] = useState(10);
   const [isDataFetched, setIsDataFetched] = useState(false);
   const [rows, setRows] = useState([]);
   const [open, setOpen] = useState(false);
   const [editData, setEditData] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState(null);
+
 
   const handleEdit = (rowData) => {
     setEditData(rowData);
     setOpen(true);
   };
 
-  const handleToggle = (id, field) => {
-    setRows(prev => prev.map(row => row.id === id ? { ...row, [field]: !row[field] } : row));
+  const handleDeleteClick = (row) => {
+    setRowToDelete(row);
+    setDeleteDialogOpen(true);
   };
 
-  const boolCell = (field) => (params) => (
-    <Checkbox
-      checked={!!params.value}
-      onChange={() => handleToggle(params.row.id, field)}
-      size="small"
-      sx={{ color: '#14213d', '&.Mui-checked': { color: '#14213d' } }}
-    />
-  );
+  const handleConfirmDelete = async () => {
+    if (!rowToDelete) return;
+    try {
+      await dataloaderApi.delete(`/attribute/delete/${rowToDelete.id}`);
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
+      fetchAttributeData();
+    } catch (error) {
+      console.error('Error deleting attribute:', error);
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setRowToDelete(null);
+  };
+
+  const BoolChip = ({ value }) => value
+    ? <Chip label="Yes" size="small" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700, bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d', border: '1px solid rgba(22,163,74,0.28)', borderRadius: 1.5 }} />
+    : <Chip label="No" size="small" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 600, bgcolor: 'rgba(100,116,139,0.07)', color: '#64748b', border: '1px solid rgba(100,116,139,0.18)', borderRadius: 1.5 }} />;
+
+  const boolCell = () => (params) => <BoolChip value={!!params.value} />;
 
   const columns = [
     {
@@ -85,6 +105,31 @@ function Attribute({ refreshData }) {
             }}
           >
             <EditOutlined sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+    {
+      field: 'delete',
+      headerName: '',
+      width: 64,
+      sortable: false,
+      filterable: false,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Tooltip title="Delete" placement="left">
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteClick(params.row)}
+            sx={{
+              color: '#dc2626',
+              bgcolor: 'rgba(220,38,38,0.06)',
+              borderRadius: 1.5,
+              '&:hover': { bgcolor: 'rgba(220,38,38,0.14)' },
+            }}
+          >
+            <DeleteOutlineOutlined sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
       ),
@@ -170,7 +215,30 @@ function Attribute({ refreshData }) {
           }}
         />
       </Box>
-      <AddAttributeDialog open={open} onClose={setOpen} editData={editData} />
+      <AddAttributeDialog
+        open={open}
+        onClose={(didSave) => {
+          setOpen(false);
+          if (didSave) {
+            fetchAttributeData();
+            onToast?.('Attribute saved successfully.');
+          }
+        }}
+        editData={editData}
+      />
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Attribute</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete <strong>{rowToDelete?.attributeName}</strong>? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
     </>
   );
 }

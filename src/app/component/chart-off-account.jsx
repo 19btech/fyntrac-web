@@ -2,14 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Box } from '@mui/material';
-import { EditOutlined } from '@mui/icons-material';
+import { IconButton, Tooltip, Box, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddChartOfAccountDialog from '../component/add-chart-of-account';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
-function ChartOfAccount({ refreshData }) {
+function ChartOfAccount({ refreshData, onToast }) {
   const { tenant } = useTenant();
   const [rows, setRows] = useState([]);
   const [columns, setColumns] = useState([
@@ -18,9 +18,37 @@ function ChartOfAccount({ refreshData }) {
     { field: 'accountSubtype', headerName: 'Account Subtype', width: 200 },
   ]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
   const [open, setOpen] = useState(false);
   const [editData, setEditData] = useState(null);
   const [rowsPerPage] = useState(10);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState(null);
+
+  const handleDeleteClick = (row) => {
+    setRowToDelete(row);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!rowToDelete) return;
+    try {
+      await dataloaderApi.delete(`/chartofaccount/delete/${rowToDelete.id}`);
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
+      fetchChartOfAccountData();
+      onToast?.('Chart of account deleted successfully.');
+    } catch (error) {
+      console.error('Error deleting chart of account:', error);
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setRowToDelete(null);
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined' && tenant) {
@@ -55,6 +83,7 @@ function ChartOfAccount({ refreshData }) {
       })
       .catch(error => {
         console.error('Error fetching attribute metadata:', error);
+        setFetchError('Unable to load column configuration. The server may be temporarily unavailable (502). Please try again later.');
         setLoading(false);
       });
   };
@@ -124,7 +153,33 @@ function ChartOfAccount({ refreshData }) {
       ),
     };
 
-    setColumns([...baseColumns, ...dynamicColumns, editColumn]);
+    const deleteColumn = {
+      field: 'delete',
+      headerName: '',
+      width: 64,
+      sortable: false,
+      filterable: false,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Tooltip title="Delete" placement="left">
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteClick(params.row)}
+            sx={{
+              color: '#dc2626',
+              bgcolor: 'rgba(220,38,38,0.06)',
+              borderRadius: 1.5,
+              '&:hover': { bgcolor: 'rgba(220,38,38,0.14)' },
+            }}
+          >
+            <DeleteOutlineOutlined sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      ),
+    };
+
+    setColumns([...baseColumns, ...dynamicColumns, editColumn, deleteColumn]);
     setLoading(false);
   };
 
@@ -170,11 +225,21 @@ function ChartOfAccount({ refreshData }) {
       })
       .catch(error => {
         console.error('Error fetching chart of account:', error);
+        setFetchError('Unable to load Chart of Accounts. The server may be temporarily unavailable (502). Please try again later.');
       });
   };
 
   return (
     <>
+      {fetchError && (
+        <Alert severity="error" variant="standard" sx={{
+          mb: 2, borderRadius: 2, fontSize: '0.85rem', fontWeight: 600,
+          bgcolor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)',
+          color: '#dc2626', '& .MuiAlert-icon': { color: '#dc2626' },
+        }}>
+          {fetchError}
+        </Alert>
+      )}
       <Box
         sx={{
           width: '100%',
@@ -242,7 +307,29 @@ function ChartOfAccount({ refreshData }) {
           }}
         />
       </Box>
-      <AddChartOfAccountDialog open={open} onClose={() => setOpen(false)} editData={editData} />
+      <AddChartOfAccountDialog
+        open={open}
+        onClose={(didSave) => {
+          setOpen(false);
+          if (didSave) {
+            fetchChartOfAccountData();
+            onToast?.('Chart of account saved successfully.');
+          }
+        }}
+        editData={editData}
+      />
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Chart of Account</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete account <strong>{rowToDelete?.accountName}</strong>? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

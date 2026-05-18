@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Autocomplete,
   IconButton, Typography, Tooltip, Box, Stack,
-  Chip, Alert, Slide,
+  Chip, Alert, Slide, Collapse,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -14,37 +14,45 @@ import { useTenant } from "../tenant-context";
 const AddAggregationDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
   const theme = useTheme();
-  const [transactionName, setTransactionName] = useState('');
   const [metricName, setMetricName] = useState('');
   const [id, setId] = useState(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showErrorMessage, setShowErrorMessage] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorSnackbar, setErrorSnackbar] = useState({ open: false, message: '' });
 
 
   const serviceURL = '/aggregation/add';
   const serviceGetTransactionNamesURL = '/transaction/get/transactions'
   const [transactionNames, setTransactionNames] = useState([]);
+  const [selectedTransactions, setSelectedTransactions] = useState([]);
 
   React.useEffect(() => {
+    if (!open) return;
     if (transactionNames.length === 0) {
       fetchTransactionNames();
     }
     if (editData) {
       // Populate form fields with editData if provided
-      setTransactionName(editData.transactionName || '');
+      // editData may have transactionNames (array from grouped display) or transactionName (single)
+      setSelectedTransactions(
+        editData.transactionNames?.length > 0
+          ? editData.transactionNames
+          : editData.transactionName ? [editData.transactionName] : []
+      );
       setMetricName(editData.metricName || '');
       setId(editData.id);
     } else {
       // Clear form fields if no editData (e.g., for adding new transaction)
-      setTransactionName('');
+      setSelectedTransactions([]);
       setMetricName('');
       setId(null);
     }
-    setShowErrorMessage(false);
-    setShowSuccessMessage(false);
+    setErrorSnackbar({ open: false, message: '' });
   }, [editData, open]);
+
+  React.useEffect(() => {
+    if (!errorSnackbar.open) return;
+    const t = setTimeout(() => setErrorSnackbar(s => ({ ...s, open: false })), 5000);
+    return () => clearTimeout(t);
+  }, [errorSnackbar.open]);
 
   const fetchTransactionNames = () => {
 
@@ -58,43 +66,53 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   };
 
   const handleAddAggregation = async () => {
-    setShowErrorMessage(false);
     try {
-      const response = await dataloaderApi.post(serviceURL, {
-        transactionName: transactionName,
-        metricName: metricName.trim(),
-        id: id
-      });
-      setSuccessMessage('Balance saved successfully.');
-      setShowSuccessMessage(true);
+      const originalTransactions = isEditMode
+        ? (editData.transactionNames || (editData.transactionName ? [editData.transactionName] : []))
+        : [];
 
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        setShowErrorMessage(false);
-        onClose(true);
-      }, 2000);
+      // Transactions the user removed from the original list
+      const toDelete = originalTransactions.filter(tx => !selectedTransactions.includes(tx));
+      if (toDelete.length > 0) {
+        setErrorSnackbar({ open: true, message: `Removing transactions (${toDelete.join(', ')}) requires a backend delete endpoint — please raise this with your backend team.` });
+        return;
+      }
+
+      // Only POST transactions that don't already exist for this metric
+      const toCreate = selectedTransactions.filter(tx => !originalTransactions.includes(tx));
+
+      if (toCreate.length === 0 && isEditMode) {
+        // Nothing new to add — treat as success and close
+        onClose(false);
+        return;
+      }
+
+      await Promise.all(
+        toCreate.map((txName) =>
+          dataloaderApi.post(serviceURL, {
+            transactionName: txName,
+            metricName: metricName.trim(),
+            id: null,
+          })
+        )
+      );
+      onClose(true);
     } catch (error) {
       console.error('Submission failed:', error);
-      
       if (error.response && error.response.status === 400) {
         const errorList = error.response.data;
-        
         const formattedMessage = Array.isArray(errorList)
           ? errorList.map(err => err.message).join(' | ')
-          : "Invalid input. Please check your data.";
-          
-        setErrorMessage(formattedMessage);
+          : 'Invalid input. Please check your data.';
+        setErrorSnackbar({ open: true, message: formattedMessage });
       } else {
-        setErrorMessage("Server error. Please try again later.");
+        setErrorSnackbar({ open: true, message: 'Server error. Please try again later.' });
       }
-      setShowErrorMessage(true);
     }
   };
 
 
   const handleClose = () => {
-    setShowErrorMessage(false);
-    setShowSuccessMessage(false);
     onClose(false);
   };
 
@@ -105,7 +123,7 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   const isMetricEmpty = !metricName.trim();
   const isMetricFormatValid = isMetricEmpty || metricRegex.test(metricName);
   
-  const canSave = transactionName && !isMetricEmpty && isMetricFormatValid;
+  const canSave = selectedTransactions.length > 0 && !isMetricEmpty && isMetricFormatValid;
 
   return (
     <Dialog
@@ -202,34 +220,65 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
         </Box>
       </DialogTitle>
 
+      {/* ── Inline error alert ── */}
+      <Collapse in={errorSnackbar.open}>
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Alert
+            severity="error"
+            variant="standard"
+            onClose={() => setErrorSnackbar(s => ({ ...s, open: false }))}
+            sx={{
+              borderRadius: 2, fontSize: '0.85rem', fontWeight: 600,
+              bgcolor: 'rgba(220,38,38,0.10)',
+              border: '1px solid rgba(220,38,38,0.3)',
+              color: '#dc2626',
+              '& .MuiAlert-icon': { color: '#dc2626' },
+            }}
+          >
+            {errorSnackbar.message}
+          </Alert>
+        </Box>
+      </Collapse>
+
       {/* ── BODY ── */}
       <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03) }}>
         <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-          {showSuccessMessage && (
-            <Alert severity="success" variant="outlined" sx={{ borderRadius: 2.5, bgcolor: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.35)' }}>
-              {successMessage || 'Balance saved successfully.'}
-            </Alert>
-          )}
-          {showErrorMessage && (
-            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2.5, bgcolor: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.35)' }}>
-              {String(errorMessage) || 'An error occurred.'}
-            </Alert>
-          )}
-
           <Autocomplete
             fullWidth
+            multiple
             disablePortal
+            filterSelectedOptions
             options={transactionNames}
-            value={transactionName}
+            value={selectedTransactions}
             getOptionLabel={(option) => option}
-            onChange={(event, newValue) => setTransactionName(newValue)}
+            onChange={(_, newValue) => setSelectedTransactions(newValue)}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => {
+                const { key, ...tagProps } = getTagProps({ index });
+                return (
+                  <Chip
+                    key={key}
+                    label={option}
+                    size="small"
+                    {...tagProps}
+                    sx={{
+                      height: 22, fontSize: '0.72rem', fontWeight: 700,
+                      bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d',
+                      border: '1px solid rgba(22,163,74,0.28)', borderRadius: 1.5,
+                      '& .MuiChip-deleteIcon': { color: '#15803d', '&:hover': { color: '#166534' } },
+                    }}
+                  />
+                );
+              })
+            }
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Transaction Name"
+                label="Transaction Name(s)"
                 required
                 size="small"
+                placeholder={selectedTransactions.length === 0 ? 'Select one or more…' : ''}
                 inputProps={{ ...params.inputProps, style: { ...params.inputProps?.style, fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
                 InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -266,20 +315,6 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
           gap: 1.25,
         }}
       >
-        <Button
-          onClick={handleClose}
-          variant="text"
-          sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 600,
-            color: 'text.secondary',
-            px: 2.5,
-            '&:hover': { bgcolor: 'action.hover' },
-          }}
-        >
-          Cancel
-        </Button>
         <Button
           onClick={handleAddAggregation}
           variant="contained"

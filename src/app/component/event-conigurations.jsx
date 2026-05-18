@@ -370,7 +370,7 @@ function EventConfigurationsList({ refreshData }) {
             {/* Event Configuration Modal */}
             <EventConfigurationModal
                 open={open}
-                onClose={(result) => {
+                onClose={(result, message) => {
                     console.log('Parent: Modal onClose called with result:', result);
                     setOpen(false);
                     setEditData(null);
@@ -378,6 +378,8 @@ function EventConfigurationsList({ refreshData }) {
                     if (result === true) {
                         console.log('Parent: Refreshing grid data...');
                         refreshGridData();
+                        setSuccessMessage(message || 'Event configuration saved successfully!');
+                        setShowSuccessMessage(true);
                     }
                 }}
                 editData={editData}

@@ -105,23 +105,21 @@ export default function CustomTablesMain() {
     // This function should be passed as onSuccess
 
 
-    const handleSuccess = async (tableData) => {
-        console.log('Table created successfully:', tableData);
-
-        // Show success message
-        setSnackbar({
-            open: true,
-            message: `Table "${tableData.tableName}" created successfully!`,
-            severity: 'success'
-        });
-
-        // Add delay before showing success message
-        await new Promise(resolve => setTimeout(resolve, 5000)); // 1 second delay
-
-        setOpenCustomTableModal(true);
-
-        // You could also refresh your tables list here
-        // fetchTables(); // if you have a function to refresh the table list
+    // Handler used by the create-table dialog when it finishes (success or cancel).
+    // The modal calls onClose(true) on a successful save and onClose() on cancel.
+    // We must always close (false) and, on success, refresh the page-level data so
+    // the new table appears in the grid.
+    const handleDialogClose = (result) => {
+        setOpenCustomTableModal(false);
+        if (result === true) {
+            fetchCustomTables();
+            setModelRefreshKey(prev => prev + 1);
+            setSnackbar({
+                open: true,
+                message: 'Custom table created successfully!',
+                severity: 'success'
+            });
+        }
     };
 
     const handleCloseSnackbar = () => {
@@ -199,11 +197,11 @@ export default function CustomTablesMain() {
             </Box>
             </Card>
             {tableType === 'OPERATIONAL' && (
-                <CreateTableDialog open={openCustomTableModal} onSuccess={handleSuccess} onClose={setOpenCustomTableModal} tableType={'OPERATIONAL'} tables={rows} />
+                <CreateTableDialog open={openCustomTableModal} onClose={handleDialogClose} tableType={'OPERATIONAL'} tables={rows} />
             )}
 
             {tableType === 'REFERENCE' && (
-                <CreateTableDialog open={openCustomTableModal} onSuccess={handleSuccess} onClose={setOpenCustomTableModal} tableType={'REFERENCE'} />
+                <CreateTableDialog open={openCustomTableModal} onClose={handleDialogClose} tableType={'REFERENCE'} />
             )}
 
             <Snackbar

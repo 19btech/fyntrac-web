@@ -92,7 +92,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 id: id
             }
             );
-            setSuccessMessage(JSON.stringify(response.data));
+            setSuccessMessage('Dashboard configuration saved successfully.');
             setShowSuccessMessage(true);
 
             setTimeout(() => {
@@ -113,7 +113,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 userFriendlyMessage = error.message;
             }
 
-            setErrorMessage(userFriendlyMessage); // Pass a string
+            setErrorMessage('Failed to save dashboard configuration.');
             setShowErrorMessage(true);
         }
     };
@@ -363,12 +363,6 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
           px: 3.5, py: 2, borderTop: '1px solid', borderColor: 'divider',
           bgcolor: 'background.paper', justifyContent: 'flex-end', gap: 1.25,
         }}>
-          <Button onClick={handleClose} variant="text" sx={{
-            borderRadius: 2, textTransform: 'none', fontWeight: 600,
-            color: 'text.secondary', px: 2.5, '&:hover': { bgcolor: 'action.hover' },
-          }}>
-            Cancel
-          </Button>
           <Button onClick={handleSaveDashboardConfiguration} variant="contained" sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700, minWidth: 150, px: 3,
             background: '#14213d', color: '#fff', boxShadow: '0 6px 16px rgba(20,33,61,0.35)',

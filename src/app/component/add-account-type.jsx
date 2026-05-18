@@ -18,8 +18,6 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
   const [accountSubType, setAccountSubType] = useState('');
   const [accountType, setAccountType] = useState('BALANCESHEET');
   const [id, setId] = useState(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const defaultAccountTypes = ['BALANCESHEET', 'INCOMESTATEMENT', 'CLEARING'];
@@ -42,37 +40,82 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
       setId(null);
     }
     setShowErrorMessage(false);
-    setShowSuccessMessage(false);
   }, [editData, open]);
 
   const handleAccountType = async () => {
     setShowErrorMessage(false);
+    const oldSubtype = editData ? editData.accountSubType : null;
+    const newSubtype = accountSubType.trim();
+    const subtypeChanged = !!editData && oldSubtype && oldSubtype !== newSubtype;
+
     try {
-      const response = await dataloaderApi.post(serviceURL, {
-        accountSubType: accountSubType.trim(),
+      await dataloaderApi.post(serviceURL, {
+        accountSubType: newSubtype,
         accountType,
         id,
       });
-      setSuccessMessage('Account type saved successfully.');
-      setShowSuccessMessage(true);
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        setShowErrorMessage(false);
+
+      if (subtypeChanged) {
+        // Cascade-update subledger mapping and chart of account entries that reference the old subtype
+        try {
+          const [smlRes, coaRes] = await Promise.all([
+            dataloaderApi.get('/subledgermapping/get/all'),
+            dataloaderApi.get('/chartofaccount/get/all'),
+          ]);
+
+          const oldSubtypeLower = oldSubtype.toLowerCase();
+
+          const smlUpdates = (smlRes.data || [])
+            .filter(s => s.accountSubType?.toLowerCase() === oldSubtypeLower)
+            .map(sml => dataloaderApi.post('/subledgermapping/add', {
+              transactionName: sml.transactionName,
+              sign: sml.sign,
+              entryType: sml.entryType,
+              accountSubType: newSubtype,
+              id: sml.id,
+            }));
+
+          const coaUpdates = (coaRes.data || [])
+            .filter(c => c.accountSubtype?.toLowerCase() === oldSubtypeLower)
+            .map(c => dataloaderApi.post('/chartofaccount/add', {
+              id: c.id,
+              accountNumber: c.accountNumber,
+              accountName: c.accountName,
+              accountSubtype: newSubtype,
+              attributes: c.attributes || {},
+            }));
+
+          await Promise.all([...smlUpdates, ...coaUpdates]);
+          onClose(true);
+        } catch (cascadeErr) {
+          console.error('Cascade update failed:', cascadeErr);
+          setErrorMessage('Account type saved, but related subledger mapping and chart of account references could not be updated automatically. Please update them manually.');
+          setShowErrorMessage(true);
+          // Don\'t close — user can close via X (editData will trigger refresh)
+        }
+      } else {
         onClose(true);
-      }, 2000);
+      }
     } catch (error) {
       console.error('Submission failed:', error);
-      
-      if (error.response && error.response.status === 400) {
+      const status = error.response?.status;
+      const responseText = JSON.stringify(error.response?.data ?? '').toLowerCase();
+      const isDuplicate =
+        status === 409 ||
+        responseText.includes('duplicate') ||
+        responseText.includes('already exists') ||
+        responseText.includes('unique');
+
+      if (isDuplicate) {
+        setErrorMessage('Duplicate account subtype found. Account subtypes must be unique.');
+      } else if (status === 400) {
         const errorList = error.response.data;
-        
         const formattedMessage = Array.isArray(errorList)
           ? errorList.map(err => err.message).join(' | ')
-          : "Invalid input. Please check your data.";
-          
+          : 'Invalid input. Please check your data.';
         setErrorMessage(formattedMessage);
       } else {
-        setErrorMessage("Server error. Please try again later.");
+        setErrorMessage('Server error. Please try again later.');
       }
       setShowErrorMessage(true);
     }
@@ -80,12 +123,16 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
 
   const handleClose = () => {
     setShowErrorMessage(false);
-    setShowSuccessMessage(false);
     onClose(false);
   };
 
   const isEditMode = !!editData;
-  const canSave = accountSubType.trim() && accountType && /^[a-zA-Z0-9_ ]+$/.test(accountSubType.trim());
+  const subtypeRegex = /^[a-zA-Z0-9_ ]+$/;
+  const isSubtypeEmpty = !accountSubType.trim();
+  const hasDoubleSpace = accountSubType.includes('  ');
+  const hasEdgeSpaces = accountSubType.length > 0 && accountSubType.trim() !== accountSubType;
+  const isSubtypeFormatValid = isSubtypeEmpty || (subtypeRegex.test(accountSubType) && !hasDoubleSpace && !hasEdgeSpaces);
+  const canSave = !isSubtypeEmpty && isSubtypeFormatValid && !!accountType;
 
   return (
     <Dialog
@@ -163,11 +210,6 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
 
       <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03) }}>
         <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          {showSuccessMessage && (
-            <Alert severity="success" variant="outlined" sx={{ borderRadius: 2.5, py: 0.5, fontSize: '0.8rem', bgcolor: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.35)' }}>
-              {successMessage || 'Account type saved successfully.'}
-            </Alert>
-          )}
           {showErrorMessage && (
             <Alert severity="error" variant="outlined" sx={{ borderRadius: 2.5, py: 0.5, fontSize: '0.8rem', bgcolor: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.35)' }}>
               {String(errorMessage) || 'An error occurred.'}
@@ -182,8 +224,10 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
             value={accountSubType}
             onChange={(e) => setAccountSubType(e.target.value)}
             placeholder="e.g. Equity, Revenue..."
-            error={accountSubType.trim() !== '' && !/^[a-zA-Z0-9_ ]+$/.test(accountSubType.trim())}
-            helperText={accountSubType.trim() !== '' && !/^[a-zA-Z0-9_ ]+$/.test(accountSubType.trim()) ? "Only alphanumeric, underscores and spaces allowed" : ""}
+            error={!isSubtypeFormatValid}
+            helperText={!isSubtypeFormatValid
+              ? (hasDoubleSpace ? 'Double spacing is not allowed.' : hasEdgeSpaces ? 'Leading or trailing spaces are not allowed.' : 'Special characters are not allowed.')
+              : ''}
             inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -249,12 +293,6 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
         px: 3.5, py: 2, borderTop: '1px solid', borderColor: 'divider',
         bgcolor: 'background.paper', justifyContent: 'flex-end', gap: 1.25,
       }}>
-        <Button onClick={handleClose} variant="text" sx={{
-          borderRadius: 2, textTransform: 'none', fontWeight: 600,
-          color: 'text.secondary', px: 2.5, '&:hover': { bgcolor: 'action.hover' },
-        }}>
-          Cancel
-        </Button>
         <Button onClick={handleAccountType} variant="contained" disabled={!canSave} sx={{
           borderRadius: 2, textTransform: 'none', fontWeight: 700, minWidth: 130, px: 3,
           background: '#14213d', color: '#fff', boxShadow: '0 6px 16px rgba(20,33,61,0.35)',
