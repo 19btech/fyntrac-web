@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Box, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { IconButton, Tooltip, Box, Chip, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddChartOfAccountDialog from '../component/add-chart-of-account';
@@ -17,7 +17,7 @@ function ChartOfAccount({ refreshData, onToast }) {
     { field: 'accountName', headerName: 'Account Name', width: 200 },
     { field: 'accountSubtype', headerName: 'Account Subtype', width: 200 },
   ]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [open, setOpen] = useState(false);
   const [editData, setEditData] = useState(null);
@@ -92,7 +92,23 @@ function ChartOfAccount({ refreshData, onToast }) {
     const baseColumns = [
       { field: 'accountNumber', headerName: 'Account Number', width: 200 },
       { field: 'accountName', headerName: 'Account Name', width: 200 },
-      { field: 'accountSubtype', headerName: 'Account Subtype', width: 200 },
+      {
+        field: 'accountSubtype',
+        headerName: 'Account Subtype',
+        width: 200,
+        renderCell: (params) => (
+          <Chip
+            label={params.value}
+            size="small"
+            sx={{
+              height: 22, fontSize: '0.72rem', fontWeight: 700,
+              bgcolor: 'rgba(234,179,8,0.1)', color: '#a16207',
+              border: '1px solid rgba(234,179,8,0.28)', borderRadius: 1.5,
+              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+            }}
+          />
+        ),
+      },
     ];
 
     const dynamicColumns = metadata.map(attr => {
@@ -207,6 +223,7 @@ function ChartOfAccount({ refreshData, onToast }) {
   };
 
   const fetchChartOfAccountData = () => {
+    setLoading(true);
     dataloaderApi.get(`/chartofaccount/get/all`, {
       headers: {
         'X-Tenant': tenant,
@@ -226,7 +243,8 @@ function ChartOfAccount({ refreshData, onToast }) {
       .catch(error => {
         console.error('Error fetching chart of account:', error);
         setFetchError('Unable to load Chart of Accounts. The server may be temporarily unavailable (502). Please try again later.');
-      });
+      })
+      .finally(() => setLoading(false));
   };
 
   return (

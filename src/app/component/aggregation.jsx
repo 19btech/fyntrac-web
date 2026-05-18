@@ -30,6 +30,7 @@ function Aggregation({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
 
   const handleEdit = (rowData) => {
@@ -157,9 +158,11 @@ function Aggregation({ refreshData, onToast }) {
   ];
 
   const fetchAggregationData = () => {
+    setLoading(true);
     dataloaderApi.get('/aggregation/get/all')
       .then(response => setRows(groupByMetric(response.data)))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   };
 
   React.useEffect(() => {
@@ -187,6 +190,7 @@ function Aggregation({ refreshData, onToast }) {
         <DataGrid
           rows={rows}
           columns={columns}
+          loading={loading}
           getRowId={(row) => row.id}
           getRowHeight={() => 'auto'}
           pageSizeOptions={[5, 10, 20]}

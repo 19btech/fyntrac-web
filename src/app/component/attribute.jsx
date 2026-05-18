@@ -16,6 +16,7 @@ function Attribute({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
 
   const handleEdit = (rowData) => {
@@ -137,9 +138,11 @@ function Attribute({ refreshData, onToast }) {
   ];
 
   const fetchAttributeData = () => {
+    setLoading(true);
     dataloaderApi.get('/attribute/get/all')
       .then(response => setRows(response.data))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   };
 
   React.useEffect(() => {
@@ -167,6 +170,7 @@ function Attribute({ refreshData, onToast }) {
         <DataGrid
           rows={rows}
           columns={columns}
+          loading={loading}
           pageSizeOptions={[5, 10, 20]}
           initialState={{ pagination: { paginationModel: { pageSize: rowsPerPage } } }}
           paginationMode="client"

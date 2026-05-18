@@ -157,11 +157,15 @@ export default function HomePage() {
     uniquePeriodIds.forEach((ap) => { if (ap > 0) yearList.push(ap.toString()) });
     setYears(yearList);
     setYear(yearList[0]);
+    return yearList[0];
   }
 
-  const fillMonthList = (apList) => {
+  const fillMonthList = (apList, selectedYear) => {
+    var filtered = selectedYear
+      ? apList.filter(r => r.year.toString() === selectedYear.toString())
+      : apList;
     var monthList = [];
-    var uniquePeriodIds = [...new Set(apList.map((record) => record.fiscalPeriod))];
+    var uniquePeriodIds = [...new Set(filtered.map((record) => record.fiscalPeriod))];
     uniquePeriodIds.forEach((ap) => {
       if (ap > 0 && ap < 10) { monthList.push("0" + ap.toString()); } else { monthList.push(ap.toString()); }
     });
@@ -232,7 +236,11 @@ export default function HomePage() {
 
   const fetchOpenAccountingPeriods = () => {
     dataloaderApi.get(serviceGetOpenAccountingPeriodsURL)
-      .then(response => { setAccountingPeriods(response.data); fillYearList(response.data); fillMonthList(response.data); })
+      .then(response => {
+        setAccountingPeriods(response.data);
+        const firstYear = fillYearList(response.data);
+        fillMonthList(response.data, firstYear);
+      })
       .catch(error => { });
   };
 
@@ -342,7 +350,7 @@ export default function HomePage() {
                   <Autocomplete
                     options={years}
                     value={year}
-                    onChange={(e, v) => setYear(v)}
+                    onChange={(e, v) => { setYear(v); fillMonthList(accountingPeriods, v); }}
                     disableClearable
                     sx={{ width: 100 }}
                     renderInput={(params) => <TextField {...params} label="Year" size="small" />}

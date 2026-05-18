@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Box, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { IconButton, Tooltip, Box, Chip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddAccountTypeDialog from '../component/add-account-type';
@@ -16,6 +16,7 @@ function AccountType({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const handleEdit = (rowData) => {
     setEditData(rowData);
@@ -63,7 +64,16 @@ function AccountType({ refreshData, onToast }) {
       flex: 1.5,
       minWidth: 180,
       renderCell: (params) => (
-        <Box sx={{ fontSize: '0.85rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', color: 'text.secondary' }}>{params.value}</Box>
+        <Chip
+          label={params.value}
+          size="small"
+          sx={{
+            height: 22, fontSize: '0.72rem', fontWeight: 700,
+            bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d',
+            border: '1px solid rgba(22,163,74,0.28)', borderRadius: 1.5,
+            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          }}
+        />
       ),
     },
     {
@@ -119,11 +129,13 @@ function AccountType({ refreshData, onToast }) {
   ];
 
   const fetchAccountTypeData = () => {
+    setLoading(true);
     dataloaderApi.get('/accounttype/get/all', {
       headers: { 'X-Tenant': tenant, Accept: '*/*' },
     })
       .then(response => setRows(response.data))
-      .catch(error => console.error('Error fetching account type data:', error));
+      .catch(error => console.error('Error fetching account type data:', error))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -151,6 +163,7 @@ function AccountType({ refreshData, onToast }) {
         <DataGrid
           rows={rows}
           columns={columns}
+          loading={loading}
           pageSizeOptions={[5, 10, 20]}
           initialState={{ pagination: { paginationModel: { pageSize: rowsPerPage } } }}
           paginationMode="client"

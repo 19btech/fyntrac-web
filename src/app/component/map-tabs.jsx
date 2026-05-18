@@ -10,6 +10,7 @@ import {
   Chip,
   Stack
 } from '@mui/material';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 
 // Helper function moved to top level
@@ -48,9 +49,22 @@ function MapAsRowsDataGridTabs({ data }) {
   if (tabData.length === 0) {
     return (
       <Card variant="outlined">
-        <CardContent sx={{ padding: 3, textAlign: 'center' }}>
-          <Typography color="textSecondary">
-            No data available to display
+        <CardContent
+          sx={{
+            padding: 6,
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
+          <FilterAltOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
+          <Typography variant="subtitle1" fontWeight={600} color="text.secondary">
+            No results to display
+          </Typography>
+          <Typography variant="body2" color="text.disabled" sx={{ maxWidth: 340 }}>
+            Select an instrument, model, and posting date above, then run the diagnostic to see results.
           </Typography>
         </CardContent>
       </Card>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Box, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { IconButton, Tooltip, Box, Chip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddSubledgerMappingDialog from '../component/add-subledger-mapping';
@@ -16,6 +16,7 @@ function SubledgerMapping({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const handleEdit = (rowData) => {
     setEditData(rowData);
@@ -62,9 +63,23 @@ function SubledgerMapping({ refreshData, onToast }) {
       headerName: 'Criteria',
       flex: 1.2,
       minWidth: 140,
-      renderCell: (params) => (
-        <Box sx={{ fontSize: '0.85rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', color: 'text.secondary' }}>{params.value}</Box>
-      ),
+      renderCell: (params) => {
+        const isNegative = params.value?.toLowerCase() === 'negative';
+        return (
+          <Chip
+            label={params.value}
+            size="small"
+            sx={{
+              height: 24, fontSize: '0.75rem', fontWeight: 700,
+              bgcolor: isNegative ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)',
+              color: isNegative ? '#dc2626' : '#15803d',
+              border: isNegative ? '1px solid rgba(220,38,38,0.28)' : '1px solid rgba(22,163,74,0.28)',
+              borderRadius: 1.5,
+              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+            }}
+          />
+        );
+      },
     },
     {
       field: 'entryType',
@@ -72,7 +87,16 @@ function SubledgerMapping({ refreshData, onToast }) {
       flex: 1,
       minWidth: 120,
       renderCell: (params) => (
-        <Box sx={{ fontSize: '0.85rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', color: 'text.secondary' }}>{params.value}</Box>
+        <Chip
+          label={params.value}
+          size="small"
+          sx={{
+            height: 24, fontSize: '0.75rem', fontWeight: 700,
+            bgcolor: 'rgba(59,130,246,0.1)', color: '#1d4ed8',
+            border: '1px solid rgba(59,130,246,0.25)', borderRadius: 1.5,
+            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          }}
+        />
       ),
     },
     {
@@ -81,7 +105,16 @@ function SubledgerMapping({ refreshData, onToast }) {
       flex: 1.5,
       minWidth: 160,
       renderCell: (params) => (
-        <Box sx={{ fontSize: '0.85rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', color: 'text.secondary' }}>{params.value}</Box>
+        <Chip
+          label={params.value}
+          size="small"
+          sx={{
+            height: 22, fontSize: '0.72rem', fontWeight: 700,
+            bgcolor: 'rgba(234,179,8,0.1)', color: '#a16207',
+            border: '1px solid rgba(234,179,8,0.28)', borderRadius: 1.5,
+            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          }}
+        />
       ),
     },
     {
@@ -137,9 +170,11 @@ function SubledgerMapping({ refreshData, onToast }) {
   ];
 
   const fetchData = () => {
+    setLoading(true);
     dataloaderApi.get('/subledgermapping/get/all')
       .then(response => setRows(response.data))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   };
 
   React.useEffect(() => {
@@ -167,6 +202,7 @@ function SubledgerMapping({ refreshData, onToast }) {
         <DataGrid
           rows={rows}
           columns={columns}
+          loading={loading}
           pageSizeOptions={[5, 10, 20]}
           initialState={{ pagination: { paginationModel: { pageSize: rowsPerPage } } }}
           paginationMode="client"

@@ -16,6 +16,7 @@ function Transaction({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
 
   const handleEdit = (rowData) => {
@@ -143,12 +144,15 @@ function Transaction({ refreshData, onToast }) {
   ];
 
   const fetchTransactionData = async () => {
+    setLoading(true);
     try {
       const response = await dataloaderApi.get('/transaction/get/all');
       const data = response.data || [];
       setRows(data.map((item, index) => ({ ...item, id: item.id || index + 1 })));
     } catch (error) {
       console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,6 +180,7 @@ function Transaction({ refreshData, onToast }) {
         <DataGrid
           rows={rows}
           columns={columns}
+          loading={loading}
           getRowId={(row) => row.id}
           pageSizeOptions={[5, 10, 20]}
           initialState={{ pagination: { paginationModel: { pageSize: rowsPerPage } } }}
