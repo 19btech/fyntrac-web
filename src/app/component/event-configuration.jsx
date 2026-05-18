@@ -40,6 +40,14 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { dataloaderApi } from '../services/api-client';
 
+const validateEventId = (value) => {
+  if (!value || value.trim() === '') return 'Event ID cannot be empty.';
+  if (/\s/.test(value)) return 'Event ID cannot have leading, in-between or trailing spaces.';
+  if (!/^[A-Za-z0-9_]+$/.test(value)) return 'Event ID cannot have special characters (only letters, numbers and underscores are allowed).';
+  if (value.length > 63) return 'Event ID cannot exceed 63 characters.';
+  return null;
+};
+
 export default function EventConfiguration({ open, onClose, editData }) {
     const { tenant, user } = useTenant();
     const theme = useTheme();
@@ -69,6 +77,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [editingRow, setEditingRow] = useState(null);
     const [isAddingNew, setIsAddingNew] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [eventIdError, setEventIdError] = useState(null);
 
     const [newSource, setNewSource] = useState({
         sourceTable: '',
@@ -698,10 +707,17 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
     // === Fixed Save Function ===
     const handleSaveConfiguration = async () => {
+        if (loading) return;
         console.log('🚀 SAVE FUNCTION STARTED');
 
-        if (!eventData.eventId || !eventData.eventName || !eventData.priority) {
-            showAlert("Please fill in all required fields: Event ID, Event Name, and Priority", 'error');
+        const idValidationError = validateEventId(eventData.eventId);
+        if (idValidationError) {
+            setEventIdError(idValidationError);
+            showAlert(idValidationError, 'error');
+            return;
+        }
+        if (!eventData.eventName || !eventData.priority) {
+            showAlert("Please fill in all required fields: Event Name and Priority", 'error');
             return;
         }
 
@@ -1001,25 +1017,27 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         <Grid container spacing={2}>
                             <Grid size={6}>
                                 <TextField
-                                    label="Event ID *"
+                                    label="Event ID"
                                     fullWidth
                                     size="small"
                                     value={eventData.eventId}
-                                    onChange={(e) => handleChange('eventId', e.target.value)}
-                                    required
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleChange('eventId', val);
+                                        setEventIdError(validateEventId(val));
+                                    }}
                                     disabled={isEditMode}
-                                    error={!isEditMode && !eventData.eventId}
-                                    helperText={!isEditMode && !eventData.eventId ? "Event ID is required" : ""}
+                                    error={!isEditMode && !!eventIdError}
+                                    helperText={!isEditMode ? (eventIdError || ' ') : ' '}
                                 />
                             </Grid>
                             <Grid size={6}>
                                 <TextField
-                                    label="Event Name *"
+                                    label="Event Name"
                                     fullWidth
                                     size="small"
                                     value={eventData.eventName}
                                     onChange={(e) => handleChange('eventName', e.target.value)}
-                                    required
                                     disabled={isEditMode}
                                     error={!isEditMode && !eventData.eventName}
                                     helperText={!isEditMode && !eventData.eventName ? "Event Name is required" : ""}
@@ -1027,13 +1045,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
                             </Grid>
                             <Grid size={6}>
                                 <TextField
-                                    label="Event Priority *"
+                                    label="Event Priority"
                                     fullWidth
                                     type="number"
                                     size="small"
                                     value={eventData.priority}
                                     onChange={(e) => handleChange('priority', e.target.value)}
-                                    required
                                     disabled={isEditMode}
                                     error={!isEditMode && !eventData.priority}
                                     helperText={!isEditMode && !eventData.priority ? "Priority is required" : ""}
@@ -1062,12 +1079,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         </Typography>
                         <Grid container spacing={2}>
                             <Grid size={6}>
-                                <FormControl fullWidth size="small" required disabled={isEditMode} error={!isEditMode && !eventData.triggerType}>
-                                    <InputLabel>Trigger Type *</InputLabel>
+                                <FormControl fullWidth size="small" disabled={isEditMode} error={!isEditMode && !eventData.triggerType}>
+                                    <InputLabel>Trigger Type</InputLabel>
                                     <Select
                                         value={eventData.triggerType}
                                         onChange={(e) => handleChange('triggerType', e.target.value)}
-                                        label="Trigger Type *"
+                                        label="Trigger Type"
                                         disabled={isEditMode}
                                     >
                                         <MenuItem value="ON_MODEL_EXECUTION">On Model Execution</MenuItem>
@@ -1165,15 +1182,19 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                             onClick={handleAddNew}
                                             disabled={!canAddSource()}
                                             sx={{
-                                                '&:hover': {
-                                                    backgroundColor: 'darkgrey',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: '#9e9e9e',
-                                                },
+                                                width: 32,
+                                                height: 32,
+                                                borderRadius: '50%',
+                                                background: theme.palette.primary.main,
+                                                color: '#fff',
+                                                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.35)}`,
+                                                transition: 'all 0.18s ease',
+                                                '&:hover': { background: theme.palette.primary.dark, boxShadow: `0 6px 16px ${alpha(theme.palette.primary.dark, 0.4)}`, transform: 'scale(1.1)' },
+                                                '&:active': { transform: 'scale(0.94)' },
+                                                '&.Mui-disabled': { bgcolor: 'grey.200', boxShadow: 0, color: 'grey.400' },
                                             }}
                                         >
-                                            <AddOutlinedIcon />
+                                            <AddOutlinedIcon sx={{ fontSize: 18 }} />
                                         </IconButton>
                                     </span>
                                 </Tooltip>
@@ -1510,7 +1531,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                 '&.Mui-disabled': { bgcolor: '#e0e0e0', color: '#9e9e9e' },
                             }}
                         >
-                            {loading ? 'Saving...' : 'Save'}
+                            {loading ? 'Saving...' : 'Save Event'}
                         </Button>
                     </span>
                 </Tooltip>

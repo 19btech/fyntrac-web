@@ -130,6 +130,7 @@ export default function SettingsPage() {
   // Restatement
   const [restatementMode, setRestatementMode] = React.useState(false);
   const [showRestatementDaialog, setShowRestatementDaialog] = React.useState(false);
+  const [isConfirmingRestatement, setIsConfirmingRestatement] = React.useState(false);
 
   // Dialogs
   const [showSchemaRefreshDialog, setShowSchemaRefreshDialog] = React.useState(false);
@@ -253,7 +254,8 @@ export default function SettingsPage() {
   };
 
   const reopenAllClosedAccountingPeriods = async () => {
-    if (!restatementMode) return;
+    if (!restatementMode || isConfirmingRestatement) return;
+    setIsConfirmingRestatement(true);
     try {
       const response = await dataloaderApi.post('/setting/restatement-mode/save', {
         homeCurrency: '', glamFields: '',
@@ -268,11 +270,14 @@ export default function SettingsPage() {
       }, 1500);
     } catch {
       showToast('Failed to enable restatement mode.', 'error');
+    } finally {
+      setIsConfirmingRestatement(false);
     }
   };
 
   const refreshEnvironment = async () => {
     if (isResetting) return;
+    setIsResetting(true);
     // Always do a fresh check immediately before resetting
     let hasClosedPeriods = closedPeriodsList.length > 0;
     try {
@@ -289,11 +294,11 @@ export default function SettingsPage() {
       // fall back to cached state value already set in hasClosedPeriods
     }
     if (hasClosedPeriods) {
+      setIsResetting(false);
       setShowSchemaRefreshDialog(false);
       showToast('You have closed accounting periods. Please use Restatement Mode to reset.', 'error');
       return;
     }
-    setIsResetting(true);
     try {
       await dataloaderApi.post('/setting/refresh/schema', true, {
         headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
@@ -537,14 +542,15 @@ export default function SettingsPage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={reopenAllClosedAccountingPeriods} variant="contained" sx={{
+          <Button onClick={reopenAllClosedAccountingPeriods} variant="contained" disabled={isConfirmingRestatement} sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700,
             fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
             background: '#14213d', color: '#fff',
             boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
             transition: 'all 0.2s ease-in-out',
             '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
-          }}>Confirm Restatement</Button>
+            '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
+          }}>{isConfirmingRestatement ? 'Confirming…' : 'Confirm Restatement'}</Button>
         </DialogActions>
       </Dialog>
 

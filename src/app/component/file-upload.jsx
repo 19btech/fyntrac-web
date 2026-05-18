@@ -212,10 +212,12 @@ export default function FileUploadComponent({
             <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
               Your files have been successfully processed and added to the queue.
             </Typography>
-            <LinearProgress
-              sx={{ mt: 4, width: '100%', maxWidth: 200, borderRadius: 2, height: 6 }}
-              color="success"
-            />
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <LinearProgress
+                sx={{ width: 200, borderRadius: 2, height: 6 }}
+                color="success"
+              />
+            </Box>
             <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: "block", fontWeight: 500 }}>
               Closing window in 5 seconds...
             </Typography>

@@ -26,6 +26,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [errorMessage, setErrorMessage] = useState('');
     const [availableMetrics, setAvailableMetrics] = useState([]);
     const [isMetricssError, setIsMetricsError] = React.useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const serviceGetMetricsURL = '/aggregation/get/metrics'
 
 
@@ -70,6 +71,8 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
 
 
     const handleSaveDashboardConfiguration = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         const serviceURL = '/setting/dashboard-configuration/save';
         try {
             const metricNames = activityGraphMetrics.map(item => item.metricName);
@@ -115,6 +118,8 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
 
             setErrorMessage('Failed to save dashboard configuration.');
             setShowErrorMessage(true);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -363,12 +368,13 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
           px: 3.5, py: 2, borderTop: '1px solid', borderColor: 'divider',
           bgcolor: 'background.paper', justifyContent: 'flex-end', gap: 1.25,
         }}>
-          <Button onClick={handleSaveDashboardConfiguration} variant="contained" sx={{
+          <Button onClick={handleSaveDashboardConfiguration} variant="contained" disabled={isSaving} sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700, minWidth: 150, px: 3,
             background: '#14213d', color: '#fff', boxShadow: '0 6px 16px rgba(20,33,61,0.35)',
             '&:hover': { background: '#0d1628', boxShadow: '0 8px 22px rgba(20,33,61,0.45)' },
+            '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
           }}>
-            {isEditMode ? 'Update Dashboard' : 'Save Dashboard'}
+            {isSaving ? 'Saving…' : (isEditMode ? 'Update Dashboard' : 'Save Dashboard')}
           </Button>
         </DialogActions>
       </Dialog>
