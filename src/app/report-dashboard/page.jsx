@@ -224,14 +224,14 @@ export default function ReportDashboard() {
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1, minHeight: 48, borderBottom: '1px solid', borderColor: 'divider', position: 'relative' }}>
           <Box />
           <IconButton
-            onClick={handleClose}
+            onClick={() => { setOpen(false); setTimeout(() => setSelectedReport(null), 200); }}
             size="small"
             sx={{
               position: 'absolute',
               right: 8,
               top: '50%',
               transform: 'translateY(-50%)',
-              zIndex: 1,
+              zIndex: 9999,
               bgcolor: 'grey.100',
               '&:hover': { bgcolor: 'grey.300' },
             }}

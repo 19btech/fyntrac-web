@@ -22,7 +22,10 @@ import {
   alpha,
   Container,
   Divider,
-  Slide
+  Slide,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 
 // Icons
@@ -270,6 +273,10 @@ export default function IngestPage() {
   const [recentUpload, setRecentUpload] = useState(null);
   const [historicalUpload, setHistoricalUpload] = useState([]);
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+  const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
   const { tenant, user } = useTenant();
 
   const baseURL = "";
@@ -282,6 +289,7 @@ export default function IngestPage() {
   };
 
   const fetchUploadActivitiyLogs = () => {
+    setIsRefreshing(true);
     dataloaderApi.get(fetchUploadActivityCall, { headers: headers })
       .then(response => {
         const logs = response.data || [];
@@ -293,9 +301,12 @@ export default function IngestPage() {
           setHistoricalUpload([]);
         }
         setIsDataFetched(true);
+        setIsRefreshing(false);
       })
       .catch(error => {
         console.error('Error fetching logs:', error);
+        setIsRefreshing(false);
+        showToast('Failed to refresh data. Please try again.', 'error');
       });
   };
 
@@ -339,9 +350,17 @@ export default function IngestPage() {
               </IconButton>
             </Tooltip>
             <Tooltip title="Refresh">
-              <IconButton onClick={fetchUploadActivitiyLogs} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
-                <CachedRoundedIcon color="action" />
-              </IconButton>
+              <span>
+                <IconButton
+                  onClick={fetchUploadActivitiyLogs}
+                  disabled={isRefreshing}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
+                >
+                  {isRefreshing
+                    ? <CircularProgress size={20} color="action" />
+                    : <CachedRoundedIcon color="action" />}
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </Box>
@@ -506,6 +525,17 @@ export default function IngestPage() {
           />
         </DialogContent>
       </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert onClose={handleToastClose} severity={toast.severity} variant="standard" sx={{ borderRadius: 3, fontWeight: 600 }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
 
     </Box>
   );

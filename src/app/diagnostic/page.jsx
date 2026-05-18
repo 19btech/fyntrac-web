@@ -240,12 +240,14 @@ const InstrumentDiagnosticPage = () => {
   };
 
   const generateGridColumns = (columnDefs) => {
-    return columnDefs.map((col) => ({
-      field: col.attributeName, // Use attributeName as the field
-      headerName: col.attributeAlias, // Use attributeAlias as the header name
-      width: 200, // Set a default width (you can customize this)
-      editable: false, // Set editable to false or true based on your requirements
-    }));
+    return columnDefs
+      .filter((col) => !col.attributeName?.startsWith('_'))
+      .map((col) => ({
+        field: col.attributeName,
+        headerName: col.attributeAlias,
+        width: 200,
+        editable: false,
+      }));
   };
 
   return (

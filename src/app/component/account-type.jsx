@@ -1,23 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Box } from '@mui/material';
-import { EditOutlined } from '@mui/icons-material';
+import { IconButton, Tooltip, Box, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddAccountTypeDialog from '../component/add-account-type';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
-function AccountType({ refreshData }) {
+function AccountType({ refreshData, onToast }) {
   const { tenant } = useTenant();
   const [rowsPerPage] = useState(10);
   const [isDataFetched, setIsDataFetched] = useState(false);
   const [rows, setRows] = useState([]);
   const [open, setOpen] = useState(false);
   const [editData, setEditData] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState(null);
 
   const handleEdit = (rowData) => {
     setEditData(rowData);
     setOpen(true);
+  };
+
+  const handleDeleteClick = (row) => {
+    setRowToDelete(row);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!rowToDelete) return;
+    try {
+      await dataloaderApi.delete(`/accounttype/delete/${rowToDelete.id}`);
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
+      fetchAccountTypeData();
+      onToast?.('Account type deleted successfully.');
+    } catch (error) {
+      console.error('Error deleting account type:', error);
+      setDeleteDialogOpen(false);
+      setRowToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setRowToDelete(null);
   };
 
   const columns = [
@@ -60,6 +87,31 @@ function AccountType({ refreshData }) {
             }}
           >
             <EditOutlined sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+    {
+      field: 'delete',
+      headerName: '',
+      width: 64,
+      sortable: false,
+      filterable: false,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Tooltip title="Delete" placement="left">
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteClick(params.row)}
+            sx={{
+              color: '#dc2626',
+              bgcolor: 'rgba(220,38,38,0.06)',
+              borderRadius: 1.5,
+              '&:hover': { bgcolor: 'rgba(220,38,38,0.14)' },
+            }}
+          >
+            <DeleteOutlineOutlined sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
       ),
@@ -147,7 +199,29 @@ function AccountType({ refreshData }) {
           }}
         />
       </Box>
-      <AddAccountTypeDialog open={open} onClose={setOpen} editData={editData} />
+      <AddAccountTypeDialog
+        open={open}
+        onClose={(didSave) => {
+          setOpen(false);
+          if (didSave) {
+            fetchAccountTypeData();
+            onToast?.('Account type saved successfully.');
+          }
+        }}
+        editData={editData}
+      />
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Account Type</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete account subtype <strong>{rowToDelete?.accountSubType}</strong>? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

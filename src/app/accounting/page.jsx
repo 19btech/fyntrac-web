@@ -70,6 +70,13 @@ export default function AccountingPage() {
   const handleCloseFileUpload = () => {
     setOpenFileUpload(false);
   };
+  const handleFileUploadComplete = () => {
+    setOpenFileUpload(false);
+    setRefreshAccountTypeKey(k => k + 1);
+    setRefreshSubledgerMapping(k => k + 1);
+    setRefreshChartOfAccountKey(k => k + 1);
+    showToast('Reference data uploaded successfully — tables refreshed.');
+  };
 
   const handleFileDrop = (acceptedFiles) => {
 
@@ -117,16 +124,28 @@ export default function AccountingPage() {
     }
   }
 
-  const handleAddChartOfAccountCloseDialog = () => {
+  const handleAddChartOfAccountCloseDialog = (didSave) => {
     setIsAddChartOfAccountDialogOpen(false);
+    if (didSave) {
+      setRefreshChartOfAccountKey(k => k + 1);
+      showToast('Chart of account saved successfully.');
+    }
   };
 
-  const handleAddSubledgerMappingCloseDialog = () => {
+  const handleAddSubledgerMappingCloseDialog = (didSave) => {
     setIsAddSubledgerMappingDialogOpen(false);
+    if (didSave) {
+      setRefreshSubledgerMapping(k => k + 1);
+      showToast('Subledger mapping saved successfully.');
+    }
   };
 
-  const handleAddAccountTypeCloseDialog = () => {
+  const handleAddAccountTypeCloseDialog = (didSave) => {
     setIsAddAccountTypeDialogOpen(false);
+    if (didSave) {
+      setRefreshAccountTypeKey(k => k + 1);
+      showToast('Account type saved successfully.');
+    }
   };
   return (
     <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
@@ -189,15 +208,15 @@ export default function AccountingPage() {
         </Box>
 
         <CustomTabPanel value={panelIndex} index={0}>
-          <AccountType refreshData={setRefreshAccountTypeKey} key={refreshAccountTypeKey} />
+          <AccountType refreshData={setRefreshAccountTypeKey} key={refreshAccountTypeKey} onToast={showToast} />
         </CustomTabPanel>
 
         <CustomTabPanel value={panelIndex} index={1}>
-          <SubledgerMapping refreshData={setRefreshSubledgerMapping} key={refreshSubledgerMapping} />
+          <SubledgerMapping refreshData={setRefreshSubledgerMapping} key={refreshSubledgerMapping} onToast={showToast} />
         </CustomTabPanel>
 
         <CustomTabPanel value={panelIndex} index={2}>
-          <ChartOfAccount refreshData={setRefreshChartOfAccountKey} key={refreshChartOfAccountKey} />
+          <ChartOfAccount refreshData={setRefreshChartOfAccountKey} key={refreshChartOfAccountKey} onToast={showToast} />
         </CustomTabPanel>
       </Box>
       </Card>
@@ -280,7 +299,7 @@ export default function AccountingPage() {
           </DialogTitle>
           <DialogContent sx={{ p: 3 }}>
             <FileUploadComponent
-              onDrop={handleCloseFileUpload}
+              onDrop={handleFileUploadComplete}
               text="Drag and drop your files here"
               iconColor="#3f51b5"
               borderColor="#3f51b5"
@@ -300,7 +319,7 @@ export default function AccountingPage() {
         autoHideDuration={4000}
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        style={{ top: '55px' }}
         TransitionComponent={(props) => <Slide {...props} direction="left" />}
       >
         <Alert

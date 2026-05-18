@@ -17,10 +17,19 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
   const [progressMap, setProgressMap] = useState({});
   const [modelName, setModelName] = useState('');
   const [modelOrderId, setModelOrderId] = useState('');
-  const [modelNameError, setModelNameError] = useState(false);
-  const [orderIdError, setOrderIdError] = useState(false);
+  const [modelNameError, setModelNameError] = useState('');
+  const [orderIdError, setOrderIdError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const fieldRegex = /^[A-Za-z0-9_]+$/;
+
+  const validateField = (value) => {
+    if (!value) return '';
+    if (/\s/.test(value)) return 'Spaces are not allowed.';
+    if (!fieldRegex.test(value)) return 'Only letters, numbers, and underscores are allowed.';
+    return '';
+  };
   const [openSuccess, setOpenSuccess] = React.useState(false);
 
   const handleSuccessClose = (event, reason) => {
@@ -37,43 +46,12 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
   };
 
   const validateFields = () => {
-    let isValid = true;
-
-    if (!modelName.trim()) {
-      setModelNameError(true);
-      isValid = false;
-    } else {
-      const regex = /^[A-Za-z][A-Za-z0-9]*$/; // Starts with an alphabet, followed by alphanumeric characters
-      if (!regex.test(modelName)) {
-        setModelNameError(true);
-        setErrorMessage('Input must start with an alphabet and afterwards may contain number(s).');
-        isValid = false;
-        return false;
-      }
-      setModelNameError(false);
-      setErrorMessage('');
-    }
-
-    if (!modelOrderId.trim()) {
-      setOrderIdError(true);
-      isValid = false;
-    } else {
-      // Regular expression to match the desired pattern
-      const regex = /^[0-9]+[A-Za-z]*$/;
-
-      if (!regex.test(modelOrderId)) {
-        setErrorMessage('Input must start with a number and may end with letters.');
-        setOrderIdError(true);
-        isValid = false;
-        return false;
-      }
-      setOrderIdError(false);
-      setErrorMessage('');
-    }
-
+    const nameErr = modelName ? validateField(modelName) : 'Model Name is required.';
+    const idErr = modelOrderId ? validateField(modelOrderId) : 'Model Order ID is required.';
+    setModelNameError(nameErr);
+    setOrderIdError(idErr);
+    const isValid = !nameErr && !idErr;
     if (!isValid) {
-      setErrorMessage('Please fill in all required fields correctly.');
-    } else {
       setErrorMessage('');
     }
 
@@ -119,7 +97,6 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
     setTimeout(() => {
       setUploading(false);
       handleFileDrop(acceptedFiles, modelName, modelOrderId);
-      onDrop(acceptedFiles, modelName, modelOrderId);
     }, 5000);
   };
 
@@ -141,6 +118,10 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
         console.log('success response', response.data);
         setSuccessMessage(response.data);
         setOpenSuccess(true);
+        // Notify parent so it can close the dialog after the user sees the success state
+        setTimeout(() => {
+          onDrop(acceptedFiles, modelName, modelOrderId);
+        }, 1500);
       })
       .catch(error => {
         const errData = error.response?.data;
@@ -151,8 +132,8 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
            errMsg = errData.message || JSON.stringify(errData);
         }
         console.error('Upload data:', errMsg);
-        setModelNameError(true);
         setErrorMessage(errMsg);
+        // Do NOT call onDrop — keep the modal open so the user can see the error and retry
       });
   };
 
@@ -214,10 +195,10 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
               fullWidth
               size="small"
               value={modelName}
-              onChange={(e) => setModelName(e.target.value)}
+              onChange={(e) => { setModelName(e.target.value); setModelNameError(validateField(e.target.value)); }}
               required
-              error={modelNameError}
-              helperText={modelNameError ? errorMessage : 'Must start with a letter, alphanumeric only'}
+              error={!!modelNameError}
+              helperText={modelNameError || 'Letters, numbers, and underscores only — no spaces'}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <TextField
@@ -225,10 +206,10 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
               fullWidth
               size="small"
               value={modelOrderId}
-              onChange={(e) => setModelOrderId(e.target.value)}
+              onChange={(e) => { setModelOrderId(e.target.value); setOrderIdError(validateField(e.target.value)); }}
               required
-              error={orderIdError}
-              helperText={orderIdError ? errorMessage : 'Must start with a number'}
+              error={!!orderIdError}
+              helperText={orderIdError || 'Letters, numbers, and underscores only — no spaces'}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
           </Stack>

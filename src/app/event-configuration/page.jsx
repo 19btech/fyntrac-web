@@ -19,6 +19,7 @@ import '../common.css';
 
 import { useTenant } from "../tenant-context";
 import EventConfiguration from '../component/event-configuration';
+import SuccessAlert from '../component/success-alert';
 // import EventConfiguration from '../component/event-configuration';
 
 const VisuallyHiddenInput = styled('input')({
@@ -41,8 +42,24 @@ export default function EventConfigurationMain() {
     const [headerLabel, setHeaderLabel] = React.useState('Setup Events');
     const [open, setOpen] = React.useState(false);
     const [openEventConfiguration, setOpenEventConfiguration] = React.useState(false);
+    const [showSuccessMessage, setShowSuccessMessage] = React.useState(false);
+    const [successMessage, setSuccessMessage] = React.useState('');
 
     const [tabValue, setTabValue] = React.useState(0);
+
+    // Close handler for the page-level Add Event modal.
+    // The modal calls onClose(true, message) on a successful save and onClose() on cancel.
+    // Passing the raw setState as onClose caused setOpenEventConfiguration(true) on save,
+    // which reopened the empty modal. This handler always closes and, on success, refreshes
+    // the grid and shows a success toast.
+    const handleEventConfigurationClose = (result, message) => {
+        setOpenEventConfiguration(false);
+        if (result === true) {
+            setModelRefreshKey(prev => prev + 1);
+            setSuccessMessage(message || 'Event configuration saved successfully!');
+            setShowSuccessMessage(true);
+        }
+    };
 
     const handleChange = (event, newValue) => {
         setTabValue(newValue);
@@ -151,7 +168,12 @@ export default function EventConfigurationMain() {
                 </CustomTabPanel>
             </Box>
             </Card>
-            <EventConfiguration open={openEventConfiguration} onClose={setOpenEventConfiguration} />
+            <EventConfiguration open={openEventConfiguration} onClose={handleEventConfigurationClose} />
+            <SuccessAlert
+                open={showSuccessMessage}
+                message={successMessage}
+                onClose={() => setShowSuccessMessage(false)}
+            />
         </Container>
         </Box>
 

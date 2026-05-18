@@ -42,24 +42,40 @@ import { useTenant } from "../tenant-context";
 import ReferenceColumnAutocomplete from "./reference-column-select";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
-// Column name validation
-const validateColumnName = (columnName) => {
-  if (!columnName?.trim()) return 'Column name is required';
+// Identifier validation — used for both table name and column name.
+// Returns the most specific of three messages so the user knows exactly what's wrong:
+//   1. Empty / null
+//   2. Contains any spaces (leading, in-between or trailing)
+//   3. Contains special characters (anything other than letters, digits or underscore)
+// Falls back to length / SQL-reserved-keyword checks for column names.
+const validateIdentifier = (name, label = 'Name') => {
+  if (name === null || name === undefined || name.trim() === '') {
+    return `${label} cannot be empty.`;
+  }
 
-  const regex = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-  if (!regex.test(columnName))
-    return 'Invalid column name: start with letter/underscore, use letters/numbers/underscores only';
+  // Any whitespace at all is disallowed (leading, in-between, trailing)
+  if (/\s/.test(name)) {
+    return `${label} cannot have leading, in-between or trailing spaces.`;
+  }
 
-  if (columnName.length > 63) return 'Column name cannot exceed 63 characters';
+  // Only letters, digits and underscore are allowed
+  if (!/^[A-Za-z0-9_]+$/.test(name)) {
+    return `${label} cannot have special characters (only letters, numbers and underscores are allowed).`;
+  }
+
+  if (name.length > 63) return `${label} cannot exceed 63 characters.`;
 
   const reserved = [
     'select', 'insert', 'update', 'delete', 'create', 'drop', 'table', 'column', 'key',
     'from', 'where', 'join', 'and', 'or', 'not', 'null', 'primary', 'foreign', 'references'
   ];
-  if (reserved.includes(columnName.toLowerCase())) return 'Cannot use SQL reserved keyword';
+  if (reserved.includes(name.toLowerCase())) return `${label} cannot be a SQL reserved keyword.`;
 
   return null;
 };
+
+const validateColumnName = (columnName) => validateIdentifier(columnName, 'Column name');
+const validateTableName = (tableName) => validateIdentifier(tableName, 'Table name');
 
 // Section wrapper for the dialog body — gives each block a numbered badge,
 // icon, title, optional description and a slot for an action button.
@@ -424,14 +440,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     /* ---------------------------------------------
        TABLE NAME VALIDATION
     ---------------------------------------------- */
-    if (!formData.tableName.trim()) {
-      newErrors.tableName = 'Table name is required';
-      console.log('❌ Table name empty');
-      isValid = false;
-    } {
-      console.log('✓ Table name not empty:', formData.tableName);
-
-      const tableNameError = validateColumnName(formData.tableName);
+    {
+      const tableNameError = validateTableName(formData.tableName);
       if (tableNameError) {
         newErrors.tableName = tableNameError;
         console.log('❌ Table name invalid:', tableNameError);
@@ -572,20 +582,12 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   const handleSubmit = async () => {
-    // Validate first
+    // Validate first — validateForm sets new errors and returns the authoritative result.
+    // Do NOT read the `errors` state here: setErrors is async and would give us a stale
+    // snapshot, which previously caused the first click to be silently swallowed.
     const isValid = validateForm();
 
-    // Check errors state after validation
-    const hasErrors = Object.keys(errors).length > 0;
-
-    console.log('Validation result:', {
-      isValid,
-      errorCount: Object.keys(errors).length,
-      errors: errors
-    });
-
-    // Double-check: if validation failed OR there are existing errors
-    if (!isValid || hasErrors) {
+    if (!isValid) {
       console.log('❌ Validation failed, stopping submission');
       return;
     }
@@ -626,8 +628,11 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       }
 
       await new Promise((res) => setTimeout(res, 1000));
-      onSuccess(tableData);
-      handleClose();
+      if (typeof onSuccess === 'function') {
+        try { onSuccess(tableData); } catch (cbErr) { console.warn('onSuccess callback threw:', cbErr); }
+      }
+      // Close the modal and signal the parent to refresh the grid (parent expects `true`).
+      handleClose(true);
 
     } catch (err) {
       console.error('❌ Error details:', err);
@@ -705,7 +710,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (result) => {
     setFormData({ tableName: '', description: '' });
     setColumns([]);
     setPrimaryKeys([]);
@@ -715,7 +720,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     setColumnErrors({});
     setLoading(false);
     setIsEditMode(false);
-    onClose();
+    // Pass the result through so the parent can refresh on success (`true`).
+    onClose(result === true ? true : undefined);
   };
 
   const canSubmit = () => {
@@ -875,7 +881,18 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                 label="Table Name"
                 placeholder="e.g. customer_accounts"
                 value={formData.tableName}
-                onChange={(e) => setFormData({ ...formData, tableName: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({ ...formData, tableName: value });
+                  const err = validateTableName(value);
+                  setErrors(prev => {
+                    const next = { ...prev };
+                    if (err) next.tableName = err; else delete next.tableName;
+                    // Clear any stale submit-error once the user starts editing again.
+                    delete next.submit;
+                    return next;
+                  });
+                }}
                 error={!!errors.tableName}
                 helperText={errors.tableName || ' '}
                 size="small"
