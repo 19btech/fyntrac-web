@@ -33,13 +33,21 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [formValues, setFormValues] = useState({});
   const [formErrors, setFormErrors] = useState({});
 
-  const alphanumericUnderscoreRegex = /^[a-zA-Z0-9_]+$/;
+  const accountNumberRegex = /^[a-zA-Z0-9_\-\.]+$/;
+  const accountNameRegex = /^[a-zA-Z0-9_\-\.\s\(\)\[\]&',/]+$/;
 
-  const validateAccountField = (value) => {
+  const validateAccountNumber = (value) => {
     if (!value) return '';
     if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
     if (/\s/.test(value)) return 'Spaces are not permitted.';
-    if (!alphanumericUnderscoreRegex.test(value)) return 'Only alphanumeric characters and underscores are allowed.';
+    if (!accountNumberRegex.test(value)) return 'Only alphanumeric characters, underscores, hyphens, and dots are allowed.';
+    return '';
+  };
+
+  const validateAccountName = (value) => {
+    if (!value) return '';
+    if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
+    if (!accountNameRegex.test(value)) return 'Contains invalid characters.';
     return '';
   };
 
@@ -146,8 +154,8 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
     setShowErrorMessage(false);
 
     // ── Field-level validation ────────────────────────────────────────────
-    const nameErr = validateAccountField(accountName);
-    const numErr = validateAccountField(accountNumber);
+    const nameErr = validateAccountName(accountName);
+    const numErr = validateAccountNumber(accountNumber);
     if (nameErr) { setAccountNameError(nameErr); return; }
     if (numErr) { setAccountNumberError(numErr); return; }
     const hasAttrError = Object.values(formErrors).some(e => !!e);
@@ -328,7 +336,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
               label="Account Number"
               fullWidth required size="small"
               value={accountNumber}
-              onChange={(e) => { setAccountNumber(e.target.value); setAccountNumberError(validateAccountField(e.target.value)); }}
+              onChange={(e) => { setAccountNumber(e.target.value); setAccountNumberError(validateAccountNumber(e.target.value)); }}
               error={!!accountNumberError}
               helperText={accountNumberError}
               sx={{
@@ -340,7 +348,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
               label="Account Name"
               fullWidth required size="small"
               value={accountName}
-              onChange={(e) => { setAccountName(e.target.value); setAccountNameError(validateAccountField(e.target.value)); }}
+              onChange={(e) => { setAccountName(e.target.value); setAccountNameError(validateAccountName(e.target.value)); }}
               error={!!accountNameError}
               helperText={accountNameError}
               sx={{
