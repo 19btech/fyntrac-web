@@ -461,7 +461,7 @@ const TransactionActivityReportPage = () => {
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
-        TransitionComponent={(props) => <Slide {...props} direction="left" />}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
       >
         <Alert
           onClose={handleToastClose}

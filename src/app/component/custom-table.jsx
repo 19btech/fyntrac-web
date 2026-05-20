@@ -739,10 +739,11 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
-      TransitionComponent={Slide}
-      TransitionProps={{ direction: 'up' }}
-      PaperProps={{
-        sx: {
+      slots={{ transition: Slide }}
+      slotProps={{
+        transition: { direction: 'up' },
+        paper: {
+          sx: {
           borderRadius: 4,
           boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
           overflow: 'hidden',
@@ -754,9 +755,10 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
           flexDirection: 'column',
           fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
           '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & .MuiMenuItem-root, & .MuiInputLabel-root, & .MuiFormHelperText-root, & .MuiSelect-root, & .MuiAlert-root': {
-            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
           },
-        }
+          },
+        },
       }}
     >
       {/* ── HEADER ── */}

@@ -131,10 +131,11 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
-      TransitionComponent={Slide}
-      TransitionProps={{ direction: 'up' }}
-      PaperProps={{
-        sx: {
+      slots={{ transition: Slide }}
+      slotProps={{
+        transition: { direction: 'up' },
+        paper: {
+          sx: {
           borderRadius: 4,
           boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
           overflow: 'hidden',
@@ -142,7 +143,8 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
           borderColor: 'divider',
           fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
           '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & .MuiFormHelperText-root': {
-            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          },
           },
         },
       }}

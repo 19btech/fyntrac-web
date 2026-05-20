@@ -24,6 +24,8 @@ import AddAggregationDialog from '../component/add-aggregation';
 import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
+import { DataGrid } from '@mui/x-data-grid';
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
   clipPath: 'inset(50%)',
@@ -52,6 +54,24 @@ export default function RulePage() {
   const [toast, setToast] = React.useState({ open: false, message: '', severity: 'success' });
   const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
   const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
+
+  // ── Validation Log ──────────────────────────────────────────────────────────
+  const [openValidationLog, setOpenValidationLog] = React.useState(false);
+  const [validationLogs, setValidationLogs] = React.useState([]);
+  const [validationLogsLoading, setValidationLogsLoading] = React.useState(false);
+
+  const fetchValidationLogs = React.useCallback(() => {
+    setValidationLogsLoading(true);
+    dataloaderApi.get('/validation-logs/ref/by-type/ACCOUNTING_RULES')
+      .then(res => setValidationLogs(res.data ?? []))
+      .catch(err => console.error('Failed to fetch validation logs:', err))
+      .finally(() => setValidationLogsLoading(false));
+  }, []);
+
+  const handleOpenValidationLog = () => {
+    setOpenValidationLog(true);
+    fetchValidationLogs();
+  };
   const handleRefresh = () => {    if (panelIndex === 0) {
       setTransactionRefreshKey(prevKey => prevKey + 1);
     } else if (panelIndex === 1) {
@@ -177,6 +197,20 @@ export default function RulePage() {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Validation Log">
+              <IconButton
+                aria-label="validation-log"
+                onClick={handleOpenValidationLog}
+                sx={{
+                  bgcolor: 'white', boxShadow: 1,
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '&:hover': { bgcolor: 'rgba(239,68,68,0.06)', boxShadow: 3, transform: 'scale(1.08)' },
+                  '&:active': { transform: 'scale(0.94)' },
+                }}
+              >
+                <FactCheckOutlinedIcon sx={{ color: '#ef4444' }} />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Upload Activity Files">
               <IconButton aria-label="Upload Activity Files" onClick={handleOpenFileUpload} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
                 <FileUploadOutlinedIcon color="action" />
@@ -235,16 +269,18 @@ export default function RulePage() {
           onClose={handleCloseFileUpload}
           maxWidth="sm"
           fullWidth
-          TransitionComponent={Slide}
-          TransitionProps={{ direction: 'up' }}
-          PaperProps={{
-            sx: {
+          slots={{ transition: Slide }}
+          slotProps={{
+            transition: { direction: 'up' },
+            paper: {
+              sx: {
               borderRadius: 4,
               boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
               overflow: 'hidden',
               border: '1px solid',
               borderColor: 'divider',
-            }
+              },
+            },
           }}
         >
           <DialogTitle sx={{ p: 0 }}>
@@ -316,6 +352,154 @@ export default function RulePage() {
         </Dialog>
       </>
       <>
+
+      {/* ── Validation Log Dialog ── */}
+      <Dialog
+        open={openValidationLog}
+        onClose={() => setOpenValidationLog(false)}
+        maxWidth="xl"
+        fullWidth
+        slots={{ transition: Slide }}
+        slotProps={{
+          transition: { direction: 'up' },
+          paper: {
+            sx: {
+              borderRadius: 3,
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          },
+        }}
+      >
+        <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              px: 3, pt: 2.5, pb: 2,
+              background: `linear-gradient(135deg, ${alpha('#ef4444', 0.07)} 0%, ${alpha('#f97316', 0.04)} 100%)`,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <img src="fyntrac.png" alt="Fyntrac" style={{ width: 64, height: 'auto' }} />
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.4 }}>
+                  <Chip
+                    icon={<FactCheckOutlinedIcon sx={{ fontSize: '12px !important', color: '#ef4444 !important' }} />}
+                    label="Accounting Rules"
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: '0.68rem', fontWeight: 700,
+                      bgcolor: 'rgba(239,68,68,0.1)', color: '#dc2626',
+                      border: '1px solid rgba(239,68,68,0.25)', borderRadius: 1,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1rem', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                  Validation Log
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
+                  {validationLogs.length} record{validationLogs.length !== 1 ? 's' : ''}
+                </Typography>
+              </Box>
+            </Box>
+            <Tooltip title="Close">
+              <IconButton
+                onClick={() => setOpenValidationLog(false)}
+                size="small"
+                sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: 'rgba(239,68,68,0.1)', color: 'error.main' } }}
+              >
+                <HighlightOffOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <DataGrid
+            rows={validationLogs}
+            loading={validationLogsLoading}
+            getRowId={(row) => row.id}
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+            disableRowSelectionOnClick
+            columns={[
+              { field: 'sourceTable', headerName: 'Source Table', width: 150,
+                renderCell: (p) => <Box sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>{p.value}</Box> },
+              { field: 'sourceColumn', headerName: 'Column', width: 140,
+                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#475569' }}>{p.value}</Box> },
+              { field: 'sourceColumnValue', headerName: 'Value', width: 130,
+                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#64748b' }}>{p.value ?? '—'}</Box> },
+              { field: 'rowNum', headerName: 'Row #', width: 80, align: 'center', headerAlign: 'center',
+                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
+              { field: 'errorCode', headerName: 'Error Code', width: 130,
+                renderCell: (p) => (
+                  <Chip label={p.value} size="small" sx={{
+                    height: 20, fontSize: '0.68rem', fontWeight: 700, fontFamily: 'monospace',
+                    bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626',
+                    border: '1px solid rgba(239,68,68,0.2)', borderRadius: 1,
+                  }} />
+                ) },
+              { field: 'severity', headerName: 'Severity', width: 110, align: 'center', headerAlign: 'center',
+                renderCell: (p) => {
+                  const isError = p.value === 'ERROR';
+                  return (
+                    <Chip label={p.value} size="small" sx={{
+                      height: 20, fontSize: '0.68rem', fontWeight: 700,
+                      bgcolor: isError ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
+                      color: isError ? '#dc2626' : '#a16207',
+                      border: `1px solid ${isError ? 'rgba(239,68,68,0.25)' : 'rgba(234,179,8,0.25)'}`,
+                      borderRadius: 1,
+                    }} />
+                  );
+                } },
+              { field: 'errorCategory', headerName: 'Category', width: 110,
+                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
+              { field: 'message', headerName: 'Message', flex: 1, minWidth: 200,
+                renderCell: (p) => (
+                  <Tooltip title={p.value} placement="top-start">
+                    <Box sx={{ fontSize: '0.82rem', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                      {p.value}
+                    </Box>
+                  </Tooltip>
+                ) },
+              { field: 'jobId', headerName: 'Job ID', width: 90, align: 'center', headerAlign: 'center',
+                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>{p.value ?? '—'}</Box> },
+              { field: 'createdTimestamp', headerName: 'Timestamp', width: 160,
+                renderCell: (p) => (
+                  <Box sx={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    {p.value ? new Date(p.value).toLocaleString() : '—'}
+                  </Box>
+                ) },
+            ]}
+            sx={{
+              border: 0, flex: 1,
+              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+              fontSize: '0.85rem',
+              '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
+              '& .MuiDataGrid-columnHeaders': {
+                bgcolor: '#f8fafc', color: '#475569', fontSize: '0.7rem',
+                fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                borderBottom: '2px solid #e2e8f0',
+              },
+              '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
+              '& .MuiDataGrid-columnSeparator': { display: 'none' },
+              '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+              '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#ef4444', 0.03) } },
+              '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
+              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#ef4444', 0.02) },
+            }}
+          />
+        </DialogContent>
+      </Dialog>
         <AddTransactionDialog open={isAddTransactionDialogOpen} onClose={handleAddTransactionCloseDialog} />
         <AddAttributeDialog open={isAddAttributeDialogOpen} onClose={handleAddAttributeCloseDialog} />
         <AddAggregationDialog open={isAddAggregationDialogOpen} onClose={handleAddAggregationCloseDialog} />
@@ -327,7 +511,7 @@ export default function RulePage() {
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         style={{ top: '55px' }}
-        TransitionComponent={(props) => <Slide {...props} direction="left" />}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
       >
         <Alert
           onClose={handleToastClose}

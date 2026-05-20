@@ -353,7 +353,7 @@ export default function SettingsPage() {
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
-        TransitionComponent={(props) => <Slide {...props} direction="left" />}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
       >
         <Alert
           onClose={handleToastClose}
@@ -378,8 +378,15 @@ export default function SettingsPage() {
         open={showDeleteConfirmDialog}
         onClose={() => setShowDeleteConfirmDialog(false)}
         maxWidth="xs" fullWidth
-        TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
-        PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
+        slots={{ transition: Slide }}
+        slotProps={{
+          transition: { direction: 'up' },
+          paper: {
+            sx: {
+            borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider'
+            },
+          },
+        }}
       >
         <Box sx={{
           px: 3, pt: 3, pb: 2,
@@ -429,8 +436,15 @@ export default function SettingsPage() {
         open={showSchemaRefreshDialog}
         onClose={() => setShowSchemaRefreshDialog(false)}
         maxWidth="xs" fullWidth
-        TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
-        PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
+        slots={{ transition: Slide }}
+        slotProps={{
+          transition: { direction: 'up' },
+          paper: {
+            sx: {
+            borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider'
+            },
+          },
+        }}
       >
         <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
           <Box sx={{
@@ -494,8 +508,15 @@ export default function SettingsPage() {
         open={showRestatementDaialog}
         onClose={() => { setShowRestatementDaialog(false); setRestatementMode(false); }}
         maxWidth="xs" fullWidth
-        TransitionComponent={Slide} TransitionProps={{ direction: 'up' }}
-        PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } }}
+        slots={{ transition: Slide }}
+        slotProps={{
+          transition: { direction: 'up' },
+          paper: {
+            sx: {
+            borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider'
+            },
+          },
+        }}
       >
         <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
           <Box sx={{

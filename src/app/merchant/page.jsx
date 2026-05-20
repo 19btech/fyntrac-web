@@ -174,16 +174,14 @@ backgroundColor: 'lightgrey',
   <Dialog
         open={open}
         onClose={handleClose}
-        PaperProps={{
-          component: 'form',
+        slotProps={{ paper: { component: 'form',
           onSubmit: (event) => {
             event.preventDefault();
             const formData = new FormData(event.currentTarget);
             const formJson = Object.fromEntries(formData.entries());
             const text = formJson.email;
             handleClose();
-          },
-        }}
+          }, } }}
       >
         <DialogTitle>Add Merchant</DialogTitle>
         <Divider />

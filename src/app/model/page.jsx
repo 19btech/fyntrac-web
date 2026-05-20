@@ -1209,16 +1209,18 @@ export default function ModelPage() {
         onClose={handleUploadClose}
         maxWidth="md"
         fullWidth
-        TransitionComponent={Slide}
-        TransitionProps={{ direction: 'up' }}
-        PaperProps={{
-          sx: {
+        slots={{ transition: Slide }}
+        slotProps={{
+          transition: { direction: 'up' },
+          paper: {
+            sx: {
             borderRadius: 4,
             boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
             overflow: 'hidden',
             border: '1px solid',
             borderColor: 'divider',
-          }
+            },
+          },
         }}
       >
         <DialogTitle sx={{ p: 0 }}>

@@ -607,7 +607,7 @@ export default function HomePage() {
         onClose={handleToastClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
-        TransitionComponent={SlideLeft}
+        slots={{ transition: SlideLeft }}
       >
         <Alert
           onClose={handleToastClose}

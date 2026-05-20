@@ -60,25 +60,25 @@ const COLLAPSED_WIDTH = 72;
 const HEADER_HEIGHT = 64;
 
 // 🎨 DESIGN TOKENS — matching theme.ts / Sidebar reference
-const INDIGO       = '#6366f1';
-const INDIGO_DARK  = '#4f46e5';
-const INDIGO_BG    = '#eef2ff';
-const SLATE_50     = '#f8fafc';
-const SLATE_100    = '#f1f5f9';
-const SLATE_200    = '#e2e8f0';
-const SLATE_500    = '#64748b';
-const SLATE_700    = '#334155';
-const SLATE_BLACK  = '#14213d';
+const INDIGO = '#6366f1';
+const INDIGO_DARK = '#4f46e5';
+const INDIGO_BG = '#eef2ff';
+const SLATE_50 = '#f8fafc';
+const SLATE_100 = '#f1f5f9';
+const SLATE_200 = '#e2e8f0';
+const SLATE_500 = '#64748b';
+const SLATE_700 = '#334155';
+const SLATE_BLACK = '#14213d';
 
 // 📍 Page title map
 const PAGE_TITLES = {
-  getstarted:         'Get Started',
-  main:               'Dashboard',
-  diagnostic:         'Diagnostic',
-  model:              'Model',
-  sync:               'Ingest',
+  getstarted: 'Get Started',
+  main: 'Dashboard',
+  diagnostic: 'Diagnostic',
+  model: 'Model',
+  sync: 'Ingest',
   'report-dashboard': 'Reports',
-  'settings-dashboard': 'Settings',
+  'settings-dashboard': 'Configurations',
 };
 
 
@@ -253,7 +253,7 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
     { segment: "model", title: "Model", icon: <ArticleOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
     { segment: "sync", title: "Ingest", icon: <SyncAltOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
     { segment: "report-dashboard", title: "Reports", icon: <TableChartOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
-    { segment: "settings-dashboard", title: "Settings", icon: <TuneOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
+    { segment: "settings-dashboard", title: "Configurations", icon: <TuneOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
     { kind: "divider" },
   ];
 
@@ -389,295 +389,297 @@ export default function DashboardLayoutModern() {
   return (
     <ThemeProvider theme={fyntracTheme}>
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-          <CssBaseline />
+        <CssBaseline />
 
-          {/* 1. SIDEBAR */}
-          <Box
-            component="nav"
+        {/* 1. SIDEBAR */}
+        <Box
+          component="nav"
+          sx={{
+            width: { sm: currentDrawerWidth },
+            flexShrink: { sm: 0 },
+            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {/* Mobile Drawer */}
+          <Drawer
+            variant="temporary"
+            open={mobileOpen}
+            onClose={handleDrawerToggle}
+            ModalProps={{ keepMounted: true }}
             sx={{
-              width: { sm: currentDrawerWidth },
-              flexShrink: { sm: 0 },
-              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: { xs: 'block', sm: 'none' },
+              '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
             }}
           >
-            {/* Mobile Drawer */}
-            <Drawer
-              variant="temporary"
-              open={mobileOpen}
-              onClose={handleDrawerToggle}
-              ModalProps={{ keepMounted: true }}
-              sx={{
-                display: { xs: 'block', sm: 'none' },
-                '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
-              }}
-            >
-              <DrawerContent
-                isCollapsed={false}
-                onExpandSidebar={() => { }}
-                pathname={pathname}
-                onNavigate={handleNavigation}
-                onLogout={() => setOpenDialog(true)}
-              />
-            </Drawer>
+            <DrawerContent
+              isCollapsed={false}
+              onExpandSidebar={() => { }}
+              pathname={pathname}
+              onNavigate={handleNavigation}
+              onLogout={() => setOpenDialog(true)}
+            />
+          </Drawer>
 
-            {/* Desktop Drawer */}
-            <Drawer
-              variant="permanent"
-              sx={{
-                display: { xs: 'none', sm: 'block' },
-                '& .MuiDrawer-paper': {
-                  boxSizing: 'border-box',
-                  width: currentDrawerWidth,
-                  transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  overflow: 'visible',
-                  borderRight: `1px solid ${SLATE_200}`,
-                  bgcolor: '#ffffff',
-                },
-              }}
-              open
-            >
-              {/* Floating expand/collapse pill */}
-              <Tooltip title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right">
-                <IconButton
-                  onClick={handleCollapseToggle}
-                  size="small"
-                  sx={{
-                    position: 'absolute',
-                    top: HEADER_HEIGHT - 12,
-                    right: -12,
-                    zIndex: (t) => t.zIndex.drawer + 2,
-                    width: 24,
-                    height: 24,
-                    bgcolor: '#fff',
-                    border: `1px solid ${SLATE_200}`,
-                    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
-                    color: SLATE_700,
-                    '&:hover': { bgcolor: INDIGO, color: '#fff', borderColor: INDIGO },
-                  }}
-                >
-                  {isCollapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-              <DrawerContent
-                isCollapsed={isCollapsed}
-                onExpandSidebar={() => setIsCollapsed(false)}
-                pathname={pathname}
-                onNavigate={handleNavigation}
-                onLogout={() => setOpenDialog(true)}
-              />
-            </Drawer>
-          </Box>
+          {/* Desktop Drawer */}
+          <Drawer
+            variant="permanent"
+            sx={{
+              display: { xs: 'none', sm: 'block' },
+              '& .MuiDrawer-paper': {
+                boxSizing: 'border-box',
+                width: currentDrawerWidth,
+                transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                overflow: 'visible',
+                borderRight: `1px solid ${SLATE_200}`,
+                bgcolor: '#ffffff',
+              },
+            }}
+            open
+          >
+            {/* Floating expand/collapse pill */}
+            <Tooltip title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right">
+              <IconButton
+                onClick={handleCollapseToggle}
+                size="small"
+                sx={{
+                  position: 'absolute',
+                  top: HEADER_HEIGHT - 12,
+                  right: -12,
+                  zIndex: (t) => t.zIndex.drawer + 2,
+                  width: 24,
+                  height: 24,
+                  bgcolor: '#fff',
+                  border: `1px solid ${SLATE_200}`,
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
+                  color: SLATE_700,
+                  '&:hover': { bgcolor: INDIGO, color: '#fff', borderColor: INDIGO },
+                }}
+              >
+                {isCollapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+            <DrawerContent
+              isCollapsed={isCollapsed}
+              onExpandSidebar={() => setIsCollapsed(false)}
+              pathname={pathname}
+              onNavigate={handleNavigation}
+              onLogout={() => setOpenDialog(true)}
+            />
+          </Drawer>
+        </Box>
 
-          {/* Right column: AppBar + Content stacked in flex-column */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+        {/* Right column: AppBar + Content stacked in flex-column */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
 
-            {/* 2. APPBAR — static, no gap */}
-            <AppBar
-              position="static"
-              elevation={0}
-              sx={{
-                bgcolor: 'background.paper',
-                borderBottom: `1px solid ${SLATE_200}`,
-                color: 'text.primary',
-                flexShrink: 0,
-              }}
-            >
-              <Toolbar sx={{ height: HEADER_HEIGHT, pl: 0, pr: { sm: 2.5 }, gap: 2, minHeight: `${HEADER_HEIGHT}px !important` }}>
-                {/* Mobile hamburger */}
-                <IconButton
-                  color="inherit"
-                  edge="start"
-                  size="small"
-                  onClick={handleDrawerToggle}
-                  sx={{ display: { sm: 'none' }, width: 32, height: 32 }}
-                >
-                  <MenuIcon sx={{ fontSize: 26 }} />
-                </IconButton>
+          {/* 2. APPBAR — static, no gap */}
+          <AppBar
+            position="static"
+            elevation={0}
+            sx={{
+              bgcolor: 'background.paper',
+              borderBottom: `1px solid ${SLATE_200}`,
+              color: 'text.primary',
+              flexShrink: 0,
+            }}
+          >
+            <Toolbar sx={{ height: HEADER_HEIGHT, pl: 0, pr: { sm: 2.5 }, gap: 2, minHeight: `${HEADER_HEIGHT}px !important` }}>
+              {/* Mobile hamburger */}
+              <IconButton
+                color="inherit"
+                edge="start"
+                size="small"
+                onClick={handleDrawerToggle}
+                sx={{ display: { sm: 'none' }, width: 32, height: 32 }}
+              >
+                <MenuIcon sx={{ fontSize: 26 }} />
+              </IconButton>
 
-                {/* Desktop expand/collapse toggle */}
-                <IconButton
-                  edge="start"
-                  onClick={handleCollapseToggle}
-                  size="small"
-                  sx={{
-                    display: { xs: 'none', sm: 'inline-flex' },
-                    color: SLATE_500,
-                    '&:hover': { bgcolor: SLATE_100, color: SLATE_BLACK },
-                  }}
-                >
-                  <MenuIcon sx={{ fontSize: 26 }} />
-                </IconButton>
+              {/* Desktop expand/collapse toggle */}
+              <IconButton
+                edge="start"
+                onClick={handleCollapseToggle}
+                size="small"
+                sx={{
+                  display: { xs: 'none', sm: 'inline-flex' },
+                  color: SLATE_500,
+                  '&:hover': { bgcolor: SLATE_100, color: SLATE_BLACK },
+                }}
+              >
+                <MenuIcon sx={{ fontSize: 26 }} />
+              </IconButton>
 
-                {/* Page title block */}
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography component="span" sx={{
-                    fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif !important',
-                    fontSize: '0.6875rem !important',
-                    fontWeight: '700 !important',
-                    fontStyle: 'normal !important',
-                    color: '#64748b !important',
-                    textTransform: 'uppercase !important',
-                    letterSpacing: '0.08em !important',
-                    lineHeight: '1.1 !important',
-                    display: 'block',
+              {/* Page title block */}
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography component="span" sx={{
+                  fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif !important',
+                  fontSize: '0.6875rem !important',
+                  fontWeight: '700 !important',
+                  fontStyle: 'normal !important',
+                  color: '#64748b !important',
+                  textTransform: 'uppercase !important',
+                  letterSpacing: '0.08em !important',
+                  lineHeight: '1.1 !important',
+                  display: 'block',
+                }}>
+                  Workspace
+                </Typography>
+                <Typography sx={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: SLATE_BLACK,
+                  lineHeight: 1.3,
+                  mt: 0,
+                  fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                }}>
+                  {currentPageTitle}
+                </Typography>
+              </Box>
+
+              {/* USER PROFILE */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {tenant && (
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    bgcolor: alpha('#919EAB', 0.12),
+                    py: 0.5,
+                    px: 1.5,
+                    borderRadius: 3
                   }}>
-                    Workspace
-                  </Typography>
-                  <Typography sx={{
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: SLATE_BLACK,
-                    lineHeight: 1.3,
-                    mt: 0,
-                    fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-                  }}>
-                    {currentPageTitle}
-                  </Typography>
-                </Box>
+                    {(() => {
+                      const displayName = user?.firstName || user?.name || user?.email || tenant || '';
+                      const initial = displayName?.[0]?.toUpperCase();
+                      return (
+                        <>
+                          <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, fontSize: 14, fontWeight: 700 }}>
+                            {initial}
+                          </Avatar>
+                          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                            <Typography variant="subtitle2" sx={{ color: 'text.primary', lineHeight: 1 }}>
+                              {displayName} / {tenant}
+                            </Typography>
+                          </Box>
+                        </>
+                      );
+                    })()}
+                  </Box>
+                )}
+              </Box>
+            </Toolbar>
+          </AppBar>
 
-                {/* USER PROFILE */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  {tenant && (
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1.5,
-                      bgcolor: alpha('#919EAB', 0.12),
-                      py: 0.5,
-                      px: 1.5,
-                      borderRadius: 3
-                    }}>
-                      {(() => {
-                        const displayName = user?.firstName || user?.name || user?.email || tenant || '';
-                        const initial = displayName?.[0]?.toUpperCase();
-                        return (
-                          <>
-                            <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, fontSize: 14, fontWeight: 700 }}>
-                              {initial}
-                            </Avatar>
-                            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                              <Typography variant="subtitle2" sx={{ color: 'text.primary', lineHeight: 1 }}>
-                                {displayName} / {tenant}
-                              </Typography>
-                            </Box>
-                          </>
-                        );
-                      })()}
-                    </Box>
-                  )}
-                </Box>
-              </Toolbar>
-            </AppBar>
-
-            {/* 3. MAIN CONTENT — scrolls independently, no top gap */}
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                overflow: 'auto',
-                bgcolor: 'background.default',
-              }}
-            >
-              <PageContent pathname={pathname} settingsKey={settingsKey} />
-            </Box>
+          {/* 3. MAIN CONTENT — scrolls independently, no top gap */}
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              overflow: 'auto',
+              bgcolor: 'background.default',
+            }}
+          >
+            <PageContent pathname={pathname} settingsKey={settingsKey} />
           </Box>
+        </Box>
 
-          {/* 4. LOGOUT DIALOG */}
-          <Dialog
-            open={openDialog}
-            onClose={() => setOpenDialog(false)}
-            maxWidth="sm"
-            fullWidth
-            TransitionComponent={Slide}
-            TransitionProps={{ direction: 'up' }}
-            PaperProps={{
+        {/* 4. LOGOUT DIALOG */}
+        <Dialog
+          open={openDialog}
+          onClose={() => setOpenDialog(false)}
+          maxWidth="sm"
+          fullWidth
+          slots={{ transition: Slide }}
+          slotProps={{
+            transition: { direction: 'up' },
+            paper: {
               sx: {
                 borderRadius: 4,
                 boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
                 overflow: 'hidden',
                 border: '1px solid',
                 borderColor: 'divider',
-              }
-            }}
-          >
-            <DialogTitle sx={{ p: 0 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  px: 3,
-                  pt: 3,
-                  pb: 2.5,
-                  background: 'linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(239,68,68,0.03) 100%)',
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
-                  <Box>
-                    <Chip
-                      label="Account"
-                      size="small"
-                      sx={{
-                        height: 18,
-                        fontSize: '0.6rem',
-                        fontWeight: 700,
-                        letterSpacing: 0.8,
-                        textTransform: 'uppercase',
-                        bgcolor: alpha('#dc2626', 0.1),
-                        color: '#dc2626',
-                        mb: 0.5,
-                        borderRadius: 1,
-                      }}
-                    />
-                    <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
-                      Sign Out
-                    </Typography>
-                  </Box>
-                </Box>
-                <Tooltip title="Close" placement="left">
-                  <IconButton
-                    onClick={() => setOpenDialog(false)}
+              },
+            },
+          }}
+        >
+          <DialogTitle sx={{ p: 0 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                px: 3,
+                pt: 3,
+                pb: 2.5,
+                background: 'linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(239,68,68,0.03) 100%)',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+                <Box>
+                  <Chip
+                    label="Account"
                     size="small"
                     sx={{
-                      color: 'text.secondary',
-                      bgcolor: 'action.hover',
-                      borderRadius: 2,
-                      '&:hover': { bgcolor: alpha('#dc2626', 0.08), color: '#dc2626' },
+                      height: 18,
+                      fontSize: '0.6rem',
+                      fontWeight: 700,
+                      letterSpacing: 0.8,
+                      textTransform: 'uppercase',
+                      bgcolor: alpha('#dc2626', 0.1),
+                      color: '#dc2626',
+                      mb: 0.5,
+                      borderRadius: 1,
                     }}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                  />
+                  <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                    Sign Out
+                  </Typography>
+                </Box>
               </Box>
-            </DialogTitle>
-            <DialogContent sx={{ px: 3, py: 3 }}>
-              <Typography color="text.secondary">
-                Are you sure you want to log out? Unsaved changes may be lost.
-              </Typography>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
-              <Button
-                onClick={() => setOpenDialog(false)}
-                variant="outlined"
-                color="inherit"
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleLogoutConfirm}
-                variant="contained"
-                color="error"
-                disableElevation
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, bgcolor: '#14213d', '&:hover': { bgcolor: '#1e2f52' } }}
-              >
-                Log Out
-              </Button>
-            </DialogActions>
-          </Dialog>
+              <Tooltip title="Close" placement="left">
+                <IconButton
+                  onClick={() => setOpenDialog(false)}
+                  size="small"
+                  sx={{
+                    color: 'text.secondary',
+                    bgcolor: 'action.hover',
+                    borderRadius: 2,
+                    '&:hover': { bgcolor: alpha('#dc2626', 0.08), color: '#dc2626' },
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ px: 3, py: 3 }}>
+            <Typography color="text.secondary">
+              Are you sure you want to log out? Unsaved changes may be lost.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
+            <Button
+              onClick={() => setOpenDialog(false)}
+              variant="outlined"
+              color="inherit"
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLogoutConfirm}
+              variant="contained"
+              color="error"
+              disableElevation
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, bgcolor: '#14213d', '&:hover': { bgcolor: '#1e2f52' } }}
+            >
+              Log Out
+            </Button>
+          </DialogActions>
+        </Dialog>
 
       </Box>
     </ThemeProvider>
