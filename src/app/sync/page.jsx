@@ -28,6 +28,7 @@ import {
   CircularProgress,
   TextField,
   Button,
+  Badge,
   Stack,
 } from '@mui/material';
 
@@ -38,7 +39,7 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
-import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { DataGrid } from '@mui/x-data-grid';
 
 import { useTenant } from "../tenant-context";
@@ -319,6 +320,79 @@ export default function IngestPage() {
     fetchValidationLogs();
   };
 
+  const [stripDismissed, setStripDismissed] = React.useState(false);
+
+  const [resolvedIds, setResolvedIds] = React.useState(() => {
+    try { return new Set(JSON.parse(sessionStorage.getItem('resolved_INGEST') ?? '[]')); }
+    catch { return new Set(); }
+  });
+
+  const unresolvedLogs = React.useMemo(() =>
+    validationLogs.filter(r => !resolvedIds.has(String(r.id ?? `${r.rowNumber}-${r.fieldName}`))),
+    [validationLogs, resolvedIds]
+  );
+
+  const validationIssueCount = unresolvedLogs.length;
+  const hasValidationIssues = validationIssueCount > 0;
+
+  const recheckValidationIssues = React.useCallback(() => {
+    if (!tenant) return;
+    dataloaderApi.get('/validation-logs/activity')
+      .then(res => {
+        setValidationLogs(res.data ?? []);
+        if ((res.data ?? []).length === 0) setStripDismissed(false);
+      })
+      .catch(() => {});
+  }, [tenant]);
+
+  useEffect(() => { recheckValidationIssues(); }, [recheckValidationIssues]);
+
+  const handleMarkResolved = (row) => {
+    const key = String(row.id ?? `${row.rowNumber}-${row.fieldName}`);
+    setResolvedIds(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
+  const handleMarkAllResolved = () => {
+    const count = unresolvedLogs.length;
+    setResolvedIds(prev => {
+      const next = new Set(prev);
+      unresolvedLogs.forEach(r => next.add(String(r.id ?? `${r.rowNumber}-${r.fieldName}`)));
+      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+    showToast(`${count} issue${count !== 1 ? 's' : ''} marked as resolved.`, 'success');
+  };
+
+  const downloadErrorReport = () => {
+    const headers = ['Row #', 'Type', 'Field', 'Rejected Value', 'Instrument ID', 'Attribute ID', 'Posting Date', 'Error Code', 'Message', 'Job ID', 'Timestamp'];
+    const rows = validationLogs.map(r => [
+      r.rowNumber ?? '',
+      r.validationType ?? '',
+      r.fieldName ?? '',
+      `"${(r.rejectedValue ?? '').toString().replace(/"/g, '""')}"`,
+      r.instrumentId ?? '',
+      r.attributeId ?? '',
+      r.postingDate ?? '',
+      r.errorCode ?? '',
+      `"${(r.errorMessage ?? '').replace(/"/g, '""')}"`,
+      r.jobId ?? '',
+      r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `validation-errors-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const baseURL = "";
   const fetchUploadActivityCall = `${baseURL}/activitylog/get/recent/loads`;
 
@@ -362,8 +436,8 @@ export default function IngestPage() {
 
   const handleCloseFileUpload = () => {
     setOpenFileUpload(false);
-    // Refresh logs after upload window closes
     fetchUploadActivitiyLogs();
+    recheckValidationIssues();
   };
 
   return (
@@ -375,7 +449,7 @@ export default function IngestPage() {
         <Box sx={{
           p: 1.5,
           borderBottom: '1.5px solid',
-          borderColor: (theme) => alpha(theme.palette.divider, 0.2), display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 4
+          borderColor: (theme) => alpha(theme.palette.divider, 0.2), display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: (hasValidationIssues && !stripDismissed) ? 0 : 4
         }}>
           <Box>
             <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
@@ -390,11 +464,14 @@ export default function IngestPage() {
                 sx={{
                   bgcolor: 'white', boxShadow: 1,
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': { bgcolor: 'rgba(239,68,68,0.06)', boxShadow: 3, transform: 'scale(1.08)' },
+                  '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' },
                   '&:active': { transform: 'scale(0.94)' },
                 }}
               >
-                <FactCheckOutlinedIcon sx={{ color: '#ef4444' }} />
+                <Badge badgeContent={validationIssueCount} color="error" max={99}
+                  sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                  <WarningAmberOutlinedIcon sx={{ color: '#d97706' }} />
+                </Badge>
               </IconButton>
             </Tooltip>
             <Tooltip title="Upload Activity Files">
@@ -417,6 +494,32 @@ export default function IngestPage() {
             </Tooltip>
           </Box>
         </Box>
+
+        {/* Validation Issues Strip */}
+        {hasValidationIssues && !stripDismissed && (
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2, py: 1.25, mb: 3,
+            borderRadius: 2,
+            bgcolor: alpha('#f59e0b', 0.08),
+            border: '1px solid', borderColor: alpha('#f59e0b', 0.35),
+          }}>
+            <WarningAmberOutlinedIcon sx={{ color: '#d97706', fontSize: 20, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ color: '#92400e', flex: 1, fontWeight: 500 }}>
+              Your data contains unresolved issues. Please review before proceeding.
+            </Typography>
+            <Button size="small" onClick={handleOpenValidationLog} disableRipple sx={{
+              color: '#d97706', fontWeight: 700, textDecoration: 'underline',
+              p: 0, minWidth: 'auto', fontSize: '0.8rem',
+              '&:hover': { bgcolor: 'transparent', color: '#b45309' },
+            }}>
+              Click here
+            </Button>
+            <IconButton size="small" onClick={() => setStripDismissed(true)} sx={{ color: '#d97706', p: 0.25, ml: 0.5 }}>
+              <HighlightOffOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
 
         {/* 2. Recent Upload Section */}
         <Box sx={{ mb: 4 }}>
@@ -603,7 +706,7 @@ export default function IngestPage() {
             sx={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               px: 3, pt: 2.5, pb: 2,
-              background: `linear-gradient(135deg, ${alpha('#ef4444', 0.07)} 0%, ${alpha('#f97316', 0.04)} 100%)`,
+              background: `linear-gradient(135deg, ${alpha('#2563EB', 0.08)} 0%, ${alpha('#2563EB', 0.03)} 100%)`,
               borderBottom: '1px solid', borderColor: 'divider',
             }}
           >
@@ -612,13 +715,13 @@ export default function IngestPage() {
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.4 }}>
                   <Chip
-                    icon={<FactCheckOutlinedIcon sx={{ fontSize: '12px !important', color: '#ef4444 !important' }} />}
+                    icon={<WarningAmberOutlinedIcon sx={{ fontSize: '12px !important', color: '#2563EB !important' }} />}
                     label="Activity Load"
                     size="small"
                     sx={{
                       height: 20, fontSize: '0.68rem', fontWeight: 700,
-                      bgcolor: 'rgba(239,68,68,0.1)', color: '#dc2626',
-                      border: '1px solid rgba(239,68,68,0.25)', borderRadius: 1,
+                      bgcolor: alpha('#2563EB', 0.1), color: '#2563EB',
+                      border: `1px solid ${alpha('#2563EB', 0.25)}`, borderRadius: 1,
                     }}
                   />
                 </Box>
@@ -626,7 +729,7 @@ export default function IngestPage() {
                   Validation Log
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
-                  {validationLogs.length} record{validationLogs.length !== 1 ? 's' : ''}
+                  {unresolvedLogs.length} unresolved
                 </Typography>
               </Box>
             </Box>
@@ -634,7 +737,7 @@ export default function IngestPage() {
               <IconButton
                 onClick={() => setOpenValidationLog(false)}
                 size="small"
-                sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: 'rgba(239,68,68,0.1)', color: 'error.main' } }}
+                sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' } }}
               >
                 <HighlightOffOutlinedIcon fontSize="small" />
               </IconButton>
@@ -643,6 +746,26 @@ export default function IngestPage() {
         </DialogTitle>
 
         <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {/* Summary Card */}
+          <Box sx={{ display: 'flex', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc', alignItems: 'center', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Unresolved', value: unresolvedLogs.length, color: '#14213d' },
+              { label: 'Errors', value: unresolvedLogs.filter(r => r.validationType === 'ERROR' || r.errorCode?.startsWith('ERR')).length, color: '#dc2626' },
+              { label: 'Warnings', value: unresolvedLogs.filter(r => r.validationType === 'WARNING').length, color: '#d97706' },
+            ].map(({ label, value, color }) => (
+              <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, borderRadius: 2, bgcolor: alpha(color, 0.06), border: '1px solid', borderColor: alpha(color, 0.2) }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>{label}:</Typography>
+                <Typography variant="caption" sx={{ color, fontWeight: 800, fontSize: '0.85rem' }}>{value}</Typography>
+              </Box>
+            ))}
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" onClick={handleMarkAllResolved} disabled={unresolvedLogs.length === 0} sx={{
+              fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
+              border: '1px solid', borderColor: alpha('#16a34a', 0.35), borderRadius: 1.5, px: 1.5,
+              '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
+            }}>✓ Mark All Resolved</Button>
+          </Box>
+          {/* Filters */}
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc' }}>
             <Stack direction="row" spacing={2} alignItems="center">
               <TextField
@@ -673,7 +796,7 @@ export default function IngestPage() {
                 variant="contained"
                 onClick={fetchValidationLogs}
                 disabled={validationLogsLoading}
-                sx={{ height: 40, bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' } }}
+                sx={{ height: 40, bgcolor: '#14213d', '&:hover': { bgcolor: '#0d1829' } }}
               >
                 Filter
               </Button>
@@ -681,9 +804,9 @@ export default function IngestPage() {
           </Box>
 
           <DataGrid
-            rows={validationLogs}
+            rows={unresolvedLogs}
             loading={validationLogsLoading}
-            getRowId={(row) => row.id}
+            getRowId={(row) => row.id ?? `${row.rowNumber}-${row.fieldName}`}
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
             disableRowSelectionOnClick
@@ -726,6 +849,15 @@ export default function IngestPage() {
                     {p.value ? new Date(p.value).toLocaleString() : '—'}
                   </Box>
                 ) },
+              { field: '__resolve', headerName: '', width: 140, sortable: false, filterable: false,
+                renderCell: (p) => (
+                  <Button size="small" onClick={() => handleMarkResolved(p.row)} sx={{
+                    fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
+                    border: '1px solid', borderColor: alpha('#16a34a', 0.3),
+                    borderRadius: 1.5, px: 1.5, py: 0.25, minWidth: 'auto',
+                    '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
+                  }}>✓ Mark Resolved</Button>
+                ) },
             ]}
             sx={{
               border: 0, flex: 1,
@@ -741,9 +873,9 @@ export default function IngestPage() {
               '& .MuiDataGrid-columnSeparator': { display: 'none' },
               '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
               '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
-              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#ef4444', 0.03) } },
+              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#2563EB', 0.03) } },
               '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
-              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#ef4444', 0.02) },
+              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
             }}
           />
         </DialogContent>

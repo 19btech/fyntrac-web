@@ -40,13 +40,15 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import DownloadIcon from '@mui/icons-material/Download';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import LayersIcon from '@mui/icons-material/Layers';
+
+import { styled } from '@mui/material/styles';
 
 // API & Context
 import { dataloaderApi } from '../services/api-client';
@@ -55,6 +57,41 @@ import { useTenant } from '../tenant-context';
 // Dialog components
 import ModelUploadComponent from '../component/model-upload';
 import ExecuteModel from '../component/execute-model';
+
+// --- STYLED COMPONENTS ---
+
+const Android12Switch = styled(Switch)(({ theme }) => ({
+  padding: 8,
+  '& .MuiSwitch-track': {
+    borderRadius: 22 / 2,
+    '&::before, &::after': {
+      content: '""',
+      position: 'absolute',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 16,
+      height: 16,
+    },
+    '&::before': {
+      backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+        theme.palette.getContrastText(theme.palette.primary.main),
+      )}" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>')`,
+      left: 12,
+    },
+    '&::after': {
+      backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+        theme.palette.getContrastText(theme.palette.primary.main),
+      )}" d="M19,13H5V11H19V13Z" /></svg>')`,
+      right: 12,
+    },
+  },
+  '& .MuiSwitch-thumb': {
+    boxShadow: 'none',
+    width: 16,
+    height: 16,
+    margin: 2,
+  },
+}));
 
 // --- HELPERS ---
 
@@ -760,15 +797,32 @@ function Row({ row, onToggleStatus, onDownload, onExecute, executionStatus, exec
             </Tooltip>
             <Tooltip title="Download">
               <IconButton size="small" onClick={handleDownload} disabled={!row.modelFileId}>
-                <DownloadIcon fontSize="small" />
+                <FileDownloadOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title={row.modelStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}>
-              <Switch
-                size="small"
-                checked={row.modelStatus === 'ACTIVE'}
-                onChange={handleToggle}
-              />
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Android12Switch
+                  checked={row.modelStatus === 'ACTIVE'}
+                  onChange={handleToggle}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#1e88e5',
+                      '&:hover': { backgroundColor: 'rgba(30, 136, 229, 0.08)' },
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      backgroundColor: '#1e88e5',
+                    },
+                    '& .MuiSwitch-switchBase:not(.Mui-checked)': {
+                      color: '#6d6d6d',
+                      '&:hover': { backgroundColor: 'rgba(109, 109, 109, 0.08)' },
+                    },
+                    '& .MuiSwitch-switchBase:not(.Mui-checked) + .MuiSwitch-track': {
+                      backgroundColor: '#6d6d6d',
+                    },
+                  }}
+                />
+              </Box>
             </Tooltip>
             <Tooltip title="Delete">
               <IconButton size="small" color="error" disabled>

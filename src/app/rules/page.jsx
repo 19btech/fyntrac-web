@@ -17,14 +17,14 @@ import AddTransactionDialog from '../component/add-transaction'
 import AddAttributeDialog from '../component/add-attribute';
 import Aggregation from '../component/aggregation'
 import Attribute from '../component/attribute'
-import { Container, Dialog, DialogContent, DialogTitle, Tooltip, Divider, Typography, Slide, Chip, Card, Snackbar, Alert } from '@mui/material';
+import { Container, Button, Badge, Dialog, DialogContent, DialogTitle, Tooltip, Divider, Typography, Slide, Chip, Card, Snackbar, Alert } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { dataloaderApi } from '../services/api-client';
 import AddAggregationDialog from '../component/add-aggregation';
 import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { DataGrid } from '@mui/x-data-grid';
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -70,8 +70,65 @@ export default function RulePage() {
 
   const handleOpenValidationLog = () => {
     setOpenValidationLog(true);
+    setSeverityFilter('all');
     fetchValidationLogs();
   };
+
+  const [stripDismissed, setStripDismissed] = React.useState(false);
+  const [severityFilter, setSeverityFilter] = React.useState('all');
+
+  const [resolvedIds, setResolvedIds] = React.useState(() => {
+    try { return new Set(JSON.parse(sessionStorage.getItem('resolved_ACCOUNTING_RULES') ?? '[]')); }
+    catch { return new Set(); }
+  });
+
+  const unresolvedLogs = React.useMemo(() =>
+    validationLogs.filter(r => !resolvedIds.has(String(r.id))),
+    [validationLogs, resolvedIds]
+  );
+
+  const validationIssueCount = unresolvedLogs.length;
+  const hasValidationIssues = validationIssueCount > 0;
+
+  const recheckValidationIssues = React.useCallback(() => {
+    if (!tenant) return;
+    dataloaderApi.get('/validation-logs/ref/by-type/ACCOUNTING_RULES')
+      .then(res => {
+        setValidationLogs(res.data ?? []);
+        if ((res.data ?? []).length === 0) setStripDismissed(false);
+      })
+      .catch(() => {});
+  }, [tenant]);
+
+  React.useEffect(() => { recheckValidationIssues(); }, [recheckValidationIssues]);
+
+  const filteredLogs = React.useMemo(() => {
+    if (severityFilter === 'all') return unresolvedLogs;
+    return unresolvedLogs.filter(r =>
+      severityFilter === 'error' ? r.severity === 'ERROR' : r.severity === 'WARNING'
+    );
+  }, [unresolvedLogs, severityFilter]);
+
+  const handleMarkResolved = (row) => {
+    setResolvedIds(prev => {
+      const next = new Set(prev);
+      next.add(String(row.id));
+      try { sessionStorage.setItem('resolved_ACCOUNTING_RULES', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
+  const handleMarkAllResolved = () => {
+    const count = filteredLogs.length;
+    setResolvedIds(prev => {
+      const next = new Set(prev);
+      filteredLogs.forEach(r => next.add(String(r.id)));
+      try { sessionStorage.setItem('resolved_ACCOUNTING_RULES', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+    showToast(`${count} issue${count !== 1 ? 's' : ''} marked as resolved.`, 'success');
+  };
+
   const handleRefresh = () => {    if (panelIndex === 0) {
       setTransactionRefreshKey(prevKey => prevKey + 1);
     } else if (panelIndex === 1) {
@@ -152,6 +209,7 @@ export default function RulePage() {
     if (didSave) {
       setTransactionRefreshKey(k => k + 1);
       showToast('Transaction saved successfully.');
+      recheckValidationIssues();
     }
   };
 
@@ -160,6 +218,7 @@ export default function RulePage() {
     if (didSave) {
       setRefreshAttributeKey(k => k + 1);
       showToast('Attribute saved successfully.');
+      recheckValidationIssues();
     }
   };
 
@@ -168,11 +227,13 @@ export default function RulePage() {
     if (didSave) {
       setRefreshAggregationKey(k => k + 1);
       showToast('Balance saved successfully.');
+      recheckValidationIssues();
     }
   };
 
   const handleAddAccountTypeCloseDialog = (didSave) => {
     setIsAddAccountTypeDialogOpen(false);
+    if (didSave) recheckValidationIssues();
   };
   return (
     <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
@@ -188,7 +249,7 @@ export default function RulePage() {
           justifyContent: 'space-between',
           alignItems: { sm: 'center' },
           gap: 2,
-          mb: 4,
+          mb: (hasValidationIssues && !stripDismissed) ? 0 : 4,
         }}>
           <Box>
             <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
@@ -204,15 +265,18 @@ export default function RulePage() {
                 sx={{
                   bgcolor: 'white', boxShadow: 1,
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': { bgcolor: 'rgba(239,68,68,0.06)', boxShadow: 3, transform: 'scale(1.08)' },
+                  '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' },
                   '&:active': { transform: 'scale(0.94)' },
                 }}
               >
-                <FactCheckOutlinedIcon sx={{ color: '#ef4444' }} />
+                <Badge badgeContent={validationIssueCount} color="error" max={99}
+                  sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                  <WarningAmberOutlinedIcon sx={{ color: '#d97706' }} />
+                </Badge>
               </IconButton>
             </Tooltip>
-            <Tooltip title="Upload Activity Files">
-              <IconButton aria-label="Upload Activity Files" onClick={handleOpenFileUpload} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
+            <Tooltip title="Upload Reference Data Files">
+              <IconButton aria-label="Upload Reference Data Files" onClick={handleOpenFileUpload} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
                 <FileUploadOutlinedIcon color="action" />
               </IconButton>
             </Tooltip>
@@ -228,6 +292,33 @@ export default function RulePage() {
             </Tooltip>
           </Box>
         </Box>
+
+        {/* Validation Issues Strip */}
+        {hasValidationIssues && !stripDismissed && (
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2, py: 1.25, mb: 3,
+            borderRadius: 2,
+            bgcolor: alpha('#f59e0b', 0.08),
+            border: '1px solid', borderColor: alpha('#f59e0b', 0.35),
+          }}>
+            <WarningAmberOutlinedIcon sx={{ color: '#d97706', fontSize: 20, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ color: '#92400e', flex: 1, fontWeight: 500 }}>
+              Your data contains unresolved issues. Please review before proceeding.
+            </Typography>
+            <Button size="small" onClick={handleOpenValidationLog} disableRipple sx={{
+              color: '#d97706', fontWeight: 700, textDecoration: 'underline',
+              p: 0, minWidth: 'auto', fontSize: '0.8rem',
+              '&:hover': { bgcolor: 'transparent', color: '#b45309' },
+            }}>
+              Click here
+            </Button>
+            <IconButton size="small" onClick={() => setStripDismissed(true)} sx={{ color: '#d97706', p: 0.25, ml: 0.5 }}>
+              <HighlightOffOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
+
       <Card elevation={0} sx={{
         borderRadius: 3,
         boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}, 0px 0px 2px ${alpha(theme.palette.grey[400], 0.2)}`,
@@ -382,7 +473,7 @@ export default function RulePage() {
               justifyContent: 'space-between',
               alignItems: 'center',
               px: 3, pt: 2.5, pb: 2,
-              background: `linear-gradient(135deg, ${alpha('#ef4444', 0.07)} 0%, ${alpha('#f97316', 0.04)} 100%)`,
+              background: `linear-gradient(135deg, ${alpha('#2563EB', 0.08)} 0%, ${alpha('#2563EB', 0.03)} 100%)`,
               borderBottom: '1px solid',
               borderColor: 'divider',
             }}
@@ -392,13 +483,13 @@ export default function RulePage() {
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.4 }}>
                   <Chip
-                    icon={<FactCheckOutlinedIcon sx={{ fontSize: '12px !important', color: '#ef4444 !important' }} />}
+                    icon={<WarningAmberOutlinedIcon sx={{ fontSize: '12px !important', color: '#2563EB !important' }} />}
                     label="Accounting Rules"
                     size="small"
                     sx={{
                       height: 20, fontSize: '0.68rem', fontWeight: 700,
-                      bgcolor: 'rgba(239,68,68,0.1)', color: '#dc2626',
-                      border: '1px solid rgba(239,68,68,0.25)', borderRadius: 1,
+                      bgcolor: alpha('#2563EB', 0.1), color: '#2563EB',
+                      border: `1px solid ${alpha('#2563EB', 0.25)}`, borderRadius: 1,
                     }}
                   />
                 </Box>
@@ -414,7 +505,7 @@ export default function RulePage() {
               <IconButton
                 onClick={() => setOpenValidationLog(false)}
                 size="small"
-                sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: 'rgba(239,68,68,0.1)', color: 'error.main' } }}
+                sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' } }}
               >
                 <HighlightOffOutlinedIcon fontSize="small" />
               </IconButton>
@@ -423,8 +514,30 @@ export default function RulePage() {
         </DialogTitle>
 
         <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {/* Severity Filter Bar */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc', flexWrap: 'wrap' }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mr: 0.5 }}>Filter:</Typography>
+            {[
+              { key: 'all', label: `All (${unresolvedLogs.length})` },
+              { key: 'error', label: `Errors (${unresolvedLogs.filter(r => r.severity === 'ERROR').length})` },
+              { key: 'warning', label: `Warnings (${unresolvedLogs.filter(r => r.severity === 'WARNING').length})` },
+            ].map(({ key, label }) => (
+              <Chip key={key} label={label} size="small" onClick={() => setSeverityFilter(key)} sx={{
+                cursor: 'pointer', fontWeight: severityFilter === key ? 700 : 500, fontSize: '0.72rem',
+                bgcolor: severityFilter === key ? (key === 'error' ? alpha('#dc2626', 0.1) : key === 'warning' ? alpha('#d97706', 0.1) : alpha('#2563EB', 0.1)) : 'transparent',
+                color: severityFilter === key ? (key === 'error' ? '#dc2626' : key === 'warning' ? '#d97706' : '#2563EB') : 'text.secondary',
+                border: '1px solid', borderColor: severityFilter === key ? (key === 'error' ? alpha('#dc2626', 0.3) : key === 'warning' ? alpha('#d97706', 0.3) : alpha('#2563EB', 0.3)) : alpha('#94a3b8', 0.3),
+              }} />
+            ))}
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" onClick={handleMarkAllResolved} disabled={filteredLogs.length === 0} sx={{
+              fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
+              border: '1px solid', borderColor: alpha('#16a34a', 0.35), borderRadius: 1.5, px: 1.5,
+              '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
+            }}>✓ Mark All Resolved</Button>
+          </Box>
           <DataGrid
-            rows={validationLogs}
+            rows={filteredLogs}
             loading={validationLogsLoading}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
@@ -478,6 +591,15 @@ export default function RulePage() {
                     {p.value ? new Date(p.value).toLocaleString() : '—'}
                   </Box>
                 ) },
+              { field: '__resolve', headerName: '', width: 140, sortable: false, filterable: false,
+                renderCell: (p) => (
+                  <Button size="small" onClick={() => handleMarkResolved(p.row)} sx={{
+                    fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
+                    border: '1px solid', borderColor: alpha('#16a34a', 0.3),
+                    borderRadius: 1.5, px: 1.5, py: 0.25, minWidth: 'auto',
+                    '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
+                  }}>✓ Mark Resolved</Button>
+                ) },
             ]}
             sx={{
               border: 0, flex: 1,
@@ -493,9 +615,9 @@ export default function RulePage() {
               '& .MuiDataGrid-columnSeparator': { display: 'none' },
               '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
               '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
-              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#ef4444', 0.03) } },
+              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#2563EB', 0.03) } },
               '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
-              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#ef4444', 0.02) },
+              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
             }}
           />
         </DialogContent>

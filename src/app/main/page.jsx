@@ -29,9 +29,11 @@ import {
   Tooltip,
   Chip,
   Slide,
+  CircularProgress,
 } from '@mui/material';
 import { useTenant } from "../tenant-context";
 import PageContent from '../component/pageContent';
+import { dataloaderApi } from '../services/api-client';
 import fyntracTheme from "../theme/fyntrac-theme";
 // Icons
 import MenuIcon from '@mui/icons-material/Menu';
@@ -51,6 +53,11 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import CloseIcon from '@mui/icons-material/Close';
+import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 // ----------------------------------------------------------------------
 // 🔧 CONFIGURATION
@@ -245,7 +252,7 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
 // ----------------------------------------------------------------------
 // 🧩 COMPONENT: Drawer Content
 // ----------------------------------------------------------------------
-function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onLogout }) {
+function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onLogout, onReadiness }) {
   const NAVIGATION = [
     { segment: "getstarted", title: "Get Started", icon: <StartOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
     { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
@@ -331,6 +338,18 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
       <Box sx={{ p: 1, borderTop: `1px solid ${SLATE_200}`, bgcolor: SLATE_50 }}>
         <NavItem
           item={{
+            segment: "readiness",
+            title: "Readiness",
+            icon: <FactCheckOutlinedIcon />,
+            onClick: onReadiness,
+          }}
+          pathname={pathname}
+          onNavigate={onNavigate}
+          isCollapsed={isCollapsed}
+          onExpandSidebar={onExpandSidebar}
+        />
+        <NavItem
+          item={{
             segment: "logout",
             title: "Sign Out",
             icon: <LogoutIcon />,
@@ -357,6 +376,84 @@ export default function DashboardLayoutModern() {
   const [pathname, setPathname] = React.useState('/main');
   const [openDialog, setOpenDialog] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
+  const [openReadiness, setOpenReadiness] = React.useState(false);
+  const [readinessLoading, setReadinessLoading] = React.useState(false);
+  const [readinessStatus, setReadinessStatus] = React.useState({});
+  const [selectedPhase, setSelectedPhase] = React.useState('tenant');
+  const readinessLoadedRef = React.useRef(false);
+
+  const fetchReadinessStatus = React.useCallback(async (showLoading = true) => {
+    if (!tenant) return;
+    if (showLoading) setReadinessLoading(true);
+    try {
+      const results = await Promise.allSettled([
+        dataloaderApi.get('/setting/get/settings'),
+        dataloaderApi.get('/accounting-period/get/open-periods'),
+        dataloaderApi.get('/transaction/get/all'),
+        dataloaderApi.get('/attribute/get/all'),
+        dataloaderApi.get('/aggregation/get/all'),
+        dataloaderApi.get('/chartofaccount/get/all'),
+        dataloaderApi.get('/subledgermapping/get/all'),
+        dataloaderApi.get('/fyntrac/event-configurations/all'),
+        dataloaderApi.get('/validation-logs/ref/by-type/ACCOUNTING_RULES'),
+        dataloaderApi.get('/validation-logs/ref/by-type/JOURNAL_MAPPING'),
+        dataloaderApi.get('/fyntrac/custom-table/reference-tables'),
+        dataloaderApi.get('/fyntrac/custom-table/operational-tables'),
+        dataloaderApi.get('/model/get/all'),
+        dataloaderApi.get('/accounttype/get/subtypes'),
+      ]);
+      const val = (r) => r.status === 'fulfilled' ? (r.value?.data ?? null) : null;
+      const cnt = (d) => {
+        if (!d) return 0;
+        if (Array.isArray(d)) return d.length;
+        // Spring paginated response
+        if (Array.isArray(d?.content)) return d.content.length;
+        if (typeof d === 'object') return Object.keys(d).length;
+        return 0;
+      };
+      const [settings, periods, txns, attrs, aggs, coa, subledger, events, rulesLog, mappingLog, customTables, operationalTables, models, subtypes] = results.map(val);
+      const resolvedRules = new Set(JSON.parse(sessionStorage.getItem('resolved_ACCOUNTING_RULES') ?? '[]'));
+      const resolvedMapping = new Set(JSON.parse(sessionStorage.getItem('resolved_JOURNAL_MAPPING') ?? '[]'));
+      const unresolvedRules = Array.isArray(rulesLog) ? rulesLog.filter(r => !resolvedRules.has(String(r.id))) : [];
+      const unresolvedMapping = Array.isArray(mappingLog) ? mappingLog.filter(r => !resolvedMapping.has(String(r.id))) : [];
+      const hasRulesErrors = unresolvedRules.length > 0;
+      const hasMappingErrors = unresolvedMapping.length > 0;
+      const customTablesArr = Array.isArray(customTables) ? customTables : (Array.isArray(customTables?.data) ? customTables.data : []);
+      const tableNames = customTablesArr.map(t => t.tableName || t.name || String(t)).filter(Boolean);
+      const operationalTablesArr = Array.isArray(operationalTables) ? operationalTables : (Array.isArray(operationalTables?.data) ? operationalTables.data : []);
+      const operationalTableNames = operationalTablesArr.map(t => t.tableName || t.name || String(t)).filter(Boolean);
+      const eventNames = Array.isArray(events) ? events.map(e => e.eventName || e.name).filter(Boolean) : [];
+      const activeModels = Array.isArray(models) ? models : [];
+      const primaryModel = activeModels[0] ?? null;
+      setReadinessStatus({
+        currency: (settings?.currency || settings?.homeCurrency) ? 'done' : 'pending',
+        fiscal: cnt(periods) > 0 ? 'done' : 'pending',
+        dashboard: (settings?.dashboardConfiguration || settings?.dashboardConfig || settings?.widgetConfig) ? 'done' : 'pending',
+        transactions: cnt(txns) > 0 ? (hasRulesErrors ? 'warning' : 'done') : (hasRulesErrors ? 'warning' : 'pending'),
+        attributes: cnt(attrs) > 0 ? (hasRulesErrors ? 'warning' : 'done') : (hasRulesErrors ? 'warning' : 'pending'),
+        balances: cnt(aggs) > 0 ? (hasRulesErrors ? 'warning' : 'done') : (hasRulesErrors ? 'warning' : 'pending'),
+        coa: cnt(coa) > 0 ? (hasMappingErrors ? 'warning' : 'done') : (hasMappingErrors ? 'warning' : 'pending'),
+        subledger: cnt(subledger) > 0 ? (hasMappingErrors ? 'warning' : 'done') : (hasMappingErrors ? 'warning' : 'pending'),
+        accountsubtypes: cnt(subtypes) > 0 ? (hasMappingErrors ? 'warning' : 'done') : (hasMappingErrors ? 'warning' : 'pending'),
+        events: cnt(events) > 0 ? 'done' : 'pending',
+        eventNames,
+        customtables: (tableNames.length + operationalTableNames.length) > 0 ? 'done' : 'pending',
+        customTableNames: tableNames,
+        operationalTableNames,
+        model: primaryModel ? 'done' : 'pending',
+        modelName: primaryModel?.modelName ?? null,
+        modelType: primaryModel?.modelType ?? null,
+        modelNames: activeModels.map(m => m.modelName).filter(Boolean),
+      });
+    } catch {}
+    readinessLoadedRef.current = true;
+    setReadinessLoading(false);
+  }, [tenant]);
+
+  // Pre-fetch silently on mount so modal opens instantly
+  React.useEffect(() => {
+    if (tenant) fetchReadinessStatus(false);
+  }, [tenant]);
   const [settingsKey, setSettingsKey] = React.useState(0);
 
   React.useEffect(() => setMounted(true), []);
@@ -417,6 +514,7 @@ export default function DashboardLayoutModern() {
               pathname={pathname}
               onNavigate={handleNavigation}
               onLogout={() => setOpenDialog(true)}
+              onReadiness={() => { setOpenReadiness(true); fetchReadinessStatus(!readinessLoadedRef.current); }}
             />
           </Drawer>
 
@@ -464,6 +562,7 @@ export default function DashboardLayoutModern() {
               pathname={pathname}
               onNavigate={handleNavigation}
               onLogout={() => setOpenDialog(true)}
+              onReadiness={() => { setOpenReadiness(true); fetchReadinessStatus(!readinessLoadedRef.current); }}
             />
           </Drawer>
         </Box>
@@ -611,7 +710,7 @@ export default function DashboardLayoutModern() {
                 px: 3,
                 pt: 3,
                 pb: 2.5,
-                background: 'linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(239,68,68,0.03) 100%)',
+                background: `linear-gradient(135deg, ${alpha('#2563EB', 0.08)} 0%, ${alpha('#2563EB', 0.03)} 100%)`,
                 borderBottom: '1px solid',
                 borderColor: 'divider',
               }}
@@ -628,8 +727,8 @@ export default function DashboardLayoutModern() {
                       fontWeight: 700,
                       letterSpacing: 0.8,
                       textTransform: 'uppercase',
-                      bgcolor: alpha('#dc2626', 0.1),
-                      color: '#dc2626',
+                      bgcolor: alpha('#2563EB', 0.1),
+                      color: '#2563EB',
                       mb: 0.5,
                       borderRadius: 1,
                     }}
@@ -647,7 +746,7 @@ export default function DashboardLayoutModern() {
                     color: 'text.secondary',
                     bgcolor: 'action.hover',
                     borderRadius: 2,
-                    '&:hover': { bgcolor: alpha('#dc2626', 0.08), color: '#dc2626' },
+                    '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' },
                   }}
                 >
                   <CloseIcon fontSize="small" />
@@ -680,6 +779,293 @@ export default function DashboardLayoutModern() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* ── Readiness Checklist Modal ── */}
+        {(() => {
+          const PHASES = [
+            {
+              id: 'tenant', label: 'Tenant Setup', route: 'settings/configure', mandatory: true,
+              items: [
+                { id: 'currency', label: 'Home Currency', route: 'settings/configure' },
+                { id: 'fiscal', label: 'Fiscal Period', route: 'settings/configure' },
+                { id: 'dashboard', label: 'Dashboard', route: 'settings/configure' },
+              ],
+            },
+            {
+              id: 'rules', label: 'Accounting Rules', route: 'settings/accounting-rules/reference-data', mandatory: true,
+              items: [
+                { id: 'transactions', label: 'Transactions', route: 'settings/accounting-rules/reference-data' },
+                { id: 'attributes', label: 'Attributes', route: 'settings/accounting-rules/reference-data' },
+                { id: 'balances', label: 'Balances', route: 'settings/accounting-rules/reference-data' },
+              ],
+            },
+            {
+              id: 'journal', label: 'Journal Mapping', route: 'journal-mapping', mandatory: true,
+              items: [
+                { id: 'accountsubtypes', label: 'Account Subtypes', route: 'journal-mapping' },
+                { id: 'coa', label: 'Chart of Accounts', route: 'journal-mapping' },
+                { id: 'subledger', label: 'Subledger Mapping', route: 'journal-mapping' },
+              ],
+            },
+            {
+              id: 'customtables', label: 'Custom Tables', route: 'settings/accounting-rules/custom-table', mandatory: false,
+              items: [
+                { id: 'customtables', label: 'Custom Tables', namesKey: 'customTableNames', opNamesKey: 'operationalTableNames', route: 'settings/accounting-rules/custom-table' },
+              ],
+            },
+            {
+              id: 'events', label: 'Event Setup', route: 'settings/accounting-rules/event-configuration', mandatory: true,
+              items: [
+                { id: 'events', label: 'Events Configured', namesKey: 'eventNames', route: 'settings/accounting-rules/event-configuration' },
+              ],
+            },
+            {
+              id: 'model', label: 'Model', route: 'model', mandatory: true,
+              items: [
+                { id: 'model', label: 'Model', namesKey: 'modelNames', showModelType: true, route: 'model' },
+              ],
+            },
+          ];
+
+          const phaseStatus = (phase) => {
+            if (!phase.mandatory && phase.items.every(i => (readinessStatus[i.id] ?? 'pending') === 'pending')) return 'optional';
+            const statuses = phase.items.map(i => readinessStatus[i.id] ?? 'pending');
+            if (statuses.every(s => s === 'done')) return 'done';
+            if (statuses.some(s => s === 'warning')) return 'warning';
+            if (statuses.some(s => s === 'done')) return 'progress';
+            return 'pending';
+          };
+
+          const circleColor = (ps) => ({
+            done: alpha('#16a34a', 0.12),
+            warning: alpha('#d97706', 0.12),
+            progress: alpha('#2563EB', 0.12),
+            pending: alpha('#94a3b8', 0.1),
+            optional: alpha('#94a3b8', 0.06),
+          }[ps] || alpha('#94a3b8', 0.1));
+
+          const circleBorderColor = (ps) => ({
+            done: alpha('#16a34a', 0.4),
+            warning: alpha('#d97706', 0.4),
+            progress: alpha('#2563EB', 0.4),
+            pending: alpha('#94a3b8', 0.25),
+            optional: alpha('#94a3b8', 0.15),
+          }[ps] || alpha('#94a3b8', 0.25));
+
+          const circleTextColor = (ps) => ({
+            done: '#16a34a',
+            warning: '#d97706',
+            progress: '#2563EB',
+            pending: '#94a3b8',
+            optional: '#cbd5e1',
+          }[ps] || '#94a3b8');
+          const itemColor = (s) => ({ done: '#16a34a', warning: '#d97706', pending: '#94a3b8' }[s] || '#94a3b8');
+
+          const StatusIcon = ({ status, size = 18 }) => {
+            if (status === 'done') return <CheckCircleOutlinedIcon sx={{ fontSize: size, color: '#16a34a', flexShrink: 0 }} />;
+            if (status === 'warning') return <WarningAmberOutlinedIcon sx={{ fontSize: size, color: '#d97706', flexShrink: 0 }} />;
+            return <RadioButtonUncheckedIcon sx={{ fontSize: size, color: '#cbd5e1', flexShrink: 0 }} />;
+          };
+
+          const activePhase = PHASES.find(p => p.id === selectedPhase) ?? PHASES[0];
+
+          return (
+            <Dialog
+              open={openReadiness}
+              onClose={() => setOpenReadiness(false)}
+              maxWidth="md"
+              fullWidth
+              slots={{ transition: Slide }}
+              slotProps={{
+                transition: { direction: 'up' },
+                paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider', height: '80vh', display: 'flex', flexDirection: 'column' } },
+              }}
+            >
+              {/* Header */}
+              <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+                <Box sx={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  px: 3, pt: 2.5, pb: 2,
+                  background: `linear-gradient(135deg, ${alpha('#2563EB', 0.08)} 0%, ${alpha('#2563EB', 0.03)} 100%)`,
+                  borderBottom: '1px solid', borderColor: 'divider',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <img src="fyntrac.png" alt="Fyntrac" style={{ width: 64, height: 'auto' }} />
+                    <Box>
+                      <Box sx={{ mb: 0.5 }}>
+                        <Chip
+                          icon={<FactCheckOutlinedIcon sx={{ fontSize: '12px !important', color: '#2563EB !important' }} />}
+                          label="Implementation"
+                          size="small"
+                          sx={{ height: 20, fontSize: '0.6rem', fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', bgcolor: alpha('#2563EB', 0.1), color: '#2563EB', borderRadius: 1 }}
+                        />
+                      </Box>
+                      <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                        Readiness Checklist
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
+                        Track your tenant setup progress
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Tooltip title="Close" placement="left">
+                    <IconButton onClick={() => setOpenReadiness(false)} size="small" sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' } }}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </DialogTitle>
+
+              <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                {readinessLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+                    <CircularProgress size={36} sx={{ color: '#2563EB' }} />
+                  </Box>
+                ) : (
+                  <>
+                    {/* Pipeline */}
+                    <Box sx={{ px: 3, pt: 3, pb: 2.5, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha('#f8fafc', 0.8) }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        {PHASES.map((phase, idx) => {
+                          const ps = phaseStatus(phase);
+                          const isSelected = selectedPhase === phase.id;
+                          return (
+                            <React.Fragment key={phase.id}>
+                              <Box
+                                onClick={() => setSelectedPhase(phase.id)}
+                                sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', px: 0.5 }}
+                              >
+                                {/* Circle */}
+                                <Box sx={{
+                                  width: 64, height: 64, borderRadius: '50%',
+                                  bgcolor: circleColor(ps),
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  border: `2px solid ${isSelected ? circleBorderColor(ps) : 'transparent'}`,
+                                  boxShadow: isSelected ? `0 0 0 3px ${alpha(circleTextColor(ps), 0.15)}` : 'none',
+                                  transition: 'all 0.2s',
+                                  '&:hover': { boxShadow: `0 0 0 3px ${alpha(circleTextColor(ps), 0.12)}`, border: `2px solid ${circleBorderColor(ps)}` },
+                                }}>
+                                  {ps === 'done' && <CheckCircleOutlinedIcon sx={{ color: '#16a34a', fontSize: 26 }} />}
+                                  {ps === 'warning' && <WarningAmberOutlinedIcon sx={{ color: '#d97706', fontSize: 26 }} />}
+                                  {(ps === 'pending' || ps === 'optional' || ps === 'progress') && (
+                                    <Typography sx={{ color: circleTextColor(ps), fontWeight: 700, fontSize: '1.1rem' }}>{idx + 1}</Typography>
+                                  )}
+                                </Box>
+                                {/* Label */}
+                                <Typography variant="caption" sx={{
+                                  mt: 1, fontWeight: isSelected ? 700 : 600, textAlign: 'center',
+                                  color: isSelected ? '#14213d' : ps === 'done' ? '#16a34a' : ps === 'warning' ? '#d97706' : '#64748b',
+                                  fontSize: '0.72rem', lineHeight: 1.3, maxWidth: 80,
+                                }}>
+                                  {phase.label}
+                                </Typography>
+                                {!phase.mandatory && (
+                                  <Chip label="Optional" size="small" sx={{ mt: 0.5, height: 14, fontSize: '0.55rem', fontWeight: 700, bgcolor: alpha('#94a3b8', 0.1), color: '#94a3b8', borderRadius: 1 }} />
+                                )}
+                              </Box>
+                              {/* Arrow */}
+                              {idx < PHASES.length - 1 && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', pt: 2.5, px: 0 }}>
+                                  <ArrowForwardIosIcon sx={{ fontSize: 13, color: '#cbd5e1' }} />
+                                </Box>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+
+                    {/* Selected Phase Content */}
+                    <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
+                      {/* Phase header */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: alpha(circleTextColor(phaseStatus(activePhase)), 0.35), flexShrink: 0 }} />
+                        <Typography variant="subtitle1" fontWeight={700} color="text.primary">{activePhase.label}</Typography>
+                        {!activePhase.mandatory && (
+                          <Chip label="Optional" size="small" sx={{ height: 18, fontSize: '0.62rem', fontWeight: 700, bgcolor: alpha('#94a3b8', 0.1), color: '#94a3b8', borderRadius: 1 }} />
+                        )}
+                      </Box>
+
+                      {/* Items */}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {activePhase.items.map(item => {
+                          const status = readinessStatus[item.id] ?? 'pending';
+                          return (
+                            <Box
+                              key={item.id}
+                              onClick={() => { setOpenReadiness(false); handleNavigation(item.route ?? activePhase.route); }}
+                              sx={{
+                                display: 'flex', alignItems: 'flex-start', gap: 2,
+                                p: 2, borderRadius: 3, cursor: 'pointer',
+                                border: '1px solid', borderColor: alpha('#e2e8f0', 0.8),
+                                bgcolor: status === 'done' ? alpha('#16a34a', 0.02) : status === 'warning' ? alpha('#d97706', 0.02) : '#fafafa',
+                                transition: 'all 0.15s',
+                                '&:hover': { borderColor: '#2563EB', bgcolor: alpha('#2563EB', 0.02), transform: 'translateX(2px)' },
+                              }}
+                            >
+                              <StatusIcon status={status} size={20} />
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" fontWeight={600} sx={{ color: status === 'pending' ? 'text.secondary' : 'text.primary', fontSize: '0.85rem' }}>
+                                  {item.label}
+                                </Typography>
+                                {/* Generic names list (events, custom tables, model names) */}
+                                {item.namesKey && (() => {
+                                  const names = readinessStatus[item.namesKey] ?? [];
+                                  const opNames = item.opNamesKey ? (readinessStatus[item.opNamesKey] ?? []) : [];
+                                  const hasAny = names.length > 0 || opNames.length > 0;
+                                  return hasAny ? (
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.75 }}>
+                                      {names.length > 0 && (
+                                        <Box>
+                                          {item.opNamesKey && (
+                                            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', mb: 0.25 }}>Reference</Typography>
+                                          )}
+                                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                            {names.map(name => (
+                                              <Chip key={name} label={name} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#16a34a', 0.08), color: '#16a34a', borderRadius: 1 }} />
+                                            ))}
+                                          </Box>
+                                        </Box>
+                                      )}
+                                      {opNames.length > 0 && (
+                                        <Box>
+                                          <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', mb: 0.25 }}>Operational</Typography>
+                                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                            {opNames.map(name => (
+                                              <Chip key={name} label={name} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#2563EB', 0.08), color: '#2563EB', borderRadius: 1 }} />
+                                            ))}
+                                          </Box>
+                                        </Box>
+                                      )}
+                                      {item.showModelType && readinessStatus.modelType && (
+                                        <Chip label={readinessStatus.modelType} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#64748b', 0.08), color: '#64748b', borderRadius: 1 }} />
+                                      )}
+                                    </Box>
+                                  ) : (
+                                    <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>
+                                      {!activePhase.mandatory ? 'Not configured (optional)' : 'None configured'}
+                                    </Typography>
+                                  );
+                                })()}
+                                {/* Warning label */}
+                                {status === 'warning' && (
+                                  <Typography variant="caption" sx={{ color: '#d97706', fontSize: '0.72rem', fontWeight: 600, display: 'block', mt: 0.5 }}>
+                                    Has validation issues — review before proceeding
+                                  </Typography>
+                                )}
+                              </Box>
+                              <ArrowForwardIosIcon sx={{ fontSize: 12, color: '#cbd5e1', mt: 0.5 }} />
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
+          );
+        })()}
 
       </Box>
     </ThemeProvider>

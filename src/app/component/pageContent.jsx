@@ -43,6 +43,8 @@ export default function PageContent({ pathname, method, settingsKey }) {
         return <ModelPage />
       case '/settings/configure':
         return <SettingsPage />
+      case '/journal-mapping':
+        return <AccountingPage />
       case '/sync':
         return <SyncPage />
       case '/report-dashboard':

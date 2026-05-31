@@ -253,7 +253,16 @@ export default function HomePage() {
 
   const fetchTrendAnalysisData = () => {
     reportingApi.get(serviceGetTrendAnalysisURL)
-      .then(response => { setTrendAnalysisData(response.data); })
+      .then(response => {
+        const periods = response.data.accountingPeriods ?? [];
+        const balances = response.data.endingBalances ?? [];
+        const last6 = Math.max(0, periods.length - 6);
+        setTrendAnalysisData({
+          ...response.data,
+          accountingPeriods: periods.slice(last6),
+          endingBalances: balances.slice(last6),
+        });
+      })
       .catch(error => { });
   };
 
@@ -266,9 +275,9 @@ export default function HomePage() {
   const fetchMoMActivityData = () => {
     reportingApi.get(serviceGetMomActivityDataURL)
       .then(response => {
-        const sorted = [...(response.data.momData || [])].sort((a, b) =>
-          String(a.accountingPeriodId).localeCompare(String(b.accountingPeriodId))
-        );
+        const sorted = [...(response.data.momData || [])]
+          .sort((a, b) => String(a.accountingPeriodId).localeCompare(String(b.accountingPeriodId)))
+          .slice(-6);
         setMomData(sorted);
         setMomMetricSeries((response.data.monthOverMonthSeries || []).map((s, i) => {
           const label = formatMetricName(s.label);
