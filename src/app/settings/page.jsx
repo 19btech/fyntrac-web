@@ -17,6 +17,7 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CustomTabPanel from '../component/custom-tab-panel';
 import AddDashboardConfiguration from '../component/add-update-dashboard-config';
 import { dataloaderApi } from '../services/api-client';
@@ -96,6 +97,36 @@ const SectionLabel = ({ label, first }) => (
   </Typography>
 );
 
+const formatPostingDate = (p) => {
+  if (!p) return null;
+  const str = String(p);
+  let date;
+  if (/^\d{8}$/.test(str)) {
+    date = new Date(Number(str.slice(0, 4)), Number(str.slice(4, 6)) - 1, Number(str.slice(6, 8)));
+  } else {
+    date = new Date(str);
+  }
+  if (isNaN(date)) return str;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatPeriod = (p) => {
+  if (!p) return p;
+  const str = String(p);
+  let year, month;
+  if (str.includes('-')) {
+    [year, month] = str.split('-');
+  } else if (str.length === 6) {
+    year = str.slice(0, 4);
+    month = str.slice(4, 6);
+  } else {
+    return str;
+  }
+  const y = Number(year), m = Number(month);
+  if (!y || !m || m < 1 || m > 12) return str;
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+};
+
 export default function SettingsPage() {
   const { tenant } = useTenant();
   const theme = useTheme();
@@ -108,6 +139,7 @@ export default function SettingsPage() {
   // Fiscal period
   const [fiscalPeriodStaringDate, setFiscalPeriodStaringDate] = React.useState(null);
   const [isFiscalPeriodButtonDisabled, setIsFiscalPeriodButtonDisabled] = React.useState(true);
+  const [hasActivityData, setHasActivityData] = React.useState(false);
 
   // Currency
   const [currency, setCurrency] = useState('USD');
@@ -123,9 +155,11 @@ export default function SettingsPage() {
   const [reopenPeriod, setReopenPeriod] = useState(null);
   const [closedPeriodsList, setClosedPeriodsList] = useState([]);
   const [isReopenPeriodButtonDisabled, setIsReopenPeriodButtonDisabled] = useState(true);
+  const [showReopenConfirm, setShowReopenConfirm] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
 
   // Delete entries
-  const [deleteEntriesDate, setDeleteEntriesDate] = useState(null);
+  const [latestPostingDate, setLatestPostingDate] = useState(null);
 
   // Restatement
   const [restatementMode, setRestatementMode] = React.useState(false);
@@ -148,6 +182,10 @@ export default function SettingsPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFiscalPeriodChange = (date) => {
+    if (hasActivityData) {
+      showToast('Activity data is already loaded into the system and an accounting period is set. You cannot change the fiscal period.', 'error');
+      return;
+    }
     setFiscalPeriodStaringDate(date);
     setIsFiscalPeriodButtonDisabled(date == null);
   };
@@ -169,7 +207,9 @@ export default function SettingsPage() {
   const fetchClosedAccountingPeriods = () => {
     dataloaderApi.get('/setting/get/closed/accounting-periods')
       .then(response => {
-        const last3 = (response.data || []).slice(0, 3);
+        const all = Array.isArray(response.data) ? response.data : [];
+        // take the 3 most recently closed (last 3 in ascending order, newest first)
+        const last3 = all.slice(-3).reverse();
         setClosedPeriodsList(last3);
       })
       .catch(() => {});
@@ -190,6 +230,15 @@ export default function SettingsPage() {
     fetchSettings();
     fetchCurrencies();
     fetchClosedAccountingPeriods();
+    dataloaderApi.get('/activitylog/get/recent/loads')
+      .then(res => {
+        const logs = res.data ?? [];
+        const completed = logs.filter(l => l.activityStatus === 'COMPLETED');
+        setHasActivityData(completed.length > 0);
+        const dates = completed.map(l => l.postingDate).filter(Boolean);
+        if (dates.length > 0) setLatestPostingDate(String(dates.sort().at(-1)));
+      })
+      .catch(() => {});
   }, []);
 
   const saveCurrency = async () => {
@@ -205,6 +254,10 @@ export default function SettingsPage() {
   };
 
   const handleSaveFiscalPeriod = async () => {
+    if (hasActivityData) {
+      showToast('Activity data is already loaded into the system and an accounting period is set. You cannot change the fiscal period.', 'error');
+      return;
+    }
     try {
       const response = await dataloaderApi.post('/setting/fiscal-priod/save', {
         homeCurrency: '', glamFields: '',
@@ -231,16 +284,20 @@ export default function SettingsPage() {
   };
 
   const handleReopenPeriod = async () => {
+    setIsReopening(true);
     try {
       await dataloaderApi.post('/setting/reopen/accounting-periods', reopenPeriod, {
         headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
       });
-      showToast(`Period ${reopenPeriod} reopened successfully.`);
+      showToast(`${formatPeriod(reopenPeriod)} and all subsequent periods have been reopened.`);
+      setShowReopenConfirm(false);
       setIsReopenPeriodButtonDisabled(true);
       setReopenPeriod(null);
       fetchClosedAccountingPeriods();
     } catch {
       showToast('Failed to reopen period.', 'error');
+    } finally {
+      setIsReopening(false);
     }
   };
 
@@ -307,16 +364,14 @@ export default function SettingsPage() {
       // After reset: set default fiscal period 01/01/2020 and home currency USD,
       // and enable restatement mode so the freshly-reset tenant starts in restatement.
       const defaultFiscalDate = new Date('2020-01-01T00:00:00.000Z');
-      const [fiscalRes] = await Promise.all([
-        dataloaderApi.post('/setting/fiscal-priod/save', {
-          homeCurrency: '', glamFields: '',
-          fiscalPeriodStartDate: defaultFiscalDate,
-          reportingPeriod: null, restatementMode: 1, id: null,
-        }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } }),
-        dataloaderApi.post('/setting/save/currency', 'USD', {
-          headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
-        }),
-      ]);
+      const fiscalRes = await dataloaderApi.post('/setting/fiscal-priod/save', {
+        homeCurrency: 'USD', glamFields: '',
+        fiscalPeriodStartDate: defaultFiscalDate,
+        reportingPeriod: null, restatementMode: 1, id: null,
+      }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } });
+      await dataloaderApi.post('/setting/save/currency', 'USD', {
+        headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
+      });
 
       // Explicitly enable restatement mode after the schema reset
       try {
@@ -381,52 +436,62 @@ export default function SettingsPage() {
         slots={{ transition: Slide }}
         slotProps={{
           transition: { direction: 'up' },
-          paper: {
-            sx: {
-            borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider'
-            },
-          },
+          paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } },
         }}
       >
-        <Box sx={{
-          px: 3, pt: 3, pb: 2,
-          background: `linear-gradient(135deg, ${alpha('#dc2626', 0.07)} 0%, ${alpha('#dc2626', 0.02)} 100%)`,
-          borderBottom: '1px solid', borderColor: 'divider',
-          display: 'flex', alignItems: 'center', gap: 2,
-        }}>
-          <Box sx={{ bgcolor: alpha('#dc2626', 0.1), borderRadius: 2, p: 1, display: 'flex' }}>
-            <DeleteOutlinedIcon sx={{ color: '#dc2626', fontSize: 22 }} />
+        <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+          <Box sx={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            px: 3, pt: 3, pb: 2.5,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            borderBottom: '1px solid', borderColor: 'divider',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Chip
+                    label="Activity Data"
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: '0.6rem', fontWeight: 700,
+                      letterSpacing: 0.8, textTransform: 'uppercase',
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main, borderRadius: 1,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                  Delete Entries
+                </Typography>
+              </Box>
+            </Box>
+            <Tooltip title="Close" placement="left">
+              <IconButton onClick={() => setShowDeleteConfirmDialog(false)} size="small" sx={{
+                color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+              }}>
+                <HighlightOffOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
-          <Box>
-            <Typography variant="h6" fontWeight={700} sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', lineHeight: 1.2 }}>
-              Delete Entries
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
-              This action cannot be undone
-            </Typography>
-          </Box>
-        </Box>
-        <DialogContent sx={{ pt: 2.5, px: 3 }}>
-          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7 }}>
-            This will <strong>permanently delete all activity data</strong> for the selected posting date{' '}
-            {deleteEntriesDate && (
-              <strong style={{ color: '#14213d' }}>({deleteEntriesDate.format('MM/DD/YYYY')})</strong>
-            )}.
+        </DialogTitle>
+        <DialogContent sx={{ pt: 5, px: 3 }}>
+          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
+            This will <strong>permanently delete all activity data</strong> for posting date{' '}
+            <strong style={{ color: '#14213d' }}>{formatPostingDate(latestPostingDate)}</strong>.
             Are you sure you want to continue?
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => setShowDeleteConfirmDialog(false)} variant="text" sx={{
-            borderRadius: 2, textTransform: 'none', fontWeight: 600,
-            color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-          }}>Cancel</Button>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={handleDeleteEntries} variant="contained" sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700,
             fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
-            background: '#dc2626', color: '#fff',
-            boxShadow: '0 4px 12px rgba(220,38,38,0.28)',
+            background: '#14213d', color: '#fff',
+            boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': { background: '#b91c1c', boxShadow: '0 6px 18px rgba(220,38,38,0.4)', transform: 'translateY(-1px)' },
+            '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
+            '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
           }}>Delete Entries</Button>
         </DialogActions>
       </Dialog>
@@ -646,14 +711,26 @@ export default function SettingsPage() {
             title="Fiscal Period Start Date"
             description="Specify the starting date of your fiscal period to generate accounting periods."
           >
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
-                value={fiscalPeriodStaringDate}
-                onChange={handleFiscalPeriodChange}
-                slotProps={{ textField: { size: 'small', sx: { width: 178, ...tfSx } } }}
-              />
-            </LocalizationProvider>
-            <ActionLink onClick={handleSaveFiscalPeriod} disabled={isFiscalPeriodButtonDisabled}>Save</ActionLink>
+            <Tooltip
+              title={hasActivityData ? 'Activity data is already loaded. Fiscal period cannot be changed.' : ''}
+              placement="top"
+              disableHoverListener={!hasActivityData}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    value={fiscalPeriodStaringDate}
+                    onChange={handleFiscalPeriodChange}
+                    disabled={hasActivityData}
+                    slotProps={{ textField: { size: 'small', sx: { width: 178, ...tfSx } } }}
+                  />
+                </LocalizationProvider>
+                {hasActivityData && (
+                  <LockOutlinedIcon sx={{ fontSize: '1rem', color: 'text.disabled' }} />
+                )}
+              </Box>
+            </Tooltip>
+            <ActionLink onClick={handleSaveFiscalPeriod} disabled={isFiscalPeriodButtonDisabled || hasActivityData}>Save</ActionLink>
           </SettingRow>
 
           <SettingRow
@@ -692,33 +769,125 @@ export default function SettingsPage() {
           {closedPeriodsList.length > 0 && (
           <SettingRow
             title="Re-Open Accounting Period"
-            description="Select a closed period to reopen for adjustments."
+            description="Reopening a period will also reopen all periods closed after it."
           >
-            <Autocomplete
-              size="small"
-              options={closedPeriodsList}
-              value={reopenPeriod}
-              getOptionLabel={(option) => option}
-              onChange={(_, newValue) => { setReopenPeriod(newValue); setIsReopenPeriodButtonDisabled(!newValue); }}
-              sx={{ width: 160 }}
-              renderInput={(params) => <TextField {...params} label="Period" sx={tfSx} />}
-            />
-            <ActionLink onClick={handleReopenPeriod} disabled={isReopenPeriodButtonDisabled}>Reopen</ActionLink>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              {closedPeriodsList.map(p => {
+                const active = reopenPeriod === p;
+                return (
+                  <Chip
+                    key={p}
+                    label={formatPeriod(p)}
+                    size="small"
+                    onClick={() => { setReopenPeriod(p); setIsReopenPeriodButtonDisabled(false); }}
+                    sx={{
+                      fontWeight: active ? 700 : 500,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      borderColor: active ? alpha('#2563EB', 0.5) : alpha('#94a3b8', 0.35),
+                      bgcolor: active ? alpha('#2563EB', 0.08) : 'transparent',
+                      color: active ? '#2563EB' : 'text.secondary',
+                      transition: 'all 0.15s',
+                      '&:hover': { borderColor: alpha('#2563EB', 0.4), bgcolor: alpha('#2563EB', 0.05) },
+                    }}
+                  />
+                );
+              })}
+            </Box>
+            <ActionLink onClick={() => setShowReopenConfirm(true)} disabled={isReopenPeriodButtonDisabled}>Reopen</ActionLink>
           </SettingRow>
           )}
 
+          {/* Reopen confirmation dialog */}
+          <Dialog
+            open={showReopenConfirm}
+            onClose={() => !isReopening && setShowReopenConfirm(false)}
+            maxWidth="xs" fullWidth
+            slots={{ transition: Slide }}
+            slotProps={{
+              transition: { direction: 'up' },
+              paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } },
+            }}
+          >
+            <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+              <Box sx={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                px: 3, pt: 3, pb: 2.5,
+                background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+                borderBottom: '1px solid', borderColor: 'divider',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                      <Chip
+                        label="Accounting Periods"
+                        size="small"
+                        sx={{
+                          height: 20, fontSize: '0.6rem', fontWeight: 700,
+                          letterSpacing: 0.8, textTransform: 'uppercase',
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: theme.palette.primary.main, borderRadius: 1,
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                      Re-Open Period
+                    </Typography>
+                  </Box>
+                </Box>
+                <Tooltip title="Close" placement="left">
+                  <IconButton onClick={() => setShowReopenConfirm(false)} disabled={isReopening} size="small" sx={{
+                    color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                    '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                  }}>
+                    <HighlightOffOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </DialogTitle>
+            <DialogContent sx={{ pt: 5, px: 3 }}>
+              <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
+                This will reopen <strong style={{ color: '#14213d' }}>{formatPeriod(reopenPeriod)}</strong> and <strong>all accounting periods closed after it</strong>. Make sure you intend to allow adjustments for these periods.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5 }}>
+              <Button onClick={handleReopenPeriod} disabled={isReopening} variant="contained" sx={{
+                borderRadius: 2, textTransform: 'none', fontWeight: 700,
+                fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
+                background: '#14213d', color: '#fff',
+                boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
+                '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
+              }}>
+                {isReopening ? 'Reopening…' : 'Confirm Reopen'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
           <SettingRow
             title="Delete Entries"
-            description="Permanently delete all activity data for the selected date."
+            description="Permanently delete all activity data up to the latest loaded posting date."
           >
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
-                value={deleteEntriesDate}
-                onChange={(date) => setDeleteEntriesDate(date)}
-                slotProps={{ textField: { size: 'small', sx: { width: 178, ...tfSx } } }}
+            {latestPostingDate ? (
+              <Chip
+                label={formatPostingDate(latestPostingDate)}
+                size="small"
+                sx={{
+                  fontSize: '0.75rem', fontWeight: 600,
+                  bgcolor: alpha('#14213d', 0.07), color: '#14213d',
+                  border: '1px solid', borderColor: alpha('#14213d', 0.2),
+                  borderRadius: 1.5,
+                }}
               />
-            </LocalizationProvider>
-            <ActionLink onClick={() => setShowDeleteConfirmDialog(true)} disabled={!deleteEntriesDate}>Delete</ActionLink>
+            ) : (
+              <Typography sx={{ fontSize: '0.78rem', color: 'text.disabled', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                No data loaded
+              </Typography>
+            )}
+            <ActionLink onClick={() => setShowDeleteConfirmDialog(true)} disabled={!latestPostingDate}>Delete</ActionLink>
           </SettingRow>
 
         </Box>

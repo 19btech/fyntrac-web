@@ -35,6 +35,7 @@ import {
 // Icons
 import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
+import DatasetOutlinedIcon from '@mui/icons-material/DatasetOutlined';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -275,6 +276,33 @@ const FyntracCard = ({ title, children, action, sx }) => {
   );
 };
 
+function ValidationNoRows({ severityFilter, context }) {
+  const msgs = {
+    rules: {
+      all: 'All accounting rules are valid — no issues detected.',
+      error: 'No errors in your accounting rules.',
+      warning: 'No warnings to review for accounting rules.',
+    },
+    journal: {
+      all: 'All journal mappings are configured correctly — no issues found.',
+      error: 'No errors in your journal mappings.',
+      warning: 'No warnings in your journal mappings.',
+    },
+    ingest: {
+      all: 'All records passed validation for the selected period.',
+      error: 'No errors found for the selected period.',
+      warning: 'No warnings found for the selected period.',
+    },
+  };
+  const text = msgs[context]?.[severityFilter] ?? 'No records found.';
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', py: 6, color: 'text.secondary' }}>
+      <Box sx={{ fontSize: '2rem', mb: 1 }}>✓</Box>
+      <Box sx={{ fontSize: '0.875rem', fontWeight: 500 }}>{text}</Box>
+    </Box>
+  );
+}
+
 // --- MAIN PAGE ---
 export default function IngestPage() {
   const theme = useTheme();
@@ -317,6 +345,7 @@ export default function IngestPage() {
 
   const handleOpenValidationLog = () => {
     setOpenValidationLog(true);
+    setSeverityFilter('all');
     fetchValidationLogs();
   };
 
@@ -331,6 +360,17 @@ export default function IngestPage() {
     validationLogs.filter(r => !resolvedIds.has(String(r.id ?? `${r.rowNumber}-${r.fieldName}`))),
     [validationLogs, resolvedIds]
   );
+
+  const [severityFilter, setSeverityFilter] = React.useState('all');
+
+  const filteredLogs = React.useMemo(() => {
+    if (severityFilter === 'all') return unresolvedLogs;
+    return unresolvedLogs.filter(r =>
+      severityFilter === 'error'
+        ? (r.validationType === 'ERROR' || r.errorCode?.startsWith('ERR'))
+        : r.validationType === 'WARNING'
+    );
+  }, [unresolvedLogs, severityFilter]);
 
   const validationIssueCount = unresolvedLogs.length;
   const hasValidationIssues = validationIssueCount > 0;
@@ -491,6 +531,11 @@ export default function IngestPage() {
                     : <CachedRoundedIcon color="action" />}
                 </IconButton>
               </span>
+            </Tooltip>
+            <Tooltip title="Download Sample Activity Data">
+              <IconButton aria-label="Download Sample Activity Data" component="a" href="/ActivityData_Sample.xlsx" download="ActivityData_Sample.xlsx" sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
+                <DatasetOutlinedIcon color="action" />
+              </IconButton>
             </Tooltip>
           </Box>
         </Box>
@@ -749,15 +794,18 @@ export default function IngestPage() {
           {/* Summary Card */}
           <Box sx={{ display: 'flex', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc', alignItems: 'center', flexWrap: 'wrap' }}>
             {[
-              { label: 'Unresolved', value: unresolvedLogs.length, color: '#14213d' },
-              { label: 'Errors', value: unresolvedLogs.filter(r => r.validationType === 'ERROR' || r.errorCode?.startsWith('ERR')).length, color: '#dc2626' },
-              { label: 'Warnings', value: unresolvedLogs.filter(r => r.validationType === 'WARNING').length, color: '#d97706' },
-            ].map(({ label, value, color }) => (
-              <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, borderRadius: 2, bgcolor: alpha(color, 0.06), border: '1px solid', borderColor: alpha(color, 0.2) }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>{label}:</Typography>
-                <Typography variant="caption" sx={{ color, fontWeight: 800, fontSize: '0.85rem' }}>{value}</Typography>
-              </Box>
-            ))}
+              { label: 'All', filterKey: 'all', value: unresolvedLogs.length, color: '#14213d' },
+              { label: 'Errors', filterKey: 'error', value: unresolvedLogs.filter(r => r.validationType === 'ERROR' || r.errorCode?.startsWith('ERR')).length, color: '#dc2626' },
+              { label: 'Warnings', filterKey: 'warning', value: unresolvedLogs.filter(r => r.validationType === 'WARNING').length, color: '#d97706' },
+            ].map(({ label, filterKey, value, color }) => {
+              const active = severityFilter === filterKey;
+              return (
+                <Box key={filterKey} onClick={() => setSeverityFilter(filterKey)} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, borderRadius: 2, cursor: 'pointer', transition: 'all 0.15s', bgcolor: active ? alpha(color, 0.12) : alpha(color, 0.06), border: '1px solid', borderColor: active ? alpha(color, 0.5) : alpha(color, 0.2), '&:hover': { borderColor: alpha(color, 0.4), bgcolor: alpha(color, 0.1) } }}>
+                  <Typography variant="caption" sx={{ color: active ? color : 'text.secondary', fontWeight: 600 }}>{label}:</Typography>
+                  <Typography variant="caption" sx={{ color, fontWeight: 800, fontSize: '0.85rem' }}>{value}</Typography>
+                </Box>
+              );
+            })}
             <Box sx={{ flex: 1 }} />
             <Button size="small" onClick={handleMarkAllResolved} disabled={unresolvedLogs.length === 0} sx={{
               fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
@@ -803,13 +851,16 @@ export default function IngestPage() {
             </Stack>
           </Box>
 
+          <Box sx={{ flex: 1, overflow: 'hidden', px: 3 }}>
           <DataGrid
-            rows={unresolvedLogs}
+            rows={filteredLogs}
             loading={validationLogsLoading}
             getRowId={(row) => row.id ?? `${row.rowNumber}-${row.fieldName}`}
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
             disableRowSelectionOnClick
+            slots={{ noRowsOverlay: ValidationNoRows }}
+            slotProps={{ noRowsOverlay: { severityFilter, context: 'ingest' } }}
             columns={[
               { field: 'validationType', headerName: 'Type', width: 140,
                 renderCell: (p) => <Box sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>{p.value}</Box> },
@@ -878,6 +929,7 @@ export default function IngestPage() {
               '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
             }}
           />
+          </Box>
         </DialogContent>
       </Dialog>
 

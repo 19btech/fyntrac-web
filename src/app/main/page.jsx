@@ -416,8 +416,13 @@ export default function DashboardLayoutModern() {
       const resolvedMapping = new Set(JSON.parse(sessionStorage.getItem('resolved_JOURNAL_MAPPING') ?? '[]'));
       const unresolvedRules = Array.isArray(rulesLog) ? rulesLog.filter(r => !resolvedRules.has(String(r.id))) : [];
       const unresolvedMapping = Array.isArray(mappingLog) ? mappingLog.filter(r => !resolvedMapping.has(String(r.id))) : [];
-      const hasRulesErrors = unresolvedRules.length > 0;
-      const hasMappingErrors = unresolvedMapping.length > 0;
+      const hasIssueFor = (logs, keyword) => logs.some(r => (r.sourceTable ?? '').toLowerCase().includes(keyword));
+      const hasTxnErrors = hasIssueFor(unresolvedRules, 'transaction');
+      const hasAttrErrors = hasIssueFor(unresolvedRules, 'attribute');
+      const hasAggErrors = hasIssueFor(unresolvedRules, 'aggregation') || hasIssueFor(unresolvedRules, 'balance');
+      const hasSubtypeErrors = hasIssueFor(unresolvedMapping, 'account') && hasIssueFor(unresolvedMapping, 'type');
+      const hasSubledgerErrors = hasIssueFor(unresolvedMapping, 'subledger');
+      const hasCoaErrors = hasIssueFor(unresolvedMapping, 'chart') || hasIssueFor(unresolvedMapping, 'coa');
       const customTablesArr = Array.isArray(customTables) ? customTables : (Array.isArray(customTables?.data) ? customTables.data : []);
       const tableNames = customTablesArr.map(t => t.tableName || t.name || String(t)).filter(Boolean);
       const operationalTablesArr = Array.isArray(operationalTables) ? operationalTables : (Array.isArray(operationalTables?.data) ? operationalTables.data : []);
@@ -426,15 +431,15 @@ export default function DashboardLayoutModern() {
       const activeModels = Array.isArray(models) ? models : [];
       const primaryModel = activeModels[0] ?? null;
       setReadinessStatus({
-        currency: (settings?.currency || settings?.homeCurrency) ? 'done' : 'pending',
+        currency: (settings?.currency || settings?.homeCurrency || settings?.fiscalPeriodStartDate) ? 'done' : 'pending',
         fiscal: cnt(periods) > 0 ? 'done' : 'pending',
         dashboard: (settings?.dashboardConfiguration || settings?.dashboardConfig || settings?.widgetConfig) ? 'done' : 'pending',
-        transactions: cnt(txns) > 0 ? (hasRulesErrors ? 'warning' : 'done') : (hasRulesErrors ? 'warning' : 'pending'),
-        attributes: cnt(attrs) > 0 ? (hasRulesErrors ? 'warning' : 'done') : (hasRulesErrors ? 'warning' : 'pending'),
-        balances: cnt(aggs) > 0 ? (hasRulesErrors ? 'warning' : 'done') : (hasRulesErrors ? 'warning' : 'pending'),
-        coa: cnt(coa) > 0 ? (hasMappingErrors ? 'warning' : 'done') : (hasMappingErrors ? 'warning' : 'pending'),
-        subledger: cnt(subledger) > 0 ? (hasMappingErrors ? 'warning' : 'done') : (hasMappingErrors ? 'warning' : 'pending'),
-        accountsubtypes: cnt(subtypes) > 0 ? (hasMappingErrors ? 'warning' : 'done') : (hasMappingErrors ? 'warning' : 'pending'),
+        transactions: cnt(txns) > 0 ? (hasTxnErrors ? 'warning' : 'done') : (hasTxnErrors ? 'warning' : 'pending'),
+        attributes: cnt(attrs) > 0 ? (hasAttrErrors ? 'warning' : 'done') : (hasAttrErrors ? 'warning' : 'pending'),
+        balances: cnt(aggs) > 0 ? (hasAggErrors ? 'warning' : 'done') : (hasAggErrors ? 'warning' : 'pending'),
+        coa: cnt(coa) > 0 ? (hasCoaErrors ? 'warning' : 'done') : (hasCoaErrors ? 'warning' : 'pending'),
+        subledger: cnt(subledger) > 0 ? (hasSubledgerErrors ? 'warning' : 'done') : (hasSubledgerErrors ? 'warning' : 'pending'),
+        accountsubtypes: cnt(subtypes) > 0 ? (hasSubtypeErrors ? 'warning' : 'done') : (hasSubtypeErrors ? 'warning' : 'pending'),
         events: cnt(events) > 0 ? 'done' : 'pending',
         eventNames,
         customtables: (tableNames.length + operationalTableNames.length) > 0 ? 'done' : 'pending',
@@ -455,6 +460,8 @@ export default function DashboardLayoutModern() {
     if (tenant) fetchReadinessStatus(false);
   }, [tenant]);
   const [settingsKey, setSettingsKey] = React.useState(0);
+  const [rulesInitialTab, setRulesInitialTab] = React.useState(0);
+  const [journalInitialTab, setJournalInitialTab] = React.useState(0);
 
   React.useEffect(() => setMounted(true), []);
 
@@ -677,7 +684,7 @@ export default function DashboardLayoutModern() {
               bgcolor: 'background.default',
             }}
           >
-            <PageContent pathname={pathname} settingsKey={settingsKey} />
+            <PageContent pathname={pathname} settingsKey={settingsKey} rulesInitialTab={rulesInitialTab} journalInitialTab={journalInitialTab} />
           </Box>
         </Box>
 
@@ -685,95 +692,67 @@ export default function DashboardLayoutModern() {
         <Dialog
           open={openDialog}
           onClose={() => setOpenDialog(false)}
-          maxWidth="sm"
+          maxWidth="xs"
           fullWidth
           slots={{ transition: Slide }}
           slotProps={{
             transition: { direction: 'up' },
-            paper: {
-              sx: {
-                borderRadius: 4,
-                boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
-                overflow: 'hidden',
-                border: '1px solid',
-                borderColor: 'divider',
-              },
-            },
+            paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } },
           }}
         >
-          <DialogTitle sx={{ p: 0 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                px: 3,
-                pt: 3,
-                pb: 2.5,
-                background: `linear-gradient(135deg, ${alpha('#2563EB', 0.08)} 0%, ${alpha('#2563EB', 0.03)} 100%)`,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-              }}
-            >
+          <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+            <Box sx={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              px: 3, pt: 3, pb: 2.5,
+              background: `linear-gradient(135deg, ${alpha('#2563EB', 0.08)} 0%, ${alpha('#2563EB', 0.05)} 100%)`,
+              borderBottom: '1px solid', borderColor: 'divider',
+            }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
                 <Box>
-                  <Chip
-                    label="Account"
-                    size="small"
-                    sx={{
-                      height: 18,
-                      fontSize: '0.6rem',
-                      fontWeight: 700,
-                      letterSpacing: 0.8,
-                      textTransform: 'uppercase',
-                      bgcolor: alpha('#2563EB', 0.1),
-                      color: '#2563EB',
-                      mb: 0.5,
-                      borderRadius: 1,
-                    }}
-                  />
-                  <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Chip
+                      label="Account"
+                      size="small"
+                      sx={{
+                        height: 20, fontSize: '0.6rem', fontWeight: 700,
+                        letterSpacing: 0.8, textTransform: 'uppercase',
+                        bgcolor: alpha('#2563EB', 0.1), color: '#2563EB', borderRadius: 1,
+                      }}
+                    />
+                  </Box>
+                  <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
                     Sign Out
                   </Typography>
                 </Box>
               </Box>
               <Tooltip title="Close" placement="left">
-                <IconButton
-                  onClick={() => setOpenDialog(false)}
-                  size="small"
-                  sx={{
-                    color: 'text.secondary',
-                    bgcolor: 'action.hover',
-                    borderRadius: 2,
-                    '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' },
-                  }}
-                >
+                <IconButton onClick={() => setOpenDialog(false)} size="small" sx={{
+                  color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                  '&:hover': { bgcolor: alpha('#dc2626', 0.12), color: '#dc2626' },
+                }}>
                   <CloseIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             </Box>
           </DialogTitle>
-          <DialogContent sx={{ px: 3, py: 3 }}>
-            <Typography color="text.secondary">
-              Are you sure you want to log out? Unsaved changes may be lost.
+          <DialogContent sx={{ pt: 5, px: 3 }}>
+            <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
+              Are you sure you want to log out? <strong>Unsaved changes may be lost.</strong>
             </Typography>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1 }}>
-            <Button
-              onClick={() => setOpenDialog(false)}
-              variant="outlined"
-              color="inherit"
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-            >
-              Cancel
-            </Button>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
             <Button
               onClick={handleLogoutConfirm}
               variant="contained"
-              color="error"
-              disableElevation
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, bgcolor: '#14213d', '&:hover': { bgcolor: '#1e2f52' } }}
+              sx={{
+                borderRadius: 2, textTransform: 'none', fontWeight: 700,
+                fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
+                background: '#14213d', color: '#fff',
+                boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
+              }}
             >
               Log Out
             </Button>
@@ -794,17 +773,17 @@ export default function DashboardLayoutModern() {
             {
               id: 'rules', label: 'Accounting Rules', route: 'settings/accounting-rules/reference-data', mandatory: true,
               items: [
-                { id: 'transactions', label: 'Transactions', route: 'settings/accounting-rules/reference-data' },
-                { id: 'attributes', label: 'Attributes', route: 'settings/accounting-rules/reference-data' },
-                { id: 'balances', label: 'Balances', route: 'settings/accounting-rules/reference-data' },
+                { id: 'transactions', label: 'Transactions', route: 'settings/accounting-rules/reference-data', tabIndex: 0 },
+                { id: 'attributes', label: 'Attributes', route: 'settings/accounting-rules/reference-data', tabIndex: 1 },
+                { id: 'balances', label: 'Balances', route: 'settings/accounting-rules/reference-data', tabIndex: 2 },
               ],
             },
             {
               id: 'journal', label: 'Journal Mapping', route: 'journal-mapping', mandatory: true,
               items: [
-                { id: 'accountsubtypes', label: 'Account Subtypes', route: 'journal-mapping' },
-                { id: 'coa', label: 'Chart of Accounts', route: 'journal-mapping' },
-                { id: 'subledger', label: 'Subledger Mapping', route: 'journal-mapping' },
+                { id: 'accountsubtypes', label: 'Account Subtypes', route: 'journal-mapping', tabIndex: 0 },
+                { id: 'coa', label: 'Chart of Accounts', route: 'journal-mapping', tabIndex: 2 },
+                { id: 'subledger', label: 'Subledger Mapping', route: 'journal-mapping', tabIndex: 1 },
               ],
             },
             {
@@ -993,7 +972,7 @@ export default function DashboardLayoutModern() {
                           return (
                             <Box
                               key={item.id}
-                              onClick={() => { setOpenReadiness(false); handleNavigation(item.route ?? activePhase.route); }}
+                              onClick={() => { setOpenReadiness(false); if (item.tabIndex !== undefined) { const r = item.route ?? activePhase.route; if (r === 'settings/accounting-rules/reference-data') setRulesInitialTab(item.tabIndex); else if (r === 'journal-mapping') setJournalInitialTab(item.tabIndex); } handleNavigation(item.route ?? activePhase.route); }}
                               sx={{
                                 display: 'flex', alignItems: 'flex-start', gap: 2,
                                 p: 2, borderRadius: 3, cursor: 'pointer',
@@ -1038,7 +1017,7 @@ export default function DashboardLayoutModern() {
                                         </Box>
                                       )}
                                       {item.showModelType && readinessStatus.modelType && (
-                                        <Chip label={readinessStatus.modelType} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#64748b', 0.08), color: '#64748b', borderRadius: 1 }} />
+                                        <Chip label={readinessStatus.modelType === 'DSL' || readinessStatus.modelType === 'PYTHON' ? 'Python Model' : readinessStatus.modelType === 'EXCEL' ? 'Excel Model' : `${readinessStatus.modelType} Model`} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#64748b', 0.08), color: '#64748b', borderRadius: 1, width: 'fit-content' }} />
                                       )}
                                     </Box>
                                   ) : (

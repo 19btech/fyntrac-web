@@ -967,11 +967,14 @@ export default function ModelPage() {
     try {
       const progRes = await dataloaderApi.get('/model/execution-progress');
       const prog = progRes.data;
-      if (prog && !prog.isComplete) {
+      const completed = prog?.completedBatches ?? 0;
+      const expected = prog?.totalExpectedBatches ?? 0;
+      const isActuallyRunning = prog && !prog.isComplete && expected > 0 && completed < expected;
+      if (isActuallyRunning) {
         const batches = prog.batches || [];
         batches.forEach(b => { if (b.modelType) inProgressTypes.add(b.modelType); });
-        // If no per-batch type info but a run is active, treat all types as in progress
-        if (inProgressTypes.size === 0 && (prog.completedBatches > 0 || prog.totalExpectedBatches > 0)) {
+        // If no per-batch type info but batches are genuinely incomplete, treat all types as in progress
+        if (inProgressTypes.size === 0) {
           types.forEach(t => inProgressTypes.add(t));
         }
       }

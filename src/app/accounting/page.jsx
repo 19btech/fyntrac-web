@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import { styled } from '@mui/material/styles';
 import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
+import DatasetOutlinedIcon from '@mui/icons-material/DatasetOutlined';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import ChartOfAccount from '../component/chart-off-account';
@@ -40,7 +41,34 @@ const VisuallyHiddenInput = styled('input')({
 });
 
 
-export default function AccountingPage() {
+function ValidationNoRows({ severityFilter, context }) {
+  const msgs = {
+    rules: {
+      all: 'All accounting rules are valid — no issues detected.',
+      error: 'No errors in your accounting rules.',
+      warning: 'No warnings to review for accounting rules.',
+    },
+    journal: {
+      all: 'All journal mappings are configured correctly — no issues found.',
+      error: 'No errors in your journal mappings.',
+      warning: 'No warnings in your journal mappings.',
+    },
+    ingest: {
+      all: 'All records passed validation for the selected period.',
+      error: 'No errors found for the selected period.',
+      warning: 'No warnings found for the selected period.',
+    },
+  };
+  const text = msgs[context]?.[severityFilter] ?? 'No records found.';
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', py: 6, color: 'text.secondary' }}>
+      <Box sx={{ fontSize: '2rem', mb: 1 }}>✓</Box>
+      <Box sx={{ fontSize: '0.875rem', fontWeight: 500 }}>{text}</Box>
+    </Box>
+  );
+}
+
+export default function AccountingPage({ initialTab = 0 }) {
   const { tenant } = useTenant();
   const theme = useTheme();
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
@@ -184,7 +212,11 @@ export default function AccountingPage() {
     setOpen(false);
   };
 
-  const [panelIndex, setPanelIndex] = React.useState(0);
+  const [panelIndex, setPanelIndex] = React.useState(initialTab);
+
+  React.useEffect(() => {
+    setPanelIndex(initialTab);
+  }, [initialTab]);
 
   const handleTransactionChange = (event, newValue) => {
     setPanelIndex(newValue);
@@ -279,6 +311,11 @@ export default function AccountingPage() {
             <Tooltip title="Add">
               <IconButton aria-label="add" onClick={handleAdd} sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
                 <AddOutlinedIcon color="action" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download Sample Ref Data">
+              <IconButton aria-label="Download Sample Ref Data" component="a" href="/RefData_Sample.xlsx" download="RefData_Sample.xlsx" sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}>
+                <DatasetOutlinedIcon color="action" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -536,6 +573,7 @@ export default function AccountingPage() {
                 '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
               }}>✓ Mark All Resolved</Button>
             </Box>
+            <Box sx={{ flex: 1, overflow: 'hidden', px: 3 }}>
             <DataGrid
               rows={filteredLogs}
               loading={validationLogsLoading}
@@ -543,6 +581,8 @@ export default function AccountingPage() {
               pageSizeOptions={[10, 25, 50]}
               initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
               disableRowSelectionOnClick
+              slots={{ noRowsOverlay: ValidationNoRows }}
+              slotProps={{ noRowsOverlay: { severityFilter, context: 'journal' } }}
               columns={[
                 {
                   field: 'sourceTable',
@@ -700,6 +740,7 @@ export default function AccountingPage() {
                 },
               }}
             />
+            </Box>
           </DialogContent>
         </Dialog>
         <Snackbar
