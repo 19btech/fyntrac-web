@@ -154,11 +154,13 @@ function Row({ row, isExpandedDefault = false }) {
         <TableCell align="center">
           <StatusChip status={row.activityStatus} />
         </TableCell>
+
+        <TableCell sx={{ color: 'text.secondary' }}>{row.fileName || '-'}</TableCell>
       </TableRow>
 
       {/* Expanded Detail View */}
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 3, ml: 9, p: 2, bgcolor: alpha(theme.palette.grey[50], 0.5), borderRadius: 2, border: `1px dashed ${theme.palette.divider}` }}>
 
@@ -476,6 +478,10 @@ export default function IngestPage() {
 
   const handleCloseFileUpload = () => {
     setOpenFileUpload(false);
+  };
+
+  const handleFileUploadComplete = () => {
+    setOpenFileUpload(false);
     fetchUploadActivitiyLogs();
     recheckValidationIssues();
   };
@@ -583,6 +589,7 @@ export default function IngestPage() {
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>File Name</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -590,7 +597,7 @@ export default function IngestPage() {
                     <Row row={recentUpload} isExpandedDefault={true} />
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary', fontStyle: 'italic' }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary', fontStyle: 'italic' }}>
                         {isDataFetched ? 'No recent upload found.' : 'Loading...'}
                       </TableCell>
                     </TableRow>
@@ -618,6 +625,7 @@ export default function IngestPage() {
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Start Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>End Time</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.75rem', color: 'text.secondary' }}>File Name</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -627,7 +635,7 @@ export default function IngestPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                         {isDataFetched ? 'No historical data available.' : 'Loading...'}
                       </TableCell>
                     </TableRow>
@@ -720,7 +728,7 @@ export default function IngestPage() {
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           <FileUploadComponent
-            onDrop={handleCloseFileUpload}
+            onDrop={handleFileUploadComplete}
             showActivitySelector={true}
             showLoadModeSelector={true}
             headerMessage={""}

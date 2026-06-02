@@ -3,12 +3,46 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Autocomplete,
   IconButton, Typography, Tooltip, Box, Chip, Alert, Slide, Paper,
+  Popover, List, ListItemButton, ListItemText, InputAdornment,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import SearchIcon from '@mui/icons-material/Search';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import CheckIcon from '@mui/icons-material/Check';
+import { List as WindowList } from 'react-window';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+
+const LISTBOX_ITEM_HEIGHT = 38;
+const LISTBOX_MAX_VISIBLE = 9;
+
+// Virtualized listbox — only renders visible rows regardless of option count
+const VirtualizedListbox = React.forwardRef(function VirtualizedListbox({ children, ...other }, ref) {
+  const items = React.Children.toArray(children);
+  const height = Math.max(1, Math.min(items.length, LISTBOX_MAX_VISIBLE)) * LISTBOX_ITEM_HEIGHT;
+  
+  const Row = ({ index, style }) => (
+    <div style={style}>{items[index]}</div>
+  );
+
+  return (
+    <Box ref={ref} {...other}>
+      <WindowList
+        style={{ height, width: "100%" }}
+        rowHeight={LISTBOX_ITEM_HEIGHT}
+        rowCount={items.length}
+        overscanCount={6}
+        rowComponent={Row}
+        rowProps={{}}
+      />
+    </Box>
+  );
+});
+
+const formatMetricLabel = (name) =>
+  (name || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const { tenant } = useTenant();
@@ -28,6 +62,23 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [isMetricssError, setIsMetricsError] = React.useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const serviceGetMetricsURL = '/aggregation/get/metrics'
+
+    // Shared metric picker popover
+    const [pickerAnchor, setPickerAnchor] = useState(null);
+    const [activeSlotSetter, setActiveSlotSetter] = useState(null);
+    const [pickerSearch, setPickerSearch] = useState('');
+
+    const openPicker = (event, setter) => {
+        setPickerAnchor(event.currentTarget);
+        setActiveSlotSetter(() => setter);
+        setPickerSearch('');
+    };
+    const closePicker = () => { setPickerAnchor(null); setActiveSlotSetter(null); };
+    const selectMetric = (metricName) => { if (activeSlotSetter) activeSlotSetter(metricName); closePicker(); };
+
+    const filteredPickerMetrics = availableMetrics.filter(m =>
+        m.metricName.toLowerCase().includes(pickerSearch.toLowerCase())
+    );
 
 
     React.useEffect(() => {
@@ -136,11 +187,6 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     };
     const hintSx = { fontSize: '0.7rem', color: 'text.secondary', mt: 0.5 };
 
-    const makeAutocompleteValue = (val) =>
-      typeof val === 'string' ? val : val?.metricName || '';
-
-    const makeMetricHandler = (setter) => (_, newValue) =>
-      setter(typeof newValue === 'string' ? newValue : newValue?.metricName || '');
 
     return (
       <Dialog
@@ -242,33 +288,69 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                   Metric Widgets
                 </Typography>
               </Box>
-              <Box sx={{ px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {[
-                  { id: 'widget-1', label: 'Widget 1', value: widgetOne, setter: setWidgetOne },
-                  { id: 'widget-2', label: 'Widget 2', value: widgetTwo, setter: setWidgetTwo },
-                  { id: 'widget-3', label: 'Widget 3', value: widgetThree, setter: setWidgetThree },
-                  { id: 'widget-4', label: 'Widget 4', value: widgetFour, setter: setWidgetFour },
-                ].map(({ id, label, value, setter }) => (
-                  <Box key={id}>
-                    <Autocomplete
-                      fullWidth
-                      disablePortal
-                      id={id}
-                      options={availableMetrics}
-                      getOptionLabel={(option) => typeof option === 'string' ? option : option?.metricName || ''}
-                      value={makeAutocompleteValue(value)}
-                      onChange={makeMetricHandler(setter)}
-                      size="small"
-                      renderInput={(params) => (
-                        <TextField {...params} label={label} sx={autocompleteFieldSx}
-                          inputProps={{ ...params.inputProps, style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                          InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                        />
+              <Box sx={{ px: 2.5, py: 2 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                  {[
+                    { label: 'Widget 1', badge: 'W1', value: widgetOne, setter: setWidgetOne },
+                    { label: 'Widget 2', badge: 'W2', value: widgetTwo, setter: setWidgetTwo },
+                    { label: 'Widget 3', badge: 'W3', value: widgetThree, setter: setWidgetThree },
+                    { label: 'Widget 4', badge: 'W4', value: widgetFour, setter: setWidgetFour },
+                  ].map(({ label, badge, value, setter }) => (
+                    <Box
+                      key={label}
+                      onClick={(e) => openPicker(e, setter)}
+                      sx={{
+                        position: 'relative',
+                        border: '1.5px solid',
+                        borderColor: value ? alpha(theme.palette.primary.main, 0.35) : alpha(theme.palette.divider, 0.8),
+                        borderStyle: value ? 'solid' : 'dashed',
+                        borderRadius: 2.5,
+                        p: 1.75,
+                        cursor: 'pointer',
+                        bgcolor: value ? alpha(theme.palette.primary.main, 0.03) : 'background.paper',
+                        transition: 'all 0.18s ease',
+                        '&:hover': {
+                          borderColor: theme.palette.primary.main,
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.08)}`,
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Box sx={{
+                          px: 0.9, py: 0.2, borderRadius: 1,
+                          bgcolor: value ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.grey[400], 0.15),
+                          color: value ? 'primary.main' : 'text.disabled',
+                          fontSize: '0.65rem', fontWeight: 800, letterSpacing: 0.5,
+                        }}>
+                          {badge}
+                        </Box>
+                        {value && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setter(''); }}
+                            sx={{ p: 0.25, color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                          >
+                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                          </IconButton>
+                        )}
+                      </Box>
+                      {value ? (
+                        <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color: 'text.primary', lineHeight: 1.3 }}>
+                          {formatMetricLabel(value)}
+                        </Typography>
+                      ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.disabled' }}>
+                          <AddCircleOutlineIcon sx={{ fontSize: '0.9rem' }} />
+                          <Typography sx={{ fontSize: '0.8rem' }}>Assign metric</Typography>
+                        </Box>
                       )}
-                    />
-                    <Typography sx={hintSx}>Define a metric to display in this widget.</Typography>
-                  </Box>
-                ))}
+                      <Typography sx={{ fontSize: '0.67rem', color: 'text.disabled', mt: 0.75 }}>
+                        {label}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
               </Box>
             </Paper>
 
@@ -287,23 +369,48 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 </Typography>
               </Box>
               <Box sx={{ px: 2.5, py: 2 }}>
-                <Autocomplete
-                  fullWidth
-                  disablePortal
-                  id="trend-analysis-graph"
-                  options={availableMetrics}
-                  getOptionLabel={(option) => typeof option === 'string' ? option : option?.metricName || ''}
-                  value={makeAutocompleteValue(trendAnalysisGraph)}
-                  onChange={makeMetricHandler(setTrendAnalysisGraph)}
-                  size="small"
-                  renderInput={(params) => (
-                    <TextField {...params} label="Trend Analysis Graph" sx={autocompleteFieldSx}
-                      inputProps={{ ...params.inputProps, style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                      InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                    />
+                <Box
+                  onClick={(e) => openPicker(e, setTrendAnalysisGraph)}
+                  sx={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    border: '1.5px solid',
+                    borderColor: trendAnalysisGraph ? alpha(theme.palette.primary.main, 0.35) : alpha(theme.palette.divider, 0.8),
+                    borderStyle: trendAnalysisGraph ? 'solid' : 'dashed',
+                    borderRadius: 2.5,
+                    px: 2, py: 1.5,
+                    cursor: 'pointer',
+                    bgcolor: trendAnalysisGraph ? alpha(theme.palette.primary.main, 0.03) : 'background.paper',
+                    transition: 'all 0.18s ease',
+                    '&:hover': {
+                      borderColor: theme.palette.primary.main,
+                      bgcolor: alpha(theme.palette.primary.main, 0.05),
+                      boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.08)}`,
+                    },
+                  }}
+                >
+                  <Box>
+                    {trendAnalysisGraph ? (
+                      <Typography sx={{ fontSize: '0.88rem', fontWeight: 600, color: 'text.primary' }}>
+                        {formatMetricLabel(trendAnalysisGraph)}
+                      </Typography>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.disabled' }}>
+                        <AddCircleOutlineIcon sx={{ fontSize: '0.9rem' }} />
+                        <Typography sx={{ fontSize: '0.82rem' }}>Assign metric</Typography>
+                      </Box>
+                    )}
+                    <Typography sx={{ fontSize: '0.67rem', color: 'text.disabled', mt: 0.4 }}>Trend Analysis Graph</Typography>
+                  </Box>
+                  {trendAnalysisGraph && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); setTrendAnalysisGraph(''); }}
+                      sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                    >
+                      <HighlightOffOutlinedIcon fontSize="small" />
+                    </IconButton>
                   )}
-                />
-                <Typography sx={hintSx}>Define a metric to display in the trend analysis graph.</Typography>
+                </Box>
               </Box>
             </Paper>
 
@@ -325,37 +432,86 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 <Autocomplete
                   multiple
                   fullWidth
+                  disableListWrap
                   id="activity-graph"
                   value={activityGraphMetrics}
                   onChange={(_, newValue) => setActivityGraphMetrics(newValue)}
                   options={availableMetrics}
-                  getOptionLabel={(option) => option.metricName}
+                  getOptionLabel={(option) => formatMetricLabel(option.metricName)}
                   isOptionEqualToValue={(option, value) => option.metricName === value.metricName}
+                  filterOptions={(options, { inputValue }) =>
+                    options.filter(o =>
+                      o.metricName.toLowerCase().includes(inputValue.toLowerCase())
+                    )
+                  }
                   size="small"
+                  ListboxComponent={VirtualizedListbox}
+                  renderOption={(props, option, { selected }) => {
+                    const { key, ...rest } = props;
+                    return (
+                      <Box
+                        component="li"
+                        key={key}
+                        {...rest}
+                        sx={{
+                          display: 'flex', alignItems: 'center', gap: 1,
+                          px: 1.5, height: LISTBOX_ITEM_HEIGHT,
+                          bgcolor: selected ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
+                          '&.Mui-focused': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                          fontSize: '0.85rem',
+                          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        }}
+                      >
+                        <Box sx={{
+                          width: 16, height: 16, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'primary.main',
+                        }}>
+                          {selected && <CheckIcon sx={{ fontSize: 14 }} />}
+                        </Box>
+                        <Typography noWrap sx={{
+                          fontSize: '0.85rem', fontWeight: selected ? 600 : 400,
+                          color: selected ? 'primary.main' : 'text.primary',
+                          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        }}>
+                          {formatMetricLabel(option.metricName)}
+                        </Typography>
+                      </Box>
+                    );
+                  }}
                   renderTags={(tagValue, getTagProps) =>
                     tagValue.map((option, index) => {
                       const { key, ...tagProps } = getTagProps({ index });
                       return (
                         <Chip
                           key={key}
-                          label={option.metricName}
+                          label={formatMetricLabel(option.metricName)}
                           {...tagProps}
                           size="small"
                           sx={{
-                            fontSize: '0.78rem', fontWeight: 600,
-                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', height: 24, borderRadius: 1.5,
+                            fontSize: '0.75rem', fontWeight: 600, height: 22, borderRadius: 1.5,
+                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            color: 'primary.main',
+                            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                            '& .MuiChip-deleteIcon': {
+                              fontSize: '14px',
+                              color: alpha(theme.palette.primary.main, 0.5),
+                              '&:hover': { color: 'primary.main' },
+                            },
                           }}
                         />
                       );
                     })
                   }
                   renderInput={(params) => (
-                    <TextField {...params} label="Metrics" placeholder="Select metrics..."
+                    <TextField
+                      {...params}
+                      placeholder={activityGraphMetrics.length === 0 ? 'Search and select metrics…' : ''}
                       error={isMetricssError}
                       helperText={isMetricssError ? errorMessage : ''}
                       sx={autocompleteFieldSx}
-                      inputProps={{ ...params.inputProps, style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                      InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                      inputProps={{ ...params.inputProps, style: { fontSize: '0.875rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
                     />
                   )}
                 />
@@ -379,6 +535,67 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
             {isSaving ? 'Saving…' : (isEditMode ? 'Update Dashboard' : 'Save Dashboard')}
           </Button>
         </DialogActions>
+
+        {/* ── Shared metric picker popover ── */}
+        <Popover
+          open={Boolean(pickerAnchor)}
+          anchorEl={pickerAnchor}
+          onClose={closePicker}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          slotProps={{
+            paper: {
+              sx: {
+                mt: 0.75,
+                width: 300,
+                borderRadius: 3,
+                boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                border: '1px solid', borderColor: 'divider',
+                overflow: 'hidden',
+              },
+            },
+          }}
+        >
+          <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              placeholder="Search metrics..."
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+          </Box>
+          <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+            {filteredPickerMetrics.length === 0 ? (
+              <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                <Typography variant="caption" color="text.disabled">No metrics found.</Typography>
+              </ListItemButton>
+            ) : filteredPickerMetrics.map((m) => (
+              <ListItemButton
+                key={m.metricName}
+                onClick={() => selectMetric(m.metricName)}
+                sx={{
+                  py: 1, px: 2,
+                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                }}
+              >
+                <ListItemText
+                  primary={formatMetricLabel(m.metricName)}
+                  primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </Popover>
       </Dialog>
     );
 };

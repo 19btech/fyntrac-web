@@ -182,6 +182,7 @@ export default function RulePage({ initialTab = 0 }) {
     setRefreshAggregationKey(k => k + 1);
     setRefreshAccountTypeKey(k => k + 1);
     showToast('Rules uploaded successfully — tables refreshed.');
+    recheckValidationIssues();
   };
 
   const handleFileDrop = () => {

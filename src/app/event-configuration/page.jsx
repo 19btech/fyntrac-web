@@ -56,8 +56,12 @@ export default function EventConfigurationMain() {
         setOpenEventConfiguration(false);
         if (result === true) {
             setModelRefreshKey(prev => prev + 1);
-            setSuccessMessage(message || 'Event configuration saved successfully!');
-            setShowSuccessMessage(true);
+            // Delay toast until after the dialog close animation (~300ms) so the
+            // scrollbar reappear / viewport-width shift doesn't move the Snackbar.
+            setTimeout(() => {
+                setSuccessMessage(message || 'Event configuration saved successfully!');
+                setShowSuccessMessage(true);
+            }, 350);
         }
     };
 

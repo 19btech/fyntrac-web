@@ -1,7 +1,6 @@
 "use client"
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Card,
     Dialog,
     DialogTitle,
     DialogContent,
@@ -27,7 +26,7 @@ import {
     Paper,
     Grid,
     Alert,
-    Snackbar,
+    Slide,
     useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -884,14 +883,16 @@ export default function EventConfiguration({ open, onClose, editData }) {
         else if (eventData?.triggerType === 'ON_TRANSACTION_POST') {
             setAvailableSources([]);
             setAvailableSources(['Transactions']);
-            setNewSource({
-                sourceTable: availableSources[0],
-                sourceColumns: [],
-                versionType: [],
-                fieldType: '',
-                dataMapping: [],
-            });
-            setIsAddingNew(true);
+            if (!editData) {
+                setNewSource({
+                    sourceTable: availableSources[0],
+                    sourceColumns: [],
+                    versionType: [],
+                    fieldType: '',
+                    dataMapping: [],
+                });
+                setIsAddingNew(true);
+            }
         }
         else if (eventData?.triggerType === 'ON_INSTRUMENT_ADD') {
             setAvailableSources([]);
@@ -927,15 +928,23 @@ export default function EventConfiguration({ open, onClose, editData }) {
             onClose={handleClose}
             maxWidth="xl"
             fullWidth
+            slots={{ transition: Slide }}
             slotProps={{
-                sx: {
-                    width: '95vw',
-                    maxWidth: '1800px',
-                    minWidth: '1600px',
-                    borderRadius: 2,
-                    boxShadow: 10,
-                    bgcolor: 'background.paper',
-                    overflow: 'hidden',
+                transition: { direction: 'up' },
+                paper: {
+                    sx: {
+                        width: '95vw',
+                        maxWidth: '1800px',
+                        borderRadius: 4,
+                        boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
+                        overflow: 'hidden',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & *': {
+                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        },
+                    },
                 },
             }}
         >
@@ -999,21 +1008,30 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 </Box>
             </DialogTitle>
 
-            <DialogContent
-                sx={{
-                    p: 0,
-                    backgroundColor: '#fafafa',
-                    maxHeight: '80vh',
-                    overflowY: 'auto',
-                    minHeight: '600px',
-                }}
-            >
-                <Box sx={{ p: 3 }}>
+            <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03), maxHeight: '80vh', overflowY: 'auto' }}>
+                <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                  {alert.open && (
+                    <Alert
+                      severity={alert.severity}
+                      variant="outlined"
+                      onClose={closeAlert}
+                      sx={{
+                        borderRadius: 2.5, py: 0.5, fontSize: '0.8rem',
+                        bgcolor: alert.severity === 'success' ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)',
+                        borderColor: alert.severity === 'success' ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)',
+                      }}
+                    >
+                      {alert.message}
+                    </Alert>
+                  )}
                     {/* Event Details Card */}
-                    <Card sx={{ p: 3, mb: 3, backgroundColor: 'white', transition: 'none', '&:hover': { transform: 'none', boxShadow: '0px 2px 8px rgba(100,116,139,0.04)', borderColor: 'rgba(241,245,249,1)' } }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', color: '#333' }}>
-                            Event Details
-                        </Typography>
+                    <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.7), bgcolor: 'background.paper', overflow: 'hidden' }}>
+                        <Box sx={{ px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), bgcolor: alpha(theme.palette.primary.main, 0.025) }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'text.secondary', fontSize: '0.67rem' }}>
+                                Event Details
+                            </Typography>
+                        </Box>
+                        <Box sx={{ p: 2.5 }}>
                         <Grid container spacing={2}>
                             <Grid size={6}>
                                 <TextField
@@ -1070,13 +1088,17 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                 />
                             </Grid>
                         </Grid>
-                    </Card>
+                        </Box>
+                    </Paper>
 
                     {/* Trigger Setup Card */}
-                    <Card sx={{ p: 3, mb: 3, backgroundColor: 'white', transition: 'none', '&:hover': { transform: 'none', boxShadow: '0px 2px 8px rgba(100,116,139,0.04)', borderColor: 'rgba(241,245,249,1)' } }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', color: '#333' }}>
-                            Trigger Setup
-                        </Typography>
+                    <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.7), bgcolor: 'background.paper', overflow: 'hidden' }}>
+                        <Box sx={{ px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), bgcolor: alpha(theme.palette.primary.main, 0.025) }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'text.secondary', fontSize: '0.67rem' }}>
+                                Trigger Setup
+                            </Typography>
+                        </Box>
+                        <Box sx={{ p: 2.5 }}>
                         <Grid container spacing={2}>
                             <Grid size={6}>
                                 <FormControl fullWidth size="small" disabled={isEditMode} error={!isEditMode && !eventData.triggerType}>
@@ -1166,45 +1188,44 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                 />
                             </Box>
                         )}
-                    </Card>
+                        </Box>
+                    </Paper>
 
                     {/* Source Mapping Configuration Card */}
-                    <Card sx={{ p: 3, backgroundColor: 'white', transition: 'none', '&:hover': { transform: 'none', boxShadow: '0px 2px 8px rgba(100,116,139,0.04)', borderColor: 'rgba(241,245,249,1)' } }}>
-                        {/* UPDATE: Hide this header for both Custom Data Trigger AND Transaction Post */}
-                        {eventData.triggerType !== 'ON_CUSTOM_DATA_TRIGGER' && eventData.triggerType !== 'ON_TRANSACTION_POST' && (
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
-                                    Source Mapping Configuration
-                                </Typography>
+                    <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.7), bgcolor: 'background.paper', overflow: 'hidden' }}>
+                        <Box sx={{ px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), bgcolor: alpha(theme.palette.primary.main, 0.025), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'text.secondary', fontSize: '0.67rem' }}>
+                                Source Mapping Configuration
+                            </Typography>
+                            {/* UPDATE: Hide add button for both Custom Data Trigger AND Transaction Post */}
+                            {eventData.triggerType !== 'ON_CUSTOM_DATA_TRIGGER' && eventData.triggerType !== 'ON_TRANSACTION_POST' && (
                                 <Tooltip title={getAddSourceTooltip()}>
                                     <span>
                                         <IconButton
                                             onClick={handleAddNew}
                                             disabled={!canAddSource()}
+                                            size="small"
                                             sx={{
-                                                width: 32,
-                                                height: 32,
-                                                borderRadius: '50%',
+                                                width: 28, height: 28, borderRadius: '50%',
                                                 background: theme.palette.primary.main,
                                                 color: '#fff',
                                                 boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.35)}`,
                                                 transition: 'all 0.18s ease',
-                                                '&:hover': { background: theme.palette.primary.dark, boxShadow: `0 6px 16px ${alpha(theme.palette.primary.dark, 0.4)}`, transform: 'scale(1.1)' },
-                                                '&:active': { transform: 'scale(0.94)' },
+                                                '&:hover': { background: theme.palette.primary.dark, transform: 'scale(1.1)' },
                                                 '&.Mui-disabled': { bgcolor: 'grey.200', boxShadow: 0, color: 'grey.400' },
                                             }}
                                         >
-                                            <AddOutlinedIcon sx={{ fontSize: 18 }} />
+                                            <AddOutlinedIcon sx={{ fontSize: 16 }} />
                                         </IconButton>
                                     </span>
                                 </Tooltip>
-                            </Box>
-                        )}
-
+                            )}
+                        </Box>
+                        <Box sx={{ p: 2.5 }}>
                         {/* Source Mapping Table */}
                         <TableContainer component={Paper} variant="outlined">
                             <Table sx={{ minWidth: 1400, tableLayout: 'fixed' }} size="small">
-                                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                                <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.8) }}>
                                     <TableRow>
                                         <TableCell sx={{ fontWeight: 'bold', width: '60px' }}>#</TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', width: '200px' }}>Source Table</TableCell>
@@ -1506,49 +1527,31 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                    </Card>
+                        </Box>
+                    </Paper>
                 </Box>
             </DialogContent>
 
-            <DialogActions sx={{ justifyContent: 'center', py: 2, backgroundColor: '#f5f5f5' }}>
-                <Tooltip
-                    title={
-                        loading
-                            ? 'Saving...'
-                            : (isAddingNew || editingRow !== null)
-                                ? 'Save the source mapping row first'
-                                : 'Save Configuration'
-                    }
-                >
+            <DialogActions sx={{ px: 3.5, py: 2, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', justifyContent: 'flex-end', gap: 1.25 }}>
+                <Tooltip title={(isAddingNew || editingRow !== null) ? 'Save the source mapping row first' : ''}>
                     <span>
                         <Button
                             onClick={handleSaveConfiguration}
+                            variant="contained"
                             disabled={loading || isAddingNew || editingRow !== null}
                             sx={{
-                                bgcolor: '#14213d',
-                                color: 'white',
-                                '&:hover': { bgcolor: '#1a2a4a' },
-                                '&.Mui-disabled': { bgcolor: '#e0e0e0', color: '#9e9e9e' },
+                                borderRadius: 2, textTransform: 'none', fontWeight: 700, minWidth: 150, px: 3,
+                                background: '#14213d', color: '#fff', boxShadow: '0 6px 16px rgba(20,33,61,0.35)',
+                                '&:hover': { background: '#0d1628', boxShadow: '0 8px 22px rgba(20,33,61,0.45)' },
+                                '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
                             }}
                         >
-                            {loading ? 'Saving...' : 'Save Event'}
+                            {loading ? 'Saving…' : (editData ? 'Update Event' : 'Save Event')}
                         </Button>
                     </span>
                 </Tooltip>
             </DialogActions>
 
-            {/* Alert Snackbar */}
-            <Snackbar
-                open={alert.open}
-                autoHideDuration={6000}
-                onClose={closeAlert}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
-            >
-                <Alert onClose={closeAlert} severity={alert.severity} sx={{ width: '100%', bgcolor: alert.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)', border: alert.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)', color: alert.severity === 'success' ? '#15803d' : '#dc2626', '& .MuiAlert-icon': { color: alert.severity === 'success' ? '#16a34a' : '#dc2626' } }} variant="standard">
-                    {alert.message}
-                </Alert>
-            </Snackbar>
         </Dialog>
     );
 }

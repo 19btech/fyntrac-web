@@ -127,6 +127,28 @@ const formatPeriod = (p) => {
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 };
 
+// ── Currency meta helpers ─────────────────────────────────────────────────────
+const CURRENCY_SYMBOL = {
+  USD:'$',   EUR:'€',   GBP:'£',   JPY:'¥',   CHF:'Fr',  CAD:'CA$', AUD:'A$',
+  NZD:'NZ$', CNY:'¥',   HKD:'HK$', SGD:'S$',  KRW:'₩',   INR:'₹',   BRL:'R$',
+  MXN:'MX$', ZAR:'R',   SEK:'kr',  NOK:'kr',  DKK:'kr',  PLN:'zł',  CZK:'Kč',
+  HUF:'Ft',  RON:'lei', TRY:'₺',   RUB:'₽',   AED:'د.إ', SAR:'﷼',   QAR:'﷼',
+  KWD:'KD',  BHD:'BD',  ILS:'₪',   EGP:'E£',  NGN:'₦',   KES:'KSh', GHS:'₵',
+  THB:'฿',   IDR:'Rp',  MYR:'RM',  PHP:'₱',   VND:'₫',   TWD:'NT$', PKR:'₨',
+  BDT:'৳',   LKR:'Rs',  CLP:'$',   COP:'$',   PEN:'S/',  ARS:'$',   UAH:'₴',
+  BGN:'лв',  ISK:'kr',  HRK:'kn',  MAD:'MAD', OMR:'﷼',   JOD:'JD',
+};
+
+const _displayNames = typeof Intl !== 'undefined'
+  ? new Intl.DisplayNames(['en'], { type: 'currency' })
+  : null;
+
+const getCurrencyName = (code) => {
+  try { return _displayNames?.of(code) || code; } catch { return code; }
+};
+
+const getCurrencySymbol = (code) => CURRENCY_SYMBOL[code] || '';
+
 export default function SettingsPage() {
   const { tenant } = useTenant();
   const theme = useTheme();
@@ -147,8 +169,7 @@ export default function SettingsPage() {
   const [isCurrencyButtonDisabled, setIsCurrencyButtonDisabled] = useState(true);
 
   // Reporting period
-  const [reportingPeriod, setReportingPeriod] = useState('6');
-  const reportingPeriodList = ['6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24'];
+  const [reportingPeriod, setReportingPeriod] = useState('12');
   const [isReportingPeriodButtonDisabled, setIsReportingPeriodButtonDisabled] = useState(true);
 
   // Reopen period
@@ -700,9 +721,55 @@ export default function SettingsPage() {
               options={currencyList || []}
               value={currency || null}
               getOptionLabel={(option) => option || ''}
+              filterOptions={(options, { inputValue }) => {
+                const q = inputValue.toLowerCase();
+                return options.filter(code =>
+                  code.toLowerCase().includes(q) ||
+                  getCurrencyName(code).toLowerCase().includes(q)
+                );
+              }}
               onChange={(_, newValue) => { setCurrency(newValue || null); setIsCurrencyButtonDisabled(false); }}
-              sx={{ width: 160 }}
-              renderInput={(params) => <TextField {...params} label="Currency" sx={tfSx} />}
+              sx={{ width: 220 }}
+              renderOption={(props, option, { selected }) => {
+                const { key, ...rest } = props;
+                const sym = getCurrencySymbol(option);
+                const name = getCurrencyName(option);
+                return (
+                  <Box component="li" key={key} {...rest}
+                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', py: 0.75, px: 1.5 }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.6 }}>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: '"Inter", sans-serif', color: selected ? 'primary.main' : 'text.primary' }}>
+                        {option}
+                      </Typography>
+                      {sym && (
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'text.secondary', fontFamily: '"Inter", sans-serif' }}>
+                          {sym}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Inter", sans-serif', lineHeight: 1.2 }}>
+                      {name}
+                    </Typography>
+                  </Box>
+                );
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Currency"
+                  placeholder="Search…"
+                  sx={tfSx}
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: currency && getCurrencySymbol(currency) ? (
+                      <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'text.secondary', fontFamily: '"Inter", sans-serif', pl: 0.5, pr: 0.25, flexShrink: 0 }}>
+                        {getCurrencySymbol(currency)}
+                      </Typography>
+                    ) : params.InputProps?.startAdornment,
+                  }}
+                />
+              )}
             />
             <ActionLink onClick={saveCurrency} disabled={isCurrencyButtonDisabled}>Save</ActionLink>
           </SettingRow>
@@ -737,14 +804,14 @@ export default function SettingsPage() {
             title="Reporting Period"
             description="Set the number of recent posting periods to include in reports."
           >
-            <Autocomplete
+            <TextField
               size="small"
-              options={reportingPeriodList}
+              type="number"
+              label="# Periods"
               value={reportingPeriod}
-              getOptionLabel={(option) => option}
-              onChange={(_, newValue) => { setReportingPeriod(newValue); setIsReportingPeriodButtonDisabled(false); }}
-              sx={{ width: 160 }}
-              renderInput={(params) => <TextField {...params} label="# Periods" sx={tfSx} />}
+              onChange={(e) => { setReportingPeriod(e.target.value); setIsReportingPeriodButtonDisabled(false); }}
+              slotProps={{ htmlInput: { min: 1, max: 60, step: 1 } }}
+              sx={{ width: 120, ...tfSx }}
             />
             <ActionLink onClick={handleSaveReportingPeriod} disabled={isReportingPeriodButtonDisabled}>Save</ActionLink>
           </SettingRow>

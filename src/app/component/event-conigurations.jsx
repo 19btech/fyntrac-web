@@ -13,7 +13,8 @@ import {
     DialogTitle,
     DialogContent,
     DialogContentText,
-    DialogActions
+    DialogActions,
+    CircularProgress,
 } from '@mui/material';
 import SuccessAlert from '../component/success-alert';
 import ErrorAlert from '../component/error-alert';
@@ -42,6 +43,7 @@ function EventConfigurationsList({ refreshData }) {
     const [errorMessage, setErrorMessage] = useState('');
     const [open, setOpen] = useState(false);
     const [editData, setEditData] = useState(null);
+    const [loadingEditId, setLoadingEditId] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Delete confirmation dialog state
@@ -82,16 +84,16 @@ function EventConfigurationsList({ refreshData }) {
     }));
 
     const fetchEventConfiguration = (eventId) => {
+        setLoadingEditId(eventId);
         dataloaderApi.get(`/fyntrac/event-configurations/get/${eventId}`)
             .then(response => {
-                const metadata = response.data;
-                console.log('Event configuration [EventId]:', eventId, metadata);
-                setEditData(metadata);
+                setEditData(response.data);
                 setOpen(true);
             })
             .catch(error => {
                 console.error('Error fetching Event configuration [EventId]:', eventId, error);
-            });
+            })
+            .finally(() => setLoadingEditId(null));
     };
 
     async function updateEventConfigurationStatus(id, isActive) {
@@ -257,9 +259,16 @@ function EventConfigurationsList({ refreshData }) {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', height: '100%' }}>
                     <Tooltip title='Edit Event Configuration' placement="left">
-                        <IconButton size="small" onClick={() => handleEdit(params.row)}
-                            sx={{ color: '#14213d', bgcolor: alpha('#14213d', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#14213d', 0.14) } }}>
-                            <EditOutlined sx={{ fontSize: 16 }} />
+                        <IconButton
+                            size="small"
+                            onClick={() => handleEdit(params.row)}
+                            disabled={loadingEditId === params.row.eventId}
+                            sx={{ color: '#14213d', bgcolor: alpha('#14213d', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#14213d', 0.14) } }}
+                        >
+                            {loadingEditId === params.row.eventId
+                                ? <CircularProgress size={14} thickness={5} sx={{ color: '#14213d' }} />
+                                : <EditOutlined sx={{ fontSize: 16 }} />
+                            }
                         </IconButton>
                     </Tooltip>
                     <Tooltip title='Delete Event Configuration' placement="right">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Tooltip, Typography } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
@@ -46,11 +46,18 @@ const MetricWidget = ({ metric, currencyCode = 'USD' }) => {
 
   const animatedEnding = useAnimatedValue(ending);
 
-  const formatted = new Intl.NumberFormat('en-US', {
+  const fullFormatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currencyCode,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
+  }).format(ending);
+
+  const compactFormatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+    notation: 'compact',
+    maximumFractionDigits: 2,
   }).format(animatedEnding);
 
   return (
@@ -89,19 +96,22 @@ const MetricWidget = ({ metric, currencyCode = 'USD' }) => {
       </Typography>
 
       {/* Animated big number */}
-      <Typography
-        sx={{
-          fontSize: '1.85rem',
-          fontWeight: 700,
-          lineHeight: 1,
-          letterSpacing: '-0.03em',
-          color: '#0f172a',
-          fontVariantNumeric: 'tabular-nums',
-          my: 1.2,
-        }}
-      >
-        {formatted}
-      </Typography>
+      <Tooltip title={fullFormatted} placement="top" arrow>
+        <Typography
+          sx={{
+            fontSize: '1.85rem',
+            fontWeight: 700,
+            lineHeight: 1,
+            letterSpacing: '-0.03em',
+            color: '#0f172a',
+            fontVariantNumeric: 'tabular-nums',
+            my: 1.2,
+            cursor: 'default',
+          }}
+        >
+          {compactFormatted}
+        </Typography>
+      </Tooltip>
 
       {/* Divider + trend row */}
       <Box

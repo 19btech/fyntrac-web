@@ -180,6 +180,7 @@ export default function AccountingPage({ initialTab = 0 }) {
     setRefreshSubledgerMapping(k => k + 1);
     setRefreshChartOfAccountKey(k => k + 1);
     showToast('Reference data uploaded successfully — tables refreshed.');
+    recheckValidationIssues();
   };
 
   const handleFileDrop = (acceptedFiles) => {
