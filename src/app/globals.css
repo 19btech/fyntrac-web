@@ -77,6 +77,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Global: label text inside all MUI fields (non-floating position) */
+.MuiInputLabel-root:not(.MuiInputLabel-shrink) {
+  font-size: 0.875rem !important;
+}
+
 /* Font family utility classes */
 .font-sans {
   font-family: var(--font-sans);

@@ -23,6 +23,10 @@ import {
   FormControl,
   InputLabel,
   InputAdornment,
+  Popover,
+  List,
+  ListItemButton,
+  ListItemText,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
@@ -36,6 +40,7 @@ import {
   ViewColumnOutlined as ColumnsIcon,
   TuneOutlined as TuneIcon,
   LockOutlined as LockIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
@@ -146,6 +151,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   const [columns, setColumns] = useState([]);
   const [primaryKeys, setPrimaryKeys] = useState([]);
   const [referenceColumn, setReferenceColumn] = useState('');
+  const [refColPickerAnchor, setRefColPickerAnchor] = useState(null);
+  const [refColPickerSearch, setRefColPickerSearch] = useState('');
   const [selectedReferenceTable, setSelectedReferenceTable] = useState(null);
   const [errors, setErrors] = useState({});
   const [columnErrors, setColumnErrors] = useState({});
@@ -1260,35 +1267,59 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
               {/* Reference column / autocomplete */}
               {currentTableType === 'REFERENCE' && (
                 <Box sx={{ width: { xs: '100%', md: 320 } }}>
-                  <FormControl size="small" fullWidth required error={!!errors.referenceColumn}>
-                    <InputLabel>Reference Column</InputLabel>
-                    <Select
-                      label="Reference Column"
-                      value={referenceColumn}
-                      onChange={(e) => setReferenceColumn(e.target.value)}
-                      sx={{
-                        borderRadius: 2.5,
-                        bgcolor: 'background.paper',
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                        fontSize: '0.9rem',
-                      }}
-                    >
-                      <MenuItem value="" disabled>Select Reference Column</MenuItem>
-                      {columns.map((col) => (
-                        <MenuItem
-                          key={col.id}
-                          value={col.columnName}
-                          disabled={!col.columnName || !!columnErrors[col.id]}
-                          sx={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.9rem' }}
+                  <TextField
+                    fullWidth required size="small"
+                    label="Reference Column"
+                    value={referenceColumn}
+                    onClick={(e) => { setRefColPickerAnchor(e.currentTarget); setRefColPickerSearch(''); }}
+                    inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } }}
+                    error={!!errors.referenceColumn}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' }, '& .MuiInputLabel-root': { fontSize: '0.9rem' } }}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+                      endAdornment: referenceColumn ? (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setReferenceColumn(''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ mt: 0.5, ml: 1.5, color: errors.referenceColumn ? 'error.main' : 'text.disabled' }}>
+                    {errors.referenceColumn || 'Used by other tables for lookups.'}
+                  </Typography>
+                  <Popover
+                    open={Boolean(refColPickerAnchor)} anchorEl={refColPickerAnchor}
+                    onClose={() => setRefColPickerAnchor(null)}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                    transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                    slotProps={{ paper: { sx: { mt: 0.75, width: refColPickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+                  >
+                    <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                      <TextField autoFocus fullWidth size="small" placeholder="Search columns..."
+                        value={refColPickerSearch} onChange={(e) => setRefColPickerSearch(e.target.value)}
+                        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                      />
+                    </Box>
+                    <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                      {columns.filter(col => col.columnName && !columnErrors[col.id] && col.columnName.toLowerCase().includes(refColPickerSearch.toLowerCase())).length === 0 ? (
+                        <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                          <Typography variant="caption" color="text.disabled">No columns found.</Typography>
+                        </ListItemButton>
+                      ) : columns.filter(col => col.columnName && !columnErrors[col.id] && col.columnName.toLowerCase().includes(refColPickerSearch.toLowerCase())).map((col) => (
+                        <ListItemButton key={col.id} selected={col.columnName === referenceColumn}
+                          onClick={() => { setReferenceColumn(col.columnName); setRefColPickerAnchor(null); }}
+                          sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
                         >
-                          {col.columnName || '(Unnamed)'}
-                        </MenuItem>
+                          <ListItemText primary={col.columnName}
+                            primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+                          />
+                        </ListItemButton>
                       ))}
-                    </Select>
-                    <Typography variant="caption" sx={{ mt: 0.5, ml: 1.5, color: errors.referenceColumn ? 'error.main' : 'text.disabled' }}>
-                      {errors.referenceColumn || 'Used by other tables for lookups.'}
-                    </Typography>
-                  </FormControl>
+                    </List>
+                  </Popover>
                 </Box>
               )}
 

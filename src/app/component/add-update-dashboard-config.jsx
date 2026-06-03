@@ -3,7 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Autocomplete,
   IconButton, Typography, Tooltip, Box, Chip, Alert, Slide, Paper,
-  Popover, List, ListItemButton, ListItemText, InputAdornment,
+  Popover, List, ListItemButton, ListItemText, InputAdornment, Checkbox,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
@@ -11,7 +11,7 @@ import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CheckIcon from '@mui/icons-material/Check';
-import { List as WindowList } from 'react-window';
+import { List as FixedSizeList } from 'react-window';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
@@ -22,21 +22,17 @@ const LISTBOX_MAX_VISIBLE = 9;
 const VirtualizedListbox = React.forwardRef(function VirtualizedListbox({ children, ...other }, ref) {
   const items = React.Children.toArray(children);
   const height = Math.max(1, Math.min(items.length, LISTBOX_MAX_VISIBLE)) * LISTBOX_ITEM_HEIGHT;
-  
-  const Row = ({ index, style }) => (
-    <div style={style}>{items[index]}</div>
-  );
-
   return (
     <Box ref={ref} {...other}>
-      <WindowList
-        style={{ height, width: "100%" }}
-        rowHeight={LISTBOX_ITEM_HEIGHT}
-        rowCount={items.length}
+      <FixedSizeList
+        height={height}
+        width="100%"
+        itemSize={LISTBOX_ITEM_HEIGHT}
+        itemCount={items.length}
         overscanCount={6}
-        rowComponent={Row}
-        rowProps={{}}
-      />
+      >
+        {({ index, style }) => <div style={style}>{items[index]}</div>}
+      </FixedSizeList>
     </Box>
   );
 });
@@ -67,6 +63,10 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [pickerAnchor, setPickerAnchor] = useState(null);
     const [activeSlotSetter, setActiveSlotSetter] = useState(null);
     const [pickerSearch, setPickerSearch] = useState('');
+
+    // Activity graph multi-select picker
+    const [activityPickerAnchor, setActivityPickerAnchor] = useState(null);
+    const [activityPickerSearch, setActivityPickerSearch] = useState('');
 
     const openPicker = (event, setter) => {
         setPickerAnchor(event.currentTarget);
@@ -429,92 +429,69 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 </Typography>
               </Box>
               <Box sx={{ px: 2.5, py: 2 }}>
-                <Autocomplete
-                  multiple
-                  fullWidth
-                  disableListWrap
-                  id="activity-graph"
-                  value={activityGraphMetrics}
-                  onChange={(_, newValue) => setActivityGraphMetrics(newValue)}
-                  options={availableMetrics}
-                  getOptionLabel={(option) => formatMetricLabel(option.metricName)}
-                  isOptionEqualToValue={(option, value) => option.metricName === value.metricName}
-                  filterOptions={(options, { inputValue }) =>
-                    options.filter(o =>
-                      o.metricName.toLowerCase().includes(inputValue.toLowerCase())
-                    )
-                  }
-                  size="small"
-                  ListboxComponent={VirtualizedListbox}
-                  renderOption={(props, option, { selected }) => {
-                    const { key, ...rest } = props;
-                    return (
-                      <Box
-                        component="li"
-                        key={key}
-                        {...rest}
-                        sx={{
-                          display: 'flex', alignItems: 'center', gap: 1,
-                          px: 1.5, height: LISTBOX_ITEM_HEIGHT,
-                          bgcolor: selected ? alpha(theme.palette.primary.main, 0.06) : 'transparent',
-                          '&.Mui-focused': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
-                          fontSize: '0.85rem',
-                          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                {(() => {
+                  const chipSx = { fontSize: '0.75rem', fontWeight: 600, height: 22, borderRadius: 1.5, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.primary.main, 0.5), '&:hover': { color: 'primary.main' } } };
+                  const filteredActivity = availableMetrics.filter(m => m.metricName.toLowerCase().includes(activityPickerSearch.toLowerCase()));
+                  const cbUnchecked = <Box sx={{ width: 16, height: 16, borderRadius: '3px', border: '1.5px solid', borderColor: 'action.disabled', flexShrink: 0 }} />;
+                  const cbChecked = <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><CheckIcon sx={{ fontSize: 11, color: '#fff' }} /></Box>;
+                  const cbIndet = <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Box sx={{ width: 8, height: 1.5, bgcolor: '#fff', borderRadius: '1px' }} /></Box>;
+                  const isSel = (m) => activityGraphMetrics.some(s => s.metricName === m.metricName);
+                  return (
+                    <>
+                      <TextField
+                        fullWidth size="small"
+                        value=""
+                        error={isMetricssError}
+                        helperText={isMetricssError ? errorMessage : ''}
+                        onClick={(e) => { setActivityPickerAnchor(e.currentTarget); setActivityPickerSearch(''); }}
+                        inputProps={{ readOnly: true, style: { width: activityGraphMetrics.length > 0 ? 0 : undefined, padding: activityGraphMetrics.length > 0 ? 0 : undefined, cursor: 'pointer', fontSize: '0.875rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                        InputLabelProps={{ shrink: true }}
+                        InputProps={{
+                          startAdornment: activityGraphMetrics.length > 0
+                            ? activityGraphMetrics.map((m, i) => <Chip key={i} label={formatMetricLabel(m.metricName)} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); setActivityGraphMetrics(prev => prev.filter((_, idx) => idx !== i)); }} />)
+                            : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
                         }}
+                        sx={{ ...autocompleteFieldSx, '& .MuiOutlinedInput-root': { ...autocompleteFieldSx?.['& .MuiOutlinedInput-root'], ...(activityGraphMetrics.length > 0 && { flexWrap: 'wrap', gap: 0.5, pt: 2.5, pb: 0.75 }) } }}
+                        placeholder={activityGraphMetrics.length === 0 ? 'Search and select metrics…' : ''}
+                      />
+                      <Popover
+                        open={Boolean(activityPickerAnchor)} anchorEl={activityPickerAnchor}
+                        onClose={() => setActivityPickerAnchor(null)}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                        slotProps={{ paper: { sx: { mt: 0.75, width: activityPickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
                       >
-                        <Box sx={{
-                          width: 16, height: 16, flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'primary.main',
-                        }}>
-                          {selected && <CheckIcon sx={{ fontSize: 14 }} />}
+                        <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                          <TextField autoFocus fullWidth size="small" placeholder="Search metrics…"
+                            value={activityPickerSearch} onChange={(e) => setActivityPickerSearch(e.target.value)}
+                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                          />
                         </Box>
-                        <Typography noWrap sx={{
-                          fontSize: '0.85rem', fontWeight: selected ? 600 : 400,
-                          color: selected ? 'primary.main' : 'text.primary',
-                          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-                        }}>
-                          {formatMetricLabel(option.metricName)}
-                        </Typography>
-                      </Box>
-                    );
-                  }}
-                  renderTags={(tagValue, getTagProps) =>
-                    tagValue.map((option, index) => {
-                      const { key, ...tagProps } = getTagProps({ index });
-                      return (
-                        <Chip
-                          key={key}
-                          label={formatMetricLabel(option.metricName)}
-                          {...tagProps}
-                          size="small"
-                          sx={{
-                            fontSize: '0.75rem', fontWeight: 600, height: 22, borderRadius: 1.5,
-                            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                            color: 'primary.main',
-                            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
-                            '& .MuiChip-deleteIcon': {
-                              fontSize: '14px',
-                              color: alpha(theme.palette.primary.main, 0.5),
-                              '&:hover': { color: 'primary.main' },
-                            },
-                          }}
-                        />
-                      );
-                    })
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder={activityGraphMetrics.length === 0 ? 'Search and select metrics…' : ''}
-                      error={isMetricssError}
-                      helperText={isMetricssError ? errorMessage : ''}
-                      sx={autocompleteFieldSx}
-                      inputProps={{ ...params.inputProps, style: { fontSize: '0.875rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                    />
-                  )}
-                />
+                        <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                          {filteredActivity.length > 0 && (
+                            <ListItemButton onClick={() => { const allSel = filteredActivity.every(m => isSel(m)); setActivityGraphMetrics(prev => allSel ? prev.filter(s => !filteredActivity.some(m => m.metricName === s.metricName)) : [...prev, ...filteredActivity.filter(m => !isSel(m))]); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                              <Checkbox checked={filteredActivity.length > 0 && filteredActivity.every(m => isSel(m))} indeterminate={filteredActivity.some(m => isSel(m)) && !filteredActivity.every(m => isSel(m))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked} indeterminateIcon={cbIndet} sx={{ p: 0.5 }} />
+                              <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                            </ListItemButton>
+                          )}
+                          {filteredActivity.length === 0
+                            ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}><Typography variant="caption" color="text.disabled">No metrics found.</Typography></ListItemButton>
+                            : filteredActivity.map(m => {
+                                const sel = isSel(m);
+                                return (
+                                  <ListItemButton key={m.metricName} onClick={() => setActivityGraphMetrics(prev => sel ? prev.filter(s => s.metricName !== m.metricName) : [...prev, m])} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}>
+                                    <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked} sx={{ p: 0.5 }} />
+                                    <ListItemText primary={formatMetricLabel(m.metricName)} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? 'primary.main' : 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }} />
+                                  </ListItemButton>
+                                );
+                              })
+                          }
+                        </List>
+                      </Popover>
+                    </>
+                  );
+                })()}
                 <Typography sx={hintSx}>Define metrics to include in the month-over-month activity graph.</Typography>
               </Box>
             </Paper>

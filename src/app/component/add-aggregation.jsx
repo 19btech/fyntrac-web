@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete,
+  Button, TextField,
   IconButton, Typography, Tooltip, Box, Stack,
   Chip, Alert, Slide, Collapse,
+  Popover, List, ListItemButton, ListItemText, InputAdornment, Checkbox,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import CheckIcon from '@mui/icons-material/Check';
+import SearchIcon from '@mui/icons-material/Search';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
@@ -23,6 +26,8 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   const serviceGetTransactionNamesURL = '/transaction/get/transactions'
   const [transactionNames, setTransactionNames] = useState([]);
   const [selectedTransactions, setSelectedTransactions] = useState([]);
+  const [txPickerAnchor, setTxPickerAnchor] = useState(null);
+  const [txPickerSearch, setTxPickerSearch] = useState('');
 
   React.useEffect(() => {
     if (!open) return;
@@ -246,47 +251,68 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
       <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03) }}>
         <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-          <Autocomplete
-            fullWidth
-            multiple
-            disablePortal
-            filterSelectedOptions
-            options={transactionNames}
-            value={selectedTransactions}
-            getOptionLabel={(option) => option}
-            onChange={(_, newValue) => setSelectedTransactions(newValue)}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => {
-                const { key, ...tagProps } = getTagProps({ index });
-                return (
-                  <Chip
-                    key={key}
-                    label={option}
-                    size="small"
-                    {...tagProps}
-                    sx={{
-                      height: 22, fontSize: '0.72rem', fontWeight: 700,
-                      bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d',
-                      border: '1px solid rgba(22,163,74,0.28)', borderRadius: 1.5,
-                      '& .MuiChip-deleteIcon': { color: '#15803d', '&:hover': { color: '#166534' } },
-                    }}
-                  />
-                );
-              })
-            }
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Transaction Name(s)"
-                required
-                size="small"
-                placeholder={selectedTransactions.length === 0 ? 'Select one or more…' : ''}
-                inputProps={{ ...params.inputProps, style: { ...params.inputProps?.style, fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
-              />
-            )}
-          />
+          {(() => {
+            const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 700, borderRadius: 1.5, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d', border: '1px solid rgba(22,163,74,0.28)', '& .MuiChip-deleteIcon': { fontSize: '14px', color: '#15803d', '&:hover': { color: '#166534' } } };
+            const GREEN = '#15803d';
+            const filteredTx = transactionNames.filter(tx => tx.toLowerCase().includes(txPickerSearch.toLowerCase()));
+            const cbUnchecked = <Box sx={{ width: 16, height: 16, borderRadius: '3px', border: '1.5px solid', borderColor: 'action.disabled', flexShrink: 0 }} />;
+            const cbChecked = <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><CheckIcon sx={{ fontSize: 11, color: '#fff' }} /></Box>;
+            const cbIndet = <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Box sx={{ width: 8, height: 1.5, bgcolor: '#fff', borderRadius: '1px' }} /></Box>;
+            return (
+              <>
+                <TextField
+                  fullWidth size="small"
+                  label="Transaction Name(s)"
+                  required
+                  value=""
+                  onClick={(e) => { setTxPickerAnchor(e.currentTarget); setTxPickerSearch(''); }}
+                  inputProps={{ readOnly: true, style: { width: selectedTransactions.length > 0 ? 0 : undefined, padding: selectedTransactions.length > 0 ? 0 : undefined, cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                  InputLabelProps={{ shrink: true, style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+                  InputProps={{
+                    startAdornment: selectedTransactions.length > 0
+                      ? selectedTransactions.map((tx, i) => <Chip key={i} label={tx} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); setSelectedTransactions(prev => prev.filter((_, idx) => idx !== i)); }} />)
+                      : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', ...(selectedTransactions.length > 0 && { flexWrap: 'wrap', gap: 0.5, pt: 2.5, pb: 0.75 }) } }}
+                />
+                <Popover
+                  open={Boolean(txPickerAnchor)} anchorEl={txPickerAnchor}
+                  onClose={() => setTxPickerAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  slotProps={{ paper: { sx: { mt: 0.75, width: txPickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+                >
+                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                    <TextField autoFocus fullWidth size="small" placeholder="Search transactions…"
+                      value={txPickerSearch} onChange={(e) => setTxPickerSearch(e.target.value)}
+                      InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                  </Box>
+                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                    {filteredTx.length > 0 && (
+                      <ListItemButton onClick={() => { const allSel = filteredTx.every(tx => selectedTransactions.includes(tx)); setSelectedTransactions(prev => allSel ? prev.filter(tx => !filteredTx.includes(tx)) : [...prev, ...filteredTx.filter(tx => !prev.includes(tx))]); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: 'rgba(22,163,74,0.02)' }}>
+                        <Checkbox checked={filteredTx.length > 0 && filteredTx.every(tx => selectedTransactions.includes(tx))} indeterminate={filteredTx.some(tx => selectedTransactions.includes(tx)) && !filteredTx.every(tx => selectedTransactions.includes(tx))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked} indeterminateIcon={cbIndet} sx={{ p: 0.5 }} />
+                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                      </ListItemButton>
+                    )}
+                    {filteredTx.length === 0
+                      ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}><Typography variant="caption" color="text.disabled">No transactions found.</Typography></ListItemButton>
+                      : filteredTx.map(tx => {
+                          const sel = selectedTransactions.includes(tx);
+                          return (
+                            <ListItemButton key={tx} onClick={() => setSelectedTransactions(prev => sel ? prev.filter(t => t !== tx) : [...prev, tx])} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: 'rgba(22,163,74,0.06)' } }}>
+                              <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked} sx={{ p: 0.5 }} />
+                              <ListItemText primary={tx} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? '#15803d' : 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }} />
+                            </ListItemButton>
+                          );
+                        })
+                    }
+                  </List>
+                </Popover>
+              </>
+            );
+          })()}
 
           <TextField
             label="Metric Name"

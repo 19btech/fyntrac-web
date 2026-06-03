@@ -17,9 +17,16 @@ import {
   Alert,
   Slide,
   Typography,
+  Popover,
+  List,
+  ListItemButton,
+  ListItemText,
+  InputAdornment,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import Grid from "@mui/material/Grid"; 
 import { dataloaderApi, reportingApi } from '../services/api-client';
@@ -64,6 +71,17 @@ const InstrumentDiagnosticPage = () => {
   const [postingDates, setPostingDates] = React.useState([]);
   const [postingDate, setPostingDate] = React.useState('');
   const [diagnosticData, setDiagnosticData] = React.useState({});
+  const [datepickerAnchor, setDatepickerAnchor] = React.useState(null);
+  const [datepickerSearch, setDatepickerSearch] = React.useState('');
+  const [modelpickerAnchor, setModelpickerAnchor] = React.useState(null);
+  const [modelpickerSearch, setModelpickerSearch] = React.useState('');
+
+  const filteredPostingDates = postingDates.filter(d =>
+    d.label.toLowerCase().includes(datepickerSearch.toLowerCase())
+  );
+  const filteredModels = models.filter(m =>
+    m.modelName.toLowerCase().includes(modelpickerSearch.toLowerCase())
+  );
 
 
 
@@ -334,50 +352,192 @@ const InstrumentDiagnosticPage = () => {
                     value={instrumentId}
                     onChange={(e) => setInstrumentId(e.target.value)}
                     size="small"
-                    sx={{ minWidth: 350 }}
-                  >
-
-                  </TextField>
+                    sx={{ minWidth: 350, '& .MuiInputLabel-root:not(.MuiInputLabel-shrink)': { fontSize: '0.875rem' } }}
+                  />
                 </Grid>
 
                 <Grid xs={12} sm={3}>
-                  <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
-                    <InputLabel id="sort-by-select-model">Select Model</InputLabel>
-                    <Select
-                      labelId="sort-by-select-model"
-                      id="sort-by-select"
-                      value={model}
-                      label="Select Model"
-                      onChange={(e) => setModel(e.target.value)}
-                    >
-                      {models.map((model) => (
-                        <MenuItem key={model.id} value={model.id}>
-                          {model.modelName}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Select Model"
+                    value={model ? (models.find(m => m.id === model)?.modelName || model) : ''}
+                    onClick={(e) => { setModelpickerAnchor(e.currentTarget); setModelpickerSearch(''); }}
+                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+                    sx={{ m: 1, minWidth: 350 }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: model ? (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setModel(''); }}
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                          >
+                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
                 </Grid>
 
+                <Popover
+                  open={Boolean(modelpickerAnchor)}
+                  anchorEl={modelpickerAnchor}
+                  onClose={() => setModelpickerAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.75,
+                        width: 350,
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                        border: '1px solid', borderColor: 'divider',
+                        overflow: 'hidden',
+                      },
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                    <TextField
+                      autoFocus
+                      fullWidth
+                      size="small"
+                      placeholder="Search models..."
+                      value={modelpickerSearch}
+                      onChange={(e) => setModelpickerSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                  </Box>
+                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                    {filteredModels.length === 0 ? (
+                      <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                        <Typography variant="caption" color="text.disabled">No models found.</Typography>
+                      </ListItemButton>
+                    ) : filteredModels.map((m) => (
+                      <ListItemButton
+                        key={m.id}
+                        selected={m.id === model}
+                        onClick={() => { setModel(m.id); setModelpickerAnchor(null); }}
+                        sx={{
+                          py: 1, px: 2,
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                          '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                        }}
+                      >
+                        <ListItemText
+                          primary={m.modelName}
+                          primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
+                        />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Popover>
+
                 <Grid xs={12} sm={3}>
-                  <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
-                    <InputLabel id="sort-by-select-model">Select Date</InputLabel>
-                    <Select
-                      labelId="sort-by-select-posting-date"
-                      id="sort-by-select-posting-date"
-                      value={postingDate}
-                      label="Select Posting"
-                      // size="small"  <-- You can remove this as it inherits from FormControl, or keep it.
-                      onChange={(e) => setPostingDate(e.target.value)}
-                    >
-                      {postingDates.map((pdate) => (
-                        <MenuItem key={pdate.value} value={pdate.value}>
-                          {pdate.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Select Posting Date"
+                    value={postingDate ? (postingDates.find(d => d.value === postingDate)?.label || postingDate) : ''}
+                    onClick={(e) => { setDatepickerAnchor(e.currentTarget); setDatepickerSearch(''); }}
+                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+                    sx={{ m: 1, minWidth: 350 }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: postingDate ? (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setPostingDate(''); }}
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                          >
+                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
                 </Grid>
+
+                <Popover
+                  open={Boolean(datepickerAnchor)}
+                  anchorEl={datepickerAnchor}
+                  onClose={() => setDatepickerAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.75,
+                        width: 350,
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                        border: '1px solid', borderColor: 'divider',
+                        overflow: 'hidden',
+                      },
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                    <TextField
+                      autoFocus
+                      fullWidth
+                      size="small"
+                      placeholder="Search dates..."
+                      value={datepickerSearch}
+                      onChange={(e) => setDatepickerSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Box>
+                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                    {filteredPostingDates.length === 0 ? (
+                      <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                        <Typography variant="caption" color="text.disabled">No dates found.</Typography>
+                      </ListItemButton>
+                    ) : filteredPostingDates.map((pdate) => (
+                      <ListItemButton
+                        key={pdate.value}
+                        selected={pdate.value === postingDate}
+                        onClick={() => { setPostingDate(pdate.value); setDatepickerAnchor(null); }}
+                        sx={{
+                          py: 1, px: 2,
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                          '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                        }}
+                      >
+                        <ListItemText
+                          primary={pdate.label}
+                          primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
+                        />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Popover>
 
                 <Grid xs={12} sm={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>

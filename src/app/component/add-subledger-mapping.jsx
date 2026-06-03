@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Autocomplete,
+  Button, TextField,
   IconButton, Typography, Tooltip, Box,
   Chip, Alert, Slide, Stack, Paper,
+  Popover, List, ListItemButton, ListItemText, InputAdornment,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
@@ -30,6 +32,16 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   const [transactionNames, setTransactionNames] = useState([]);
   const [signs, setSigns] = useState(['AMOUNT < 0', 'AMOUNT > 0']);
   const [entryTypes, setEntryTypes] = useState(['DEBIT', 'CREDIT']);
+  const [txPickerAnchor, setTxPickerAnchor] = useState(null);
+  const [txPickerSearch, setTxPickerSearch] = useState('');
+  const [subtypePickerAnchor, setSubtypePickerAnchor] = useState(null);
+  const [subtypePickerSearch, setSubtypePickerSearch] = useState('');
+  const filteredTransactionNames = transactionNames.filter(tx =>
+    tx.toLowerCase().includes(txPickerSearch.toLowerCase())
+  );
+  const filteredAccountSubtypes = accountSubtypes.filter(st =>
+    st.toLowerCase().includes(subtypePickerSearch.toLowerCase())
+  );
 
   const serviceURL = '/subledgermapping/add';
   const sericeGetSubTypeURL = '/accounttype/get/subtypes'
@@ -291,27 +303,52 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
           )}
 
           {/* Transaction Name */}
-          <Autocomplete
-            fullWidth disablePortal
-            options={transactionNames}
+          <TextField
+            fullWidth label="Transaction Name" required size="small"
             value={transactionName}
-            getOptionLabel={(option) => option}
-            onChange={(event, newValue) => setTransactionName(newValue)}
-            renderOption={(props, option) => {
-              const { key, ...otherProps } = props;
-              return (
-                <Box component="li" key={key} {...otherProps} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
-              );
+            onClick={(e) => { setTxPickerAnchor(e.currentTarget); setTxPickerSearch(''); }}
+            inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' }, '& .MuiInputLabel-root': { fontSize: '0.9rem' } }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+              endAdornment: transactionName ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setTransactionName(''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                    <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
             }}
-            renderInput={(params) => (
-              <TextField {...params} label="Transaction Name" required size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
-                  '& .MuiInputLabel-root': { fontSize: '0.9rem' },
-                }}
-              />
-            )}
           />
+          <Popover
+            open={Boolean(txPickerAnchor)} anchorEl={txPickerAnchor}
+            onClose={() => setTxPickerAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+            slotProps={{ paper: { sx: { mt: 0.75, width: txPickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+          >
+            <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+              <TextField autoFocus fullWidth size="small" placeholder="Search transactions..."
+                value={txPickerSearch} onChange={(e) => setTxPickerSearch(e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+            </Box>
+            <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+              {filteredTransactionNames.length === 0 ? (
+                <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                  <Typography variant="caption" color="text.disabled">No transactions found.</Typography>
+                </ListItemButton>
+              ) : filteredTransactionNames.map((tx) => (
+                <ListItemButton key={tx} selected={tx === transactionName}
+                  onClick={() => { setTransactionName(tx); setTxPickerAnchor(null); }}
+                  sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+                >
+                  <ListItemText primary={tx} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Popover>
 
           {/* Criteria + Entry Type chip toggles */}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -421,27 +458,52 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
           </Stack>
 
           {/* Account Subtype */}
-          <Autocomplete
-            fullWidth disablePortal
-            options={accountSubtypes}
+          <TextField
+            fullWidth label="Account Subtype" required size="small"
             value={accountSubType}
-            getOptionLabel={(option) => option}
-            onChange={(event, newValue) => setAccountSubType(newValue)}
-            renderOption={(props, option) => {
-              const { key, ...otherProps } = props;
-              return (
-                <Box component="li" key={key} {...otherProps} sx={{ fontSize: '0.82rem !important' }}>{option}</Box>
-              );
+            onClick={(e) => { setSubtypePickerAnchor(e.currentTarget); setSubtypePickerSearch(''); }}
+            inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' }, '& .MuiInputLabel-root': { fontSize: '0.9rem' } }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+              endAdornment: accountSubType ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAccountSubType(''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                    <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
             }}
-            renderInput={(params) => (
-              <TextField {...params} label="Account Subtype" required size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
-                  '& .MuiInputLabel-root': { fontSize: '0.9rem' },
-                }}
-              />
-            )}
           />
+          <Popover
+            open={Boolean(subtypePickerAnchor)} anchorEl={subtypePickerAnchor}
+            onClose={() => setSubtypePickerAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+            slotProps={{ paper: { sx: { mt: 0.75, width: subtypePickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+          >
+            <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+              <TextField autoFocus fullWidth size="small" placeholder="Search subtypes..."
+                value={subtypePickerSearch} onChange={(e) => setSubtypePickerSearch(e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+            </Box>
+            <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+              {filteredAccountSubtypes.length === 0 ? (
+                <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                  <Typography variant="caption" color="text.disabled">No subtypes found.</Typography>
+                </ListItemButton>
+              ) : filteredAccountSubtypes.map((st) => (
+                <ListItemButton key={st} selected={st === accountSubType}
+                  onClick={() => { setAccountSubType(st); setSubtypePickerAnchor(null); }}
+                  sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+                >
+                  <ListItemText primary={st} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Popover>
         </Box>
       </DialogContent>
 

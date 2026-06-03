@@ -1,23 +1,26 @@
 "use client"
 import React, { useState } from 'react';
 import {
-  Box, Typography, Autocomplete, TextField,
+  Box, Typography, TextField,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, IconButton, Switch, Tooltip, Chip,
   Card, Snackbar, Alert, Slide, Link,
+  Popover, List, ListItemButton, ListItemText, InputAdornment,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import SearchIcon from '@mui/icons-material/Search';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import CustomTabPanel from '../component/custom-tab-panel';
 import AddDashboardConfiguration from '../component/add-update-dashboard-config';
 import { dataloaderApi } from '../services/api-client';
@@ -162,11 +165,18 @@ export default function SettingsPage() {
   const [fiscalPeriodStaringDate, setFiscalPeriodStaringDate] = React.useState(null);
   const [isFiscalPeriodButtonDisabled, setIsFiscalPeriodButtonDisabled] = React.useState(true);
   const [hasActivityData, setHasActivityData] = React.useState(false);
+  const [fiscalCalendarAnchor, setFiscalCalendarAnchor] = useState(null);
 
   // Currency
   const [currency, setCurrency] = useState('USD');
   const [currencyList, setCurrencyList] = useState([]);
   const [isCurrencyButtonDisabled, setIsCurrencyButtonDisabled] = useState(true);
+  const [currencyPickerAnchor, setCurrencyPickerAnchor] = useState(null);
+  const [currencyPickerSearch, setCurrencyPickerSearch] = useState('');
+  const filteredCurrencies = (currencyList || []).filter(code =>
+    code.toLowerCase().includes(currencyPickerSearch.toLowerCase()) ||
+    getCurrencyName(code).toLowerCase().includes(currencyPickerSearch.toLowerCase())
+  );
 
   // Reporting period
   const [reportingPeriod, setReportingPeriod] = useState('12');
@@ -716,61 +726,112 @@ export default function SettingsPage() {
             title="Home Currency"
             description="Choose the default currency for your environment."
           >
-            <Autocomplete
+            <TextField
               size="small"
-              options={currencyList || []}
-              value={currency || null}
-              getOptionLabel={(option) => option || ''}
-              filterOptions={(options, { inputValue }) => {
-                const q = inputValue.toLowerCase();
-                return options.filter(code =>
-                  code.toLowerCase().includes(q) ||
-                  getCurrencyName(code).toLowerCase().includes(q)
-                );
+              label="Currency"
+              value={currency ? `${currency}${getCurrencySymbol(currency) ? ` (${getCurrencySymbol(currency)})` : ''}` : ''}
+              onClick={(e) => { setCurrencyPickerAnchor(e.currentTarget); setCurrencyPickerSearch(''); }}
+              inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+              sx={{ width: 220, ...tfSx }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: currency ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); setCurrency(null); setIsCurrencyButtonDisabled(false); }}
+                      sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                    >
+                      <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
               }}
-              onChange={(_, newValue) => { setCurrency(newValue || null); setIsCurrencyButtonDisabled(false); }}
-              sx={{ width: 220 }}
-              renderOption={(props, option, { selected }) => {
-                const { key, ...rest } = props;
-                const sym = getCurrencySymbol(option);
-                const name = getCurrencyName(option);
-                return (
-                  <Box component="li" key={key} {...rest}
-                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', py: 0.75, px: 1.5 }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.6 }}>
-                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: '"Inter", sans-serif', color: selected ? 'primary.main' : 'text.primary' }}>
-                        {option}
-                      </Typography>
-                      {sym && (
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'text.secondary', fontFamily: '"Inter", sans-serif' }}>
-                          {sym}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Inter", sans-serif', lineHeight: 1.2 }}>
-                      {name}
-                    </Typography>
-                  </Box>
-                );
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Currency"
-                  placeholder="Search…"
-                  sx={tfSx}
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: currency && getCurrencySymbol(currency) ? (
-                      <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'text.secondary', fontFamily: '"Inter", sans-serif', pl: 0.5, pr: 0.25, flexShrink: 0 }}>
-                        {getCurrencySymbol(currency)}
-                      </Typography>
-                    ) : params.InputProps?.startAdornment,
-                  }}
-                />
-              )}
             />
+            <Popover
+              open={Boolean(currencyPickerAnchor)}
+              anchorEl={currencyPickerAnchor}
+              onClose={() => setCurrencyPickerAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    mt: 0.75,
+                    width: 280,
+                    borderRadius: 3,
+                    boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                    border: '1px solid', borderColor: 'divider',
+                    overflow: 'hidden',
+                  },
+                },
+              }}
+            >
+              <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  placeholder="Search currencies..."
+                  value={currencyPickerSearch}
+                  onChange={(e) => setCurrencyPickerSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </Box>
+              <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                {filteredCurrencies.length === 0 ? (
+                  <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                    <Typography variant="caption" color="text.disabled">No currencies found.</Typography>
+                  </ListItemButton>
+                ) : filteredCurrencies.map((code) => {
+                  const sym = getCurrencySymbol(code);
+                  const name = getCurrencyName(code);
+                  return (
+                    <ListItemButton
+                      key={code}
+                      selected={code === currency}
+                      onClick={() => { setCurrency(code); setIsCurrencyButtonDisabled(false); setCurrencyPickerAnchor(null); }}
+                      sx={{
+                        py: 0.75, px: 2,
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                        '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.6 }}>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: '"Inter", sans-serif', color: code === currency ? 'primary.main' : 'text.primary' }}>
+                              {code}
+                            </Typography>
+                            {sym && (
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'text.secondary', fontFamily: '"Inter", sans-serif' }}>
+                                {sym}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        secondary={
+                          <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Inter", sans-serif', lineHeight: 1.2 }}>
+                            {name}
+                          </Typography>
+                        }
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            </Popover>
             <ActionLink onClick={saveCurrency} disabled={isCurrencyButtonDisabled}>Save</ActionLink>
           </SettingRow>
 
@@ -784,14 +845,73 @@ export default function SettingsPage() {
               disableHoverListener={!hasActivityData}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker
-                    value={fiscalPeriodStaringDate}
-                    onChange={handleFiscalPeriodChange}
-                    disabled={hasActivityData}
-                    slotProps={{ textField: { size: 'small', sx: { width: 178, ...tfSx } } }}
-                  />
-                </LocalizationProvider>
+                <TextField
+                  size="small"
+                  label="Start Date"
+                  value={fiscalPeriodStaringDate ? fiscalPeriodStaringDate.format('MM/DD/YYYY') : ''}
+                  onClick={(e) => { if (!hasActivityData) { setFiscalCalendarAnchor(e.currentTarget); } }}
+                  inputProps={{ readOnly: true, style: { cursor: hasActivityData ? 'default' : 'pointer' } }}
+                  disabled={hasActivityData}
+                  sx={{ width: 178, ...tfSx }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CalendarTodayOutlinedIcon fontSize="small" sx={{ color: 'text.disabled', fontSize: '0.95rem' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: fiscalPeriodStaringDate && !hasActivityData ? (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); handleFiscalPeriodChange(null); }}
+                          sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                        >
+                          <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                />
+                <Popover
+                  open={Boolean(fiscalCalendarAnchor)}
+                  anchorEl={fiscalCalendarAnchor}
+                  onClose={() => setFiscalCalendarAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.75,
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        overflow: 'hidden',
+                      },
+                    },
+                  }}
+                >
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DateCalendar
+                      value={fiscalPeriodStaringDate}
+                      onChange={(date) => { handleFiscalPeriodChange(date); setFiscalCalendarAnchor(null); }}
+                      sx={{
+                        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                        '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
+                        '& .MuiPickersDay-root': {
+                          borderRadius: 1.5,
+                          fontSize: '0.82rem',
+                          '&.Mui-selected': {
+                            bgcolor: theme.palette.primary.main,
+                            '&:hover': { bgcolor: theme.palette.primary.dark },
+                          },
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                        },
+                        '& .MuiPickersCalendarHeader-root': { fontSize: '0.85rem' },
+                      }}
+                    />
+                  </LocalizationProvider>
+                </Popover>
                 {hasActivityData && (
                   <LockOutlinedIcon sx={{ fontSize: '1rem', color: 'text.disabled' }} />
                 )}

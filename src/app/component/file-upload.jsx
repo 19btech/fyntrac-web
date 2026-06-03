@@ -71,10 +71,8 @@ export default function FileUploadComponent({
     loadModeRef.current = loadMode;
   }, [loadMode]);
 
-  const activity_overwriteURL = `/accounting/rule/upload-overwrite`;
-  const activity_appendURL = `/accounting/rule/upload`;
-  const custom_overwriteURL = `/fyntrac/custom-table/data-upload-overwrite`;
-  const custom_appendURL = `/fyntrac/custom-table/data-upload`;
+  const standardURL = `/accounting/rule/upload`;
+  const customURL = `/fyntrac/custom-table/data-upload`;
 
   const handleDrop = async (acceptedFiles, fileRejections) => {
     // 🔒 Prevent double upload
@@ -94,22 +92,10 @@ export default function FileUploadComponent({
       ? activityTypeRef.current
       : ACTIVITY_TYPES.STANDARD;
 
-    const targetUrl = (() => {
-      console.log("Mode:", loadMode, "Activity Type:", currentActivityType);
-
-      if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
-        return custom_overwriteURL;
-      } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
-        return custom_appendURL;
-      } else if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.STANDARD) { // ◄ Fixed here
-        return activity_overwriteURL;
-      } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.STANDARD) {  // ◄ Fixed here
-        return activity_appendURL;
-      }
-
-      return null;
-    })();
-
+    const targetUrl =
+      currentActivityType === ACTIVITY_TYPES.CUSTOM
+        ? customURL
+        : standardURL;
 
     const newFiles = acceptedFiles.map((file) =>
       Object.assign(file, { preview: URL.createObjectURL(file) })
@@ -125,8 +111,6 @@ export default function FileUploadComponent({
     }
 
     try {
-
-      console.log("Activity upload targetUrl", targetUrl);
       const response = await dataloaderApi.post(targetUrl, formData, {
         headers: {
           "X-Tenant": tenant || "",
@@ -149,7 +133,7 @@ export default function FileUploadComponent({
         setStatus("idle");
         setFiles([]);
         setUploadProgress({});
-        uploadLock.current = false;
+        uploadLock.current = false; 
         onDrop()// 🔓 Release lock
       }, 5000);
 

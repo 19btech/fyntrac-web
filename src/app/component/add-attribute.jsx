@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, TextField, Switch, Autocomplete,
+  Button, TextField, Switch,
   IconButton, Typography, Tooltip, Box, Stack,
   Chip, Alert, Paper, Slide, Collapse,
+  Popover, List, ListItemButton, ListItemText, InputAdornment,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
@@ -22,15 +24,13 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   const [isNullable, setIsNullable] = useState(false);
   const [id, setId] = useState(null);
   const [errorSnackbar, setErrorSnackbar] = useState({ open: false, message: '' });
-  const dataTypes = [{ label: 'STRING' },
-  { label: 'NUMBER' },
-  { label: 'DATE' },
-  { label: 'BOOLEAN' }];
+  const [dataTypePickerAnchor, setDataTypePickerAnchor] = useState(null);
+  const [dataTypePickerSearch, setDataTypePickerSearch] = useState('');
 
-  const defaultDataTypes = ['STRING',
-    'NUMBER',
-    'DATE',
-    'BOOLEAN'];
+  const defaultDataTypes = ['STRING', 'NUMBER', 'DATE', 'BOOLEAN'];
+  const filteredDataTypes = defaultDataTypes.filter(dt =>
+    dt.toLowerCase().includes(dataTypePickerSearch.toLowerCase())
+  );
 
 
 
@@ -258,36 +258,87 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
             />
-            <Autocomplete
+            <TextField
               fullWidth
-              disablePortal
-              options={defaultDataTypes}
+              label="Data Type"
+              required
+              size="small"
               value={dataType}
-              getOptionLabel={(option) => option}
-              onChange={(event, newValue) => setDataType(newValue)}
-              componentsProps={{
+              onClick={(e) => { setDataTypePickerAnchor(e.currentTarget); setDataTypePickerSearch(''); }}
+              inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+              InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Popover
+              open={Boolean(dataTypePickerAnchor)}
+              anchorEl={dataTypePickerAnchor}
+              onClose={() => setDataTypePickerAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              slotProps={{
                 paper: {
                   sx: {
-                    '& .MuiAutocomplete-option': {
-                      fontSize: '0.9rem',
-                      fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-                      py: 0.5,
-                    },
+                    mt: 0.75,
+                    width: dataTypePickerAnchor?.offsetWidth,
+                    borderRadius: 3,
+                    boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                    border: '1px solid', borderColor: 'divider',
+                    overflow: 'hidden',
                   },
                 },
               }}
-              renderInput={(params) => (
+            >
+              <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
                 <TextField
-                  {...params}
-                  label="Data Type"
-                  required
+                  autoFocus
+                  fullWidth
                   size="small"
-                  inputProps={{ ...params.inputProps, style: { ...params.inputProps?.style, fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                  InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
+                  placeholder="Search types..."
+                  value={dataTypePickerSearch}
+                  onChange={(e) => setDataTypePickerSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 />
-              )}
-            />
+              </Box>
+              <List dense disablePadding>
+                {filteredDataTypes.length === 0 ? (
+                  <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                    <Typography variant="caption" color="text.disabled">No types found.</Typography>
+                  </ListItemButton>
+                ) : filteredDataTypes.map((dt) => (
+                  <ListItemButton
+                    key={dt}
+                    selected={dt === dataType}
+                    onClick={() => { setDataType(dt); setDataTypePickerAnchor(null); }}
+                    sx={{
+                      py: 1, px: 2,
+                      fontSize: '0.9rem',
+                      fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                      '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                    }}
+                  >
+                    <ListItemText
+                      primary={dt}
+                      primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Popover>
           </Stack>
 
           {/* Toggle flags */}

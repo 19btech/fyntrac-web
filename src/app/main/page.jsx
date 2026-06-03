@@ -782,8 +782,8 @@ export default function DashboardLayoutModern() {
               id: 'journal', label: 'Journal Mapping', route: 'journal-mapping', mandatory: true,
               items: [
                 { id: 'accountsubtypes', label: 'Account Subtypes', route: 'journal-mapping', tabIndex: 0 },
-                { id: 'coa', label: 'Chart of Accounts', route: 'journal-mapping', tabIndex: 2 },
                 { id: 'subledger', label: 'Subledger Mapping', route: 'journal-mapping', tabIndex: 1 },
+                { id: 'coa', label: 'Chart of Accounts', route: 'journal-mapping', tabIndex: 2 },
               ],
             },
             {

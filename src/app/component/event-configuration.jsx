@@ -28,16 +28,32 @@ import {
     Alert,
     Slide,
     useTheme,
+    Popover,
+    List,
+    ListItemButton,
+    ListItemText,
+    InputAdornment,
+    Checkbox,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import SearchIcon from '@mui/icons-material/Search';
+import CheckIcon from '@mui/icons-material/Check';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import SaveIcon from '@mui/icons-material/Save';
-import CancelIcon from '@mui/icons-material/Cancel';
 import { dataloaderApi } from '../services/api-client';
+
+const TRIGGER_TYPES = [
+  { value: 'ON_MODEL_EXECUTION',   label: 'On Model Execution' },
+  { value: 'ON_INSTRUMENT_ADD',    label: 'On Instrument Add' },
+  { value: 'ON_TRANSACTION_POST',  label: 'On Transaction Post' },
+  { value: 'ON_ATTRIBUTE_CHANGE',  label: 'On Attribute Change' },
+  { value: 'ON_CUSTOM_DATA_TRIGGER', label: 'On Custom Data Trigger' },
+  { value: 'ON_REPLAY',            label: 'On Replay' },
+];
 
 const validateEventId = (value) => {
   if (!value || value.trim() === '') return 'Event ID cannot be empty.';
@@ -77,6 +93,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [isAddingNew, setIsAddingNew] = useState(false);
     const [loading, setLoading] = useState(false);
     const [eventIdError, setEventIdError] = useState(null);
+    const [submitted, setSubmitted] = useState(false);
 
     const [newSource, setNewSource] = useState({
         sourceTable: '',
@@ -102,6 +119,30 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [customTableMappings, setCustomTableMappings] = useState([]);
     const [referenceTables, setReferenceTables] = useState([]);
     const [operationalTables, setOperationalTables] = useState([]);
+    const [triggerTypePickerAnchor, setTriggerTypePickerAnchor] = useState(null);
+    const [triggerTypePickerSearch, setTriggerTypePickerSearch] = useState('');
+    const [editSourcePickerAnchor, setEditSourcePickerAnchor] = useState(null);
+    const [editSourcePickerSearch, setEditSourcePickerSearch] = useState('');
+    const [editSourcePickerRowId, setEditSourcePickerRowId] = useState(null);
+    const [newSourcePickerAnchor, setNewSourcePickerAnchor] = useState(null);
+    const [newSourcePickerSearch, setNewSourcePickerSearch] = useState('');
+    const [tsPickerAnchor, setTsPickerAnchor] = useState(null);
+    const [tsPickerSearch, setTsPickerSearch] = useState('');
+    const [ecPickerAnchor, setEcPickerAnchor] = useState(null);
+    const [ecPickerSearch, setEcPickerSearch] = useState('');
+    const [ecPickerRowId, setEcPickerRowId] = useState(null);
+    const [evPickerAnchor, setEvPickerAnchor] = useState(null);
+    const [evPickerSearch, setEvPickerSearch] = useState('');
+    const [evPickerRowId, setEvPickerRowId] = useState(null);
+    const [emPickerAnchor, setEmPickerAnchor] = useState(null);
+    const [emPickerSearch, setEmPickerSearch] = useState('');
+    const [emPickerRowId, setEmPickerRowId] = useState(null);
+    const [ncPickerAnchor, setNcPickerAnchor] = useState(null);
+    const [ncPickerSearch, setNcPickerSearch] = useState('');
+    const [nvPickerAnchor, setNvPickerAnchor] = useState(null);
+    const [nvPickerSearch, setNvPickerSearch] = useState('');
+    const [nmPickerAnchor, setNmPickerAnchor] = useState(null);
+    const [nmPickerSearch, setNmPickerSearch] = useState('');
 
     const sourceColumnsOptions = {
         Attribute: attributeList,
@@ -352,6 +393,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
         });
         setAlert({ open: false, message: '', severity: 'success' });
         setCustomTableMappings([]);
+        setSubmitted(false);
     };
 
     const showAlert = (message, severity = 'success') => {
@@ -544,7 +586,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             return;
         }
         setNewSource({
-            sourceTable: availableSources[0],
+            sourceTable: '',
             sourceColumns: [],
             versionType: [],
             fieldType: '',
@@ -708,6 +750,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const handleSaveConfiguration = async () => {
         if (loading) return;
         console.log('🚀 SAVE FUNCTION STARTED');
+        setSubmitted(true);
 
         const idValidationError = validateEventId(eventData.eventId);
         if (idValidationError) {
@@ -871,7 +914,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
         if (eventData?.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
             if (!editData) {
                 setNewSource({
-                    sourceTable: availableSources[0],
+                    sourceTable: '',
                     sourceColumns: [],
                     versionType: [],
                     fieldType: '',
@@ -885,7 +928,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             setAvailableSources(['Transactions']);
             if (!editData) {
                 setNewSource({
-                    sourceTable: availableSources[0],
+                    sourceTable: '',
                     sourceColumns: [],
                     versionType: [],
                     fieldType: '',
@@ -921,6 +964,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
     // When editing an existing event only the source mappings should be editable.
     // Event Details and Trigger Setup fields are locked in edit mode.
     const isEditMode = Boolean(editData);
+
+    const cbUnchecked = <Box sx={{ width: 16, height: 16, borderRadius: '3px', border: '1.5px solid', borderColor: 'action.disabled', flexShrink: 0 }} />;
+    const cbChecked = (color) => <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><CheckIcon sx={{ fontSize: 11, color: '#fff' }} /></Box>;
+    const cbIndeterminate = (color) => <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Box sx={{ width: 8, height: 1.5, bgcolor: '#fff', borderRadius: '1px' }} /></Box>;
 
     return (
         <Dialog
@@ -1057,8 +1104,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     value={eventData.eventName}
                                     onChange={(e) => handleChange('eventName', e.target.value)}
                                     disabled={isEditMode}
-                                    error={!isEditMode && !eventData.eventName}
-                                    helperText={!isEditMode && !eventData.eventName ? "Event Name is required" : ""}
+                                    error={!isEditMode && submitted && !eventData.eventName}
+                                    helperText={!isEditMode && submitted && !eventData.eventName ? "Event Name is required" : ""}
                                 />
                             </Grid>
                             <Grid size={6}>
@@ -1070,8 +1117,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     value={eventData.priority}
                                     onChange={(e) => handleChange('priority', e.target.value)}
                                     disabled={isEditMode}
-                                    error={!isEditMode && !eventData.priority}
-                                    helperText={!isEditMode && !eventData.priority ? "Priority is required" : ""}
+                                    error={!isEditMode && submitted && !eventData.priority}
+                                    helperText={!isEditMode && submitted && !eventData.priority ? "Priority is required" : ""}
                                     slotProps={{ min: 1 }}
                                 />
                             </Grid>
@@ -1101,93 +1148,143 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         <Box sx={{ p: 2.5 }}>
                         <Grid container spacing={2}>
                             <Grid size={6}>
-                                <FormControl fullWidth size="small" disabled={isEditMode} error={!isEditMode && !eventData.triggerType}>
-                                    <InputLabel>Trigger Type</InputLabel>
-                                    <Select
-                                        value={eventData.triggerType}
-                                        onChange={(e) => handleChange('triggerType', e.target.value)}
-                                        label="Trigger Type"
-                                        disabled={isEditMode}
-                                    >
-                                        <MenuItem value="ON_MODEL_EXECUTION">On Model Execution</MenuItem>
-                                        <MenuItem value="ON_INSTRUMENT_ADD">On Instrument Add</MenuItem>
-                                        <MenuItem value="ON_TRANSACTION_POST">On Transaction Post</MenuItem>
-                                        <MenuItem value="ON_ATTRIBUTE_CHANGE">On Attribute Change</MenuItem>
-                                        <MenuItem value="ON_CUSTOM_DATA_TRIGGER">On Custom Data Trigger</MenuItem>
-                                        <MenuItem value="ON_REPLAY">On Replay</MenuItem>
-                                    </Select>
-                                </FormControl>
+                                <TextField
+                                    fullWidth size="small" label="Trigger Type"
+                                    value={TRIGGER_TYPES.find(t => t.value === eventData.triggerType)?.label || ''}
+                                    onClick={(e) => { if (!isEditMode) { setTriggerTypePickerAnchor(e.currentTarget); setTriggerTypePickerSearch(''); } }}
+                                    inputProps={{ readOnly: true, style: { cursor: isEditMode ? 'default' : 'pointer' } }}
+                                    disabled={isEditMode}
+                                    error={!isEditMode && submitted && !eventData.triggerType}
+                                    InputProps={{
+                                        startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+                                        endAdornment: eventData.triggerType && !isEditMode ? (
+                                            <InputAdornment position="end">
+                                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleChange('triggerType', ''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                                                    <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ) : null,
+                                    }}
+                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                />
+                                <Popover
+                                    open={Boolean(triggerTypePickerAnchor)} anchorEl={triggerTypePickerAnchor}
+                                    onClose={() => setTriggerTypePickerAnchor(null)}
+                                    anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                    transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                    slotProps={{ paper: { sx: { mt: 0.75, width: triggerTypePickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+                                >
+                                    <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                        <TextField autoFocus fullWidth size="small" placeholder="Search trigger types..."
+                                            value={triggerTypePickerSearch} onChange={(e) => setTriggerTypePickerSearch(e.target.value)}
+                                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                        />
+                                    </Box>
+                                    <List dense disablePadding>
+                                        {TRIGGER_TYPES.filter(t => t.label.toLowerCase().includes(triggerTypePickerSearch.toLowerCase())).map((t) => (
+                                            <ListItemButton key={t.value} selected={t.value === eventData.triggerType}
+                                                onClick={() => { handleChange('triggerType', t.value); setTriggerTypePickerAnchor(null); }}
+                                                sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+                                            >
+                                                <ListItemText primary={t.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }} />
+                                            </ListItemButton>
+                                        ))}
+                                    </List>
+                                </Popover>
                             </Grid>
                         </Grid>
 
-                        {showTriggerSource && (
-                            <Box sx={{ mt: 2 }}>
-                                <Autocomplete
-                                    multiple={eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER'}
-                                    size="small"
-                                    disabled={isEditMode}
-                                    options={triggerSourceOptions[eventData.triggerType] || []}
-                                    getOptionLabel={(option) => option.label || option}
-                                    value={
-                                        eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER'
-                                            ? Array.isArray(eventData.triggerSource) ? eventData.triggerSource : []
-                                            : Array.isArray(eventData.triggerSource) && eventData.triggerSource.length > 0
-                                                ? eventData.triggerSource[0]
-                                                : null
-                                    }
-                                    onChange={(event, newValue) => {
-                                        console.log('🎯 Trigger Source Changed:', newValue);
-
-                                        // Handle both single and multiple values properly
-                                        let valueToSet;
-                                        if (eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER') {
-                                            // For multiple selection, ensure it's always an array
-                                            valueToSet = Array.isArray(newValue) ? newValue : [];
-                                            if (eventData.triggerType === 'ON_TRANSACTION_POST') {
-                                                setAvailableSources(['Transactions']);
-                                            } else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') {
-                                                setAvailableSources(['Attribute']);
-                                            } else {
-                                                setAvailableSources(ALL_SOURCES);
-                                            }
-                                        } else {
-                                            // For single selection, wrap in array to maintain consistent structure
-                                            valueToSet = newValue ? [newValue] : [];
-                                            console.log('🎯 Single Selection:', valueToSet);
-                                            if (valueToSet[0].value === 'reference_table') {
-                                                setAvailableSources(referenceTables);
-                                            } else if (valueToSet[0].value === 'operational_table') {
-                                                setAvailableSources(operationalTables);
-                                            } else {
-                                                setAvailableSources([]);
-                                            }
-                                        }
-
-                                        handleChange('triggerSource', valueToSet);
-                                    }}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label={eventData.triggerType === 'ON_REPLAY' ? "TimeLine Driver" : "Trigger Source"}
-                                            required
-                                            error={
-                                                eventData.triggerType != 'ON_CUSTOM_DATA_TRIGGER'
-                                                    ? !Array.isArray(eventData.triggerSource) || eventData.triggerSource.length === 0
-                                                    : !eventData.triggerSource || !Array.isArray(eventData.triggerSource) || eventData.triggerSource.length === 0
-                                            }
-                                            helperText={
-                                                // First check if there is an error
-                                                (!Array.isArray(eventData.triggerSource) || eventData.triggerSource.length === 0)
-                                                    // If error exists, check type to determine message
-                                                    ? (eventData.triggerType === 'ON_REPLAY' ? "TimeLine Driver is required" : "Trigger Source is required")
-                                                    // If no error, return empty string
-                                                    : ""
-                                            }
-                                        />
-                                    )}
-                                />
-                            </Box>
-                        )}
+                        {showTriggerSource && (() => {
+                            const isMultiple = eventData.triggerType !== 'ON_CUSTOM_DATA_TRIGGER';
+                            const tsLabel = eventData.triggerType === 'ON_REPLAY' ? 'TimeLine Driver' : 'Trigger Source';
+                            const tsOptions = triggerSourceOptions[eventData.triggerType] || [];
+                            const tsSelected = Array.isArray(eventData.triggerSource) ? eventData.triggerSource : [];
+                            const tsFiltered = tsOptions.filter(o => (o.label || o).toLowerCase().includes(tsPickerSearch.toLowerCase()));
+                            const isTsSelected = (opt) => tsSelected.some(v => (v.value || v) === (opt.value || opt));
+                            const tsError = submitted && !tsSelected.length;
+                            const handleTsToggle = (opt) => {
+                                if (isMultiple) {
+                                    const newVal = isTsSelected(opt) ? tsSelected.filter(v => (v.value || v) !== (opt.value || opt)) : [...tsSelected, opt];
+                                    if (eventData.triggerType === 'ON_TRANSACTION_POST') setAvailableSources(['Transactions']);
+                                    else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') setAvailableSources(['Attribute']);
+                                    else setAvailableSources(ALL_SOURCES);
+                                    handleChange('triggerSource', newVal);
+                                } else {
+                                    const newVal = [opt];
+                                    if (opt.value === 'reference_table') setAvailableSources(referenceTables);
+                                    else if (opt.value === 'operational_table') setAvailableSources(operationalTables);
+                                    else setAvailableSources([]);
+                                    handleChange('triggerSource', newVal);
+                                    setTsPickerAnchor(null);
+                                }
+                            };
+                            return (
+                                <Box sx={{ mt: 2 }}>
+                                    <TextField
+                                        fullWidth size="small"
+                                        label={tsLabel}
+                                        required
+                                        disabled={isEditMode}
+                                        value=""
+                                        error={tsError}
+                                        helperText={tsError ? `${tsLabel} is required` : ''}
+                                        onClick={(e) => { if (!isEditMode) { setTsPickerAnchor(e.currentTarget); setTsPickerSearch(''); } }}
+                                        inputProps={{ readOnly: true, style: { width: tsSelected.length > 0 ? 0 : undefined, padding: tsSelected.length > 0 ? 0 : undefined, cursor: isEditMode ? 'default' : 'pointer' } }}
+                                        InputLabelProps={{ shrink: true }}
+                                        InputProps={{
+                                            startAdornment: tsSelected.length > 0
+                                                ? tsSelected.map((item, i) => (
+                                                    <Chip key={i} label={item.label || item} size="small"
+                                                        onDelete={isEditMode ? undefined : (e) => { e.stopPropagation(); handleChange('triggerSource', tsSelected.filter((_, idx) => idx !== i)); }}
+                                                        sx={{ height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.primary.main, 0.5), '&:hover': { color: 'primary.main' } } }}
+                                                    />
+                                                ))
+                                                : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+                                        }}
+                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(tsSelected.length > 0 && { flexWrap: 'wrap', gap: 0.5, pt: 2.5, pb: 0.75 }) } }}
+                                    />
+                                    <Popover
+                                        open={Boolean(tsPickerAnchor)} anchorEl={tsPickerAnchor}
+                                        onClose={() => setTsPickerAnchor(null)}
+                                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                        slotProps={{ paper: { sx: { mt: 0.75, width: tsPickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+                                    >
+                                        <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                            <TextField autoFocus fullWidth size="small" placeholder={`Search ${tsLabel.toLowerCase()}…`}
+                                                value={tsPickerSearch} onChange={(e) => setTsPickerSearch(e.target.value)}
+                                                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                            />
+                                        </Box>
+                                        <List dense disablePadding sx={{ maxHeight: 240, overflow: 'auto' }}>
+                                            {isMultiple && tsFiltered.length > 0 && (
+                                                <ListItemButton onClick={() => { const allSel = tsFiltered.every(o => isTsSelected(o)); const newVal = allSel ? tsSelected.filter(v => !tsFiltered.some(o => (o.value || o) === (v.value || v))) : [...tsSelected, ...tsFiltered.filter(o => !isTsSelected(o))]; if (eventData.triggerType === 'ON_TRANSACTION_POST') setAvailableSources(['Transactions']); else if (eventData.triggerType === 'ON_ATTRIBUTE_CHANGE') setAvailableSources(['Attribute']); else setAvailableSources(ALL_SOURCES); handleChange('triggerSource', newVal); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                                                    <Checkbox checked={tsFiltered.length > 0 && tsFiltered.every(o => isTsSelected(o))} indeterminate={tsFiltered.some(o => isTsSelected(o)) && !tsFiltered.every(o => isTsSelected(o))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('primary.main')} indeterminateIcon={cbIndeterminate('primary.main')} sx={{ p: 0.5 }} />
+                                                    <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                </ListItemButton>
+                                            )}
+                                            {tsFiltered.length === 0 ? (
+                                                <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                                                    <Typography variant="caption" color="text.disabled">No options found.</Typography>
+                                                </ListItemButton>
+                                            ) : tsFiltered.map((opt) => {
+                                                const sel = isTsSelected(opt);
+                                                return (
+                                                    <ListItemButton key={opt.value || opt} onClick={() => handleTsToggle(opt)}
+                                                        sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}
+                                                    >
+                                                        {isMultiple && <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('primary.main')} sx={{ p: 0.5 }} />}
+                                                        <ListItemText primary={opt.label || opt} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? 'primary.main' : 'text.primary' }} />
+                                                    </ListItemButton>
+                                                );
+                                            })}
+                                        </List>
+                                    </Popover>
+                                </Box>
+                            );
+                        })()}
                         </Box>
                     </Paper>
 
@@ -1195,7 +1292,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                     <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.7), bgcolor: 'background.paper', overflow: 'hidden' }}>
                         <Box sx={{ px: 2.5, py: 1.25, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), bgcolor: alpha(theme.palette.primary.main, 0.025), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'text.secondary', fontSize: '0.67rem' }}>
-                                Source Mapping Configuration
+                                Source Mapping
                             </Typography>
                             {/* UPDATE: Hide add button for both Custom Data Trigger AND Transaction Post */}
                             {eventData.triggerType !== 'ON_CUSTOM_DATA_TRIGGER' && eventData.triggerType !== 'ON_TRANSACTION_POST' && (
@@ -1225,14 +1322,13 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         {/* Source Mapping Table */}
                         <TableContainer component={Paper} variant="outlined">
                             <Table sx={{ minWidth: 1400, tableLayout: 'fixed' }} size="small">
-                                <TableHead sx={{ bgcolor: alpha(theme.palette.grey[100], 0.8) }}>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '60px' }}>#</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '200px' }}>Source Table</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '300px' }}>Source Columns</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '200px' }}>Version Type</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '300px' }}>Map Fields</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold', width: '140px' }}>Actions</TableCell>
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                        {['#', 'Source Table', 'Source Columns', 'Version Type', 'Map Fields', 'Actions'].map((label, i) => (
+                                            <TableCell key={label} sx={{ width: [60, 200, 300, 200, 300, 140][i], color: '#475569', fontSize: '0.72rem', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', borderBottom: '2px solid #e2e8f0', bgcolor: '#f8fafc' }}>
+                                                {label}
+                                            </TableCell>
+                                        ))}
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -1241,23 +1337,47 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                             <TableCell>{index + 1}</TableCell>
                                             <TableCell>
                                                 {editingRow === row.id ? (
-                                                    <FormControl fullWidth size="small">
-                                                        <Select
+                                                    <>
+                                                        <TextField
+                                                            fullWidth size="small"
                                                             value={row.sourceTable}
-                                                            onChange={(e) => {
-                                                                handleCellChange(row.id, 'sourceTable', e.target.value);
-                                                            }
-                                                            }
+                                                            onClick={(e) => { setEditSourcePickerAnchor(e.currentTarget); setEditSourcePickerSearch(''); setEditSourcePickerRowId(row.id); }}
+                                                            inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+                                                            InputProps={{
+                                                                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+                                                            }}
+                                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                        />
+                                                        <Popover
+                                                            open={Boolean(editSourcePickerAnchor) && editSourcePickerRowId === row.id}
+                                                            anchorEl={editSourcePickerAnchor}
+                                                            onClose={() => setEditSourcePickerAnchor(null)}
+                                                            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                                            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                                            slotProps={{ paper: { sx: { mt: 0.75, width: editSourcePickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
                                                         >
-                                                            {availableSources.concat(row.sourceTable)
-                                                                .filter((src, index, array) => array.indexOf(src) === index)
-                                                                .map((src) => (
-                                                                    <MenuItem key={src} value={src}>
-                                                                        {src}
-                                                                    </MenuItem>
-                                                                ))}
-                                                        </Select>
-                                                    </FormControl>
+                                                            <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                <TextField autoFocus fullWidth size="small" placeholder="Search tables..."
+                                                                    value={editSourcePickerSearch} onChange={(e) => setEditSourcePickerSearch(e.target.value)}
+                                                                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                                />
+                                                            </Box>
+                                                            <List dense disablePadding sx={{ maxHeight: 240, overflow: 'auto' }}>
+                                                                {availableSources.concat(row.sourceTable)
+                                                                    .filter((src, i, arr) => arr.indexOf(src) === i)
+                                                                    .filter(src => src.toLowerCase().includes(editSourcePickerSearch.toLowerCase()))
+                                                                    .map((src) => (
+                                                                        <ListItemButton key={src} selected={src === row.sourceTable}
+                                                                            onClick={() => { handleCellChange(row.id, 'sourceTable', src); setEditSourcePickerAnchor(null); }}
+                                                                            sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+                                                                        >
+                                                                            <ListItemText primary={src} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }} />
+                                                                        </ListItemButton>
+                                                                    ))}
+                                                            </List>
+                                                        </Popover>
+                                                    </>
                                                 ) : (
                                                     <Chip
                                                         label={row.sourceTable}
@@ -1272,26 +1392,45 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                {editingRow === row.id ? (
-                                                    <Autocomplete
-                                                        multiple
-                                                        size="small"
-                                                        options={resolveSourceColumnOptions(row, eventData)}
-                                                        getOptionLabel={(option) => option.label}
-                                                        value={row.sourceColumns.map(value => {
-                                                            const option =
-                                                                resolveSourceColumnOptions(row, eventData)
-                                                                    .find(opt => opt.value === value);
-
-                                                            return option || { label: value, value: value };
-                                                        })}
-
-                                                        onChange={(event, newValue) =>
-                                                            handleCellChange(row.id, 'sourceColumns', newValue)
-                                                        }
-                                                        renderInput={(params) => <TextField {...params} placeholder="Select columns" />}
-                                                    />
-                                                ) : (
+                                                {editingRow === row.id ? (() => {
+                                                    const colOpts = resolveSourceColumnOptions(row, eventData);
+                                                    const filtCols = colOpts.filter(o => o.label.toLowerCase().includes(ecPickerSearch.toLowerCase()));
+                                                    const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.12), color: theme.palette.primary.dark, border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.primary.main, 0.5), '&:hover': { color: theme.palette.primary.dark } } };
+                                                    return (
+                                                        <>
+                                                            <TextField fullWidth size="small"
+                                                                value=""
+                                                                onClick={(e) => { setEcPickerAnchor(e.currentTarget); setEcPickerSearch(''); setEcPickerRowId(row.id); }}
+                                                                inputProps={{ readOnly: true, style: { width: row.sourceColumns.length > 0 ? 0 : undefined, padding: row.sourceColumns.length > 0 ? 0 : undefined, cursor: 'pointer' } }}
+                                                                InputLabelProps={{ shrink: row.sourceColumns.length > 0 }}
+                                                                InputProps={{ startAdornment: row.sourceColumns.length > 0
+                                                                    ? row.sourceColumns.map(v => { const o = colOpts.find(x => x.value === v) || { label: v, value: v }; return <Chip key={v} label={o.label} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); handleCellChange(row.id, 'sourceColumns', row.sourceColumns.filter(s => s !== v).map(s => colOpts.find(x => x.value === s) || { label: s, value: s })); }} />; })
+                                                                    : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(row.sourceColumns.length > 0 && { flexWrap: 'wrap', gap: 0.5, py: 0.75 }) } }}
+                                                                placeholder="Search and select columns…"
+                                                            />
+                                                            <Popover open={Boolean(ecPickerAnchor) && ecPickerRowId === row.id} anchorEl={ecPickerAnchor} onClose={() => setEcPickerAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { mt: 0.75, minWidth: 240, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}>
+                                                                <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                    <TextField autoFocus fullWidth size="small" placeholder="Search columns…" value={ecPickerSearch} onChange={(e) => setEcPickerSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                                                                </Box>
+                                                                <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
+                                                                    {filtCols.length > 0 && <ListItemButton onClick={() => { const allSel = filtCols.every(o => row.sourceColumns.includes(o.value)); const cur = row.sourceColumns.map(v => colOpts.find(x => x.value === v) || { label: v, value: v }); handleCellChange(row.id, 'sourceColumns', allSel ? cur.filter(o => !filtCols.some(f => f.value === o.value)) : [...cur, ...filtCols.filter(o => !row.sourceColumns.includes(o.value))]); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                                                                        <Checkbox checked={filtCols.length > 0 && filtCols.every(o => row.sourceColumns.includes(o.value))} indeterminate={filtCols.some(o => row.sourceColumns.includes(o.value)) && !filtCols.every(o => row.sourceColumns.includes(o.value))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('primary.main')} indeterminateIcon={cbIndeterminate('primary.main')} sx={{ p: 0.5 }} />
+                                                                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                                    </ListItemButton>}
+                                                                    {filtCols.length === 0 ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2 }}><Typography variant="caption" color="text.disabled">No columns found.</Typography></ListItemButton>
+                                                                    : filtCols.map(opt => {
+                                                                        const sel = row.sourceColumns.includes(opt.value);
+                                                                        return <ListItemButton key={opt.value} onClick={() => { const cur = row.sourceColumns.map(v => colOpts.find(x => x.value === v) || { label: v, value: v }); handleCellChange(row.id, 'sourceColumns', sel ? cur.filter(o => o.value !== opt.value) : [...cur, opt]); }} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}>
+                                                                            <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('primary.main')} sx={{ p: 0.5 }} />
+                                                                            <ListItemText primary={opt.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? theme.palette.primary.dark : 'text.primary' }} />
+                                                                        </ListItemButton>;
+                                                                    })}
+                                                                </List>
+                                                            </Popover>
+                                                        </>
+                                                    );
+                                                })() : (
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                                         {getOptionLabels(row.sourceColumns, sourceColumnsOptions[row.sourceTable] || []).map((label, idx) => (
                                                             <Chip
@@ -1309,30 +1448,46 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                {editingRow === row.id ? (
-                                                    <Autocomplete
-                                                        multiple
-                                                        size="small"
-                                                        options={versionTypeOptions}
-                                                        getOptionLabel={(option) => option.label}
-                                                        value={row.versionType.map(value => {
-                                                            const option = versionTypeOptions.find(opt => opt.value === value);
-                                                            return option || { label: value, value: value };
-                                                        })}
-                                                        onChange={(event, newValue) =>
-                                                            handleCellChange(row.id, 'versionType', newValue)
-                                                        }
-                                                        renderInput={(params) => (
-                                                            <TextField
-                                                                {...params}
-                                                                placeholder="Select versions"
-                                                                disabled={!isVersionTypeEnabled(row.sourceTable)}
+                                                {editingRow === row.id ? (() => {
+                                                    const vtEnabled = isVersionTypeEnabled(row.sourceTable);
+                                                    const filtVT = versionTypeOptions.filter(o => o.label.toLowerCase().includes(evPickerSearch.toLowerCase()));
+                                                    const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark, border: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.warning.main, 0.5), '&:hover': { color: theme.palette.warning.dark } } };
+                                                    return (
+                                                        <>
+                                                            <TextField fullWidth size="small"
+                                                                value=""
+                                                                onClick={(e) => { if (vtEnabled) { setEvPickerAnchor(e.currentTarget); setEvPickerSearch(''); setEvPickerRowId(row.id); } }}
+                                                                inputProps={{ readOnly: true, style: { width: row.versionType.length > 0 ? 0 : undefined, padding: row.versionType.length > 0 ? 0 : undefined, cursor: vtEnabled ? 'pointer' : 'default' } }}
+                                                                InputLabelProps={{ shrink: row.versionType.length > 0 }}
+                                                                disabled={!vtEnabled}
+                                                                InputProps={{ startAdornment: row.versionType.length > 0
+                                                                    ? row.versionType.map(v => { const o = versionTypeOptions.find(x => x.value === v) || { label: v, value: v }; return <Chip key={v} label={o.label} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); handleCellChange(row.id, 'versionType', row.versionType.filter(s => s !== v).map(s => versionTypeOptions.find(x => x.value === s) || { label: s, value: s })); }} />; })
+                                                                    : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(row.versionType.length > 0 && { flexWrap: 'wrap', gap: 0.5, py: 0.75 }) }, '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
+                                                                placeholder="Search and select versions…"
                                                             />
-                                                        )}
-                                                        disabled={!isVersionTypeEnabled(row.sourceTable)}
-                                                        sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
-                                                    />
-                                                ) : (
+                                                            <Popover open={Boolean(evPickerAnchor) && evPickerRowId === row.id} anchorEl={evPickerAnchor} onClose={() => setEvPickerAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { mt: 0.75, minWidth: 240, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}>
+                                                                <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                    <TextField autoFocus fullWidth size="small" placeholder="Search versions…" value={evPickerSearch} onChange={(e) => setEvPickerSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                                                                </Box>
+                                                                <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
+                                                                    {filtVT.length > 0 && <ListItemButton onClick={() => { const allSel = filtVT.every(o => row.versionType.includes(o.value)); const cur = row.versionType.map(v => versionTypeOptions.find(x => x.value === v) || { label: v, value: v }); handleCellChange(row.id, 'versionType', allSel ? cur.filter(o => !filtVT.some(f => f.value === o.value)) : [...cur, ...filtVT.filter(o => !row.versionType.includes(o.value))]); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.warning.main, 0.02) }}>
+                                                                        <Checkbox checked={filtVT.length > 0 && filtVT.every(o => row.versionType.includes(o.value))} indeterminate={filtVT.some(o => row.versionType.includes(o.value)) && !filtVT.every(o => row.versionType.includes(o.value))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('warning.main')} indeterminateIcon={cbIndeterminate('warning.main')} sx={{ p: 0.5 }} />
+                                                                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                                    </ListItemButton>}
+                                                                    {filtVT.length === 0 ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2 }}><Typography variant="caption" color="text.disabled">No versions found.</Typography></ListItemButton>
+                                                                    : filtVT.map(opt => {
+                                                                        const sel = row.versionType.includes(opt.value);
+                                                                        return <ListItemButton key={opt.value} onClick={() => { const cur = row.versionType.map(v => versionTypeOptions.find(x => x.value === v) || { label: v, value: v }); handleCellChange(row.id, 'versionType', sel ? cur.filter(o => o.value !== opt.value) : [...cur, opt]); }} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.06) } }}>
+                                                                            <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('warning.main')} sx={{ p: 0.5 }} />
+                                                                            <ListItemText primary={opt.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? theme.palette.warning.dark : 'text.primary' }} />
+                                                                        </ListItemButton>;
+                                                                    })}
+                                                                </List>
+                                                            </Popover>
+                                                        </>
+                                                    );
+                                                })() : (
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                                         {getOptionLabels(row.versionType, versionTypeOptions).map((label, idx) => (
                                                             <Chip
@@ -1356,30 +1511,47 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                {editingRow === row.id ? (
-                                                    <Autocomplete
-                                                        multiple
-                                                        size="small"
-                                                        options={dataMappingOptions[row.sourceTable] || []}
-                                                        getOptionLabel={(option) => option.label}
-                                                        value={row.dataMapping.map(value => {
-                                                            const option = dataMappingOptions[row.sourceTable]?.find(opt => opt.value === value);
-                                                            return option || { label: value, value: value };
-                                                        })}
-                                                        onChange={(event, newValue) =>
-                                                            handleCellChange(row.id, 'dataMapping', newValue)
-                                                        }
-                                                        renderInput={(params) => (
-                                                            <TextField
-                                                                {...params}
-                                                                placeholder="Select mappings"
-                                                                disabled={!isDataMappingEnabled(row.sourceTable)}
+                                                {editingRow === row.id ? (() => {
+                                                    const dmOpts = dataMappingOptions[row.sourceTable] || [];
+                                                    const dmEnabled = isDataMappingEnabled(row.sourceTable);
+                                                    const filtDM = dmOpts.filter(o => o.label.toLowerCase().includes(emPickerSearch.toLowerCase()));
+                                                    const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.secondary.main, 0.12), color: theme.palette.secondary.dark, border: `1px solid ${alpha(theme.palette.secondary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.secondary.main, 0.5), '&:hover': { color: theme.palette.secondary.dark } } };
+                                                    return (
+                                                        <>
+                                                            <TextField fullWidth size="small"
+                                                                value=""
+                                                                onClick={(e) => { if (dmEnabled) { setEmPickerAnchor(e.currentTarget); setEmPickerSearch(''); setEmPickerRowId(row.id); } }}
+                                                                inputProps={{ readOnly: true, style: { width: row.dataMapping.length > 0 ? 0 : undefined, padding: row.dataMapping.length > 0 ? 0 : undefined, cursor: dmEnabled ? 'pointer' : 'default' } }}
+                                                                InputLabelProps={{ shrink: row.dataMapping.length > 0 }}
+                                                                disabled={!dmEnabled}
+                                                                InputProps={{ startAdornment: row.dataMapping.length > 0
+                                                                    ? row.dataMapping.map(v => { const o = dmOpts.find(x => x.value === v) || { label: v, value: v }; return <Chip key={v} label={o.label} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); handleCellChange(row.id, 'dataMapping', row.dataMapping.filter(s => s !== v).map(s => dmOpts.find(x => x.value === s) || { label: s, value: s })); }} />; })
+                                                                    : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(row.dataMapping.length > 0 && { flexWrap: 'wrap', gap: 0.5, py: 0.75 }) }, '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
+                                                                placeholder="Search and select mappings…"
                                                             />
-                                                        )}
-                                                        disabled={!isDataMappingEnabled(row.sourceTable)}
-                                                        sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
-                                                    />
-                                                ) : (
+                                                            <Popover open={Boolean(emPickerAnchor) && emPickerRowId === row.id} anchorEl={emPickerAnchor} onClose={() => setEmPickerAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { mt: 0.75, minWidth: 240, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}>
+                                                                <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                    <TextField autoFocus fullWidth size="small" placeholder="Search mappings…" value={emPickerSearch} onChange={(e) => setEmPickerSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                                                                </Box>
+                                                                <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
+                                                                    {filtDM.length > 0 && <ListItemButton onClick={() => { const allSel = filtDM.every(o => row.dataMapping.includes(o.value)); const cur = row.dataMapping.map(v => dmOpts.find(x => x.value === v) || { label: v, value: v }); handleCellChange(row.id, 'dataMapping', allSel ? cur.filter(o => !filtDM.some(f => f.value === o.value)) : [...cur, ...filtDM.filter(o => !row.dataMapping.includes(o.value))]); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
+                                                                        <Checkbox checked={filtDM.length > 0 && filtDM.every(o => row.dataMapping.includes(o.value))} indeterminate={filtDM.some(o => row.dataMapping.includes(o.value)) && !filtDM.every(o => row.dataMapping.includes(o.value))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('secondary.main')} indeterminateIcon={cbIndeterminate('secondary.main')} sx={{ p: 0.5 }} />
+                                                                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                                    </ListItemButton>}
+                                                                    {filtDM.length === 0 ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2 }}><Typography variant="caption" color="text.disabled">No mappings found.</Typography></ListItemButton>
+                                                                    : filtDM.map(opt => {
+                                                                        const sel = row.dataMapping.includes(opt.value);
+                                                                        return <ListItemButton key={opt.value} onClick={() => { const cur = row.dataMapping.map(v => dmOpts.find(x => x.value === v) || { label: v, value: v }); handleCellChange(row.id, 'dataMapping', sel ? cur.filter(o => o.value !== opt.value) : [...cur, opt]); }} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.06) } }}>
+                                                                            <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('secondary.main')} sx={{ p: 0.5 }} />
+                                                                            <ListItemText primary={opt.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? theme.palette.secondary.dark : 'text.primary' }} />
+                                                                        </ListItemButton>;
+                                                                    })}
+                                                                </List>
+                                                            </Popover>
+                                                        </>
+                                                    );
+                                                })() : (
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                                         {getOptionLabels(row.dataMapping, dataMappingOptions[row.sourceTable] || []).map((label, idx) => (
                                                             <Chip
@@ -1405,28 +1577,28 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
                                             <TableCell>
                                                 {editingRow === row.id ? (
-                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <Box sx={{ display: 'flex', gap: 0.75 }}>
                                                         <Tooltip title="Save">
-                                                            <IconButton size="small" onClick={() => handleSaveRow(row.id)} sx={{ color: '#2e7d32' }}>
-                                                                <SaveIcon fontSize="medium" />
+                                                            <IconButton size="small" onClick={() => handleSaveRow(row.id)} sx={{ color: '#16a34a', bgcolor: 'rgba(22,163,74,0.06)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(22,163,74,0.14)' } }}>
+                                                                <CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
                                                             </IconButton>
                                                         </Tooltip>
                                                         <Tooltip title="Cancel">
-                                                            <IconButton size="medium" onClick={handleCancelEdit}>
-                                                                <CancelIcon fontSize="medium" />
+                                                            <IconButton size="small" onClick={handleCancelEdit} sx={{ color: '#64748B', bgcolor: 'rgba(100,116,139,0.06)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(100,116,139,0.14)' } }}>
+                                                                <HighlightOffOutlinedIcon sx={{ fontSize: 16 }} />
                                                             </IconButton>
                                                         </Tooltip>
                                                     </Box>
                                                 ) : (
-                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <Box sx={{ display: 'flex', gap: 0.75 }}>
                                                         <Tooltip title="Edit">
-                                                            <IconButton size="medium" onClick={() => handleEditRow(row)}>
-                                                                <EditOutlinedIcon fontSize="medium" />
+                                                            <IconButton size="small" onClick={() => handleEditRow(row)} sx={{ color: '#14213d', bgcolor: alpha('#14213d', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#14213d', 0.14) } }}>
+                                                                <EditOutlinedIcon sx={{ fontSize: 16 }} />
                                                             </IconButton>
                                                         </Tooltip>
                                                         <Tooltip title="Delete">
-                                                            <IconButton size="medium" onClick={() => handleDeleteSource(row.id)}>
-                                                                <DeleteOutlineIcon fontSize="medium" />
+                                                            <IconButton size="small" onClick={() => handleDeleteSource(row.id)} sx={{ color: '#dc2626', bgcolor: 'rgba(220,38,38,0.06)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(220,38,38,0.14)' } }}>
+                                                                <DeleteOutlineIcon sx={{ fontSize: 16 }} />
                                                             </IconButton>
                                                         </Tooltip>
                                                     </Box>
@@ -1439,85 +1611,179 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         <TableRow sx={{ backgroundColor: '#f8f9fa' }}>
                                             <TableCell>{sourceMappings.length + 1}</TableCell>
                                             <TableCell>
-                                                <FormControl fullWidth size="small">
-                                                    <Select
-                                                        value={newSource.sourceTable}
-                                                        onChange={(e) => setNewSource(prev => ({ ...prev, sourceTable: e.target.value }))}
-                                                    >
-                                                        {availableSources.map((src) => (
-                                                            <MenuItem key={src} value={src}>
-                                                                {src}
-                                                            </MenuItem>
+                                                <TextField
+                                                    fullWidth size="small"
+                                                    value={newSource.sourceTable}
+                                                    onClick={(e) => { setNewSourcePickerAnchor(e.currentTarget); setNewSourcePickerSearch(''); }}
+                                                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+                                                    InputProps={{
+                                                        startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+                                                    }}
+                                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                />
+                                                <Popover
+                                                    open={Boolean(newSourcePickerAnchor)} anchorEl={newSourcePickerAnchor}
+                                                    onClose={() => setNewSourcePickerAnchor(null)}
+                                                    anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                                    transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                                    slotProps={{ paper: { sx: { mt: 0.75, width: newSourcePickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+                                                >
+                                                    <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                        <TextField autoFocus fullWidth size="small" placeholder="Search tables..."
+                                                            value={newSourcePickerSearch} onChange={(e) => setNewSourcePickerSearch(e.target.value)}
+                                                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                        />
+                                                    </Box>
+                                                    <List dense disablePadding sx={{ maxHeight: 240, overflow: 'auto' }}>
+                                                        {availableSources.filter(src => src.toLowerCase().includes(newSourcePickerSearch.toLowerCase())).map((src) => (
+                                                            <ListItemButton key={src} selected={src === newSource.sourceTable}
+                                                                onClick={() => { setNewSource(prev => ({ ...prev, sourceTable: src })); setNewSourcePickerAnchor(null); }}
+                                                                sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+                                                            >
+                                                                <ListItemText primary={src} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }} />
+                                                            </ListItemButton>
                                                         ))}
-                                                    </Select>
-                                                </FormControl>
+                                                    </List>
+                                                </Popover>
                                             </TableCell>
                                             <TableCell>
-                                                <Autocomplete
-                                                    multiple
-                                                    size="small"
-                                                    // ✅ FIX: Call the dynamic resolution function here
-                                                    options={resolveSourceColumnOptions(newSource, eventData)}
-                                                    getOptionLabel={(option) => option.label || option}
-                                                    value={newSource.sourceColumns}
-                                                    onChange={(event, newValue) => setNewSource(prev => ({ ...prev, sourceColumns: newValue }))}
-                                                    renderInput={(params) => <TextField {...params} placeholder="Select columns" />}
-                                                />
+                                                {(() => {
+                                                    const colOpts = resolveSourceColumnOptions(newSource, eventData);
+                                                    const filtNC = colOpts.filter(o => (o.label || o).toLowerCase().includes(ncPickerSearch.toLowerCase()));
+                                                    const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.12), color: theme.palette.primary.dark, border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.primary.main, 0.5), '&:hover': { color: theme.palette.primary.dark } } };
+                                                    return (
+                                                        <>
+                                                            <TextField fullWidth size="small"
+                                                                value=""
+                                                                onClick={(e) => { setNcPickerAnchor(e.currentTarget); setNcPickerSearch(''); }}
+                                                                inputProps={{ readOnly: true, style: { width: newSource.sourceColumns.length > 0 ? 0 : undefined, padding: newSource.sourceColumns.length > 0 ? 0 : undefined, cursor: 'pointer' } }}
+                                                                InputLabelProps={{ shrink: newSource.sourceColumns.length > 0 }}
+                                                                InputProps={{ startAdornment: newSource.sourceColumns.length > 0
+                                                                    ? newSource.sourceColumns.map((o, i) => <Chip key={i} label={o.label || o} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); setNewSource(prev => ({ ...prev, sourceColumns: prev.sourceColumns.filter((_, idx) => idx !== i) })); }} />)
+                                                                    : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(newSource.sourceColumns.length > 0 && { flexWrap: 'wrap', gap: 0.5, py: 0.75 }) } }}
+                                                                placeholder="Search and select columns…"
+                                                            />
+                                                            <Popover open={Boolean(ncPickerAnchor)} anchorEl={ncPickerAnchor} onClose={() => setNcPickerAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { mt: 0.75, minWidth: 240, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}>
+                                                                <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                    <TextField autoFocus fullWidth size="small" placeholder="Search columns…" value={ncPickerSearch} onChange={(e) => setNcPickerSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                                                                </Box>
+                                                                <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
+                                                                    {filtNC.length > 0 && <ListItemButton onClick={() => { const allSel = filtNC.every(o => newSource.sourceColumns.some(s => (s.value || s) === (o.value || o))); setNewSource(prev => ({ ...prev, sourceColumns: allSel ? prev.sourceColumns.filter(s => !filtNC.some(o => (o.value || o) === (s.value || s))) : [...prev.sourceColumns, ...filtNC.filter(o => !prev.sourceColumns.some(s => (s.value || s) === (o.value || o)))] })); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                                                                        <Checkbox checked={filtNC.length > 0 && filtNC.every(o => newSource.sourceColumns.some(s => (s.value || s) === (o.value || o)))} indeterminate={filtNC.some(o => newSource.sourceColumns.some(s => (s.value || s) === (o.value || o))) && !filtNC.every(o => newSource.sourceColumns.some(s => (s.value || s) === (o.value || o)))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('primary.main')} indeterminateIcon={cbIndeterminate('primary.main')} sx={{ p: 0.5 }} />
+                                                                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                                    </ListItemButton>}
+                                                                    {filtNC.length === 0 ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2 }}><Typography variant="caption" color="text.disabled">No columns found.</Typography></ListItemButton>
+                                                                    : filtNC.map(opt => {
+                                                                        const sel = newSource.sourceColumns.some(o => (o.value || o) === (opt.value || opt));
+                                                                        return <ListItemButton key={opt.value || opt} onClick={() => setNewSource(prev => ({ ...prev, sourceColumns: sel ? prev.sourceColumns.filter(o => (o.value || o) !== (opt.value || opt)) : [...prev.sourceColumns, opt] }))} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}>
+                                                                            <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('primary.main')} sx={{ p: 0.5 }} />
+                                                                            <ListItemText primary={opt.label || opt} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? theme.palette.primary.dark : 'text.primary' }} />
+                                                                        </ListItemButton>;
+                                                                    })}
+                                                                </List>
+                                                            </Popover>
+                                                        </>
+                                                    );
+                                                })()}
                                             </TableCell>
                                             <TableCell>
-                                                <Autocomplete
-                                                    multiple
-                                                    size="small"
-                                                    options={versionTypeOptions}
-                                                    getOptionLabel={(option) => option.label}
-                                                    value={newSource.versionType}
-                                                    onChange={(event, newValue) => setNewSource(prev => ({ ...prev, versionType: newValue }))}
-                                                    renderInput={(params) => (
-                                                        <TextField
-                                                            {...params}
-                                                            placeholder="Select versions"
-                                                            disabled={!isVersionTypeEnabled(newSource.sourceTable)}
-                                                        />
-                                                    )}
-                                                    disabled={!isVersionTypeEnabled(newSource.sourceTable)}
-                                                    sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
-                                                />
+                                                {(() => {
+                                                    const nvEnabled = isVersionTypeEnabled(newSource.sourceTable);
+                                                    const filtNV = versionTypeOptions.filter(o => o.label.toLowerCase().includes(nvPickerSearch.toLowerCase()));
+                                                    const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark, border: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.warning.main, 0.5), '&:hover': { color: theme.palette.warning.dark } } };
+                                                    return (
+                                                        <>
+                                                            <TextField fullWidth size="small"
+                                                                value=""
+                                                                onClick={(e) => { if (nvEnabled) { setNvPickerAnchor(e.currentTarget); setNvPickerSearch(''); } }}
+                                                                inputProps={{ readOnly: true, style: { width: newSource.versionType.length > 0 ? 0 : undefined, padding: newSource.versionType.length > 0 ? 0 : undefined, cursor: nvEnabled ? 'pointer' : 'default' } }}
+                                                                InputLabelProps={{ shrink: newSource.versionType.length > 0 }}
+                                                                disabled={!nvEnabled}
+                                                                InputProps={{ startAdornment: newSource.versionType.length > 0
+                                                                    ? newSource.versionType.map((o, i) => <Chip key={i} label={o.label || o} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); setNewSource(prev => ({ ...prev, versionType: prev.versionType.filter((_, idx) => idx !== i) })); }} />)
+                                                                    : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(newSource.versionType.length > 0 && { flexWrap: 'wrap', gap: 0.5, py: 0.75 }) }, '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
+                                                                placeholder="Search and select versions…"
+                                                            />
+                                                            <Popover open={Boolean(nvPickerAnchor)} anchorEl={nvPickerAnchor} onClose={() => setNvPickerAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { mt: 0.75, minWidth: 240, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}>
+                                                                <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                    <TextField autoFocus fullWidth size="small" placeholder="Search versions…" value={nvPickerSearch} onChange={(e) => setNvPickerSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                                                                </Box>
+                                                                <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
+                                                                    {filtNV.length > 0 && <ListItemButton onClick={() => { const allSel = filtNV.every(o => newSource.versionType.some(s => (s.value || s) === o.value)); setNewSource(prev => ({ ...prev, versionType: allSel ? prev.versionType.filter(s => !filtNV.some(o => o.value === (s.value || s))) : [...prev.versionType, ...filtNV.filter(o => !prev.versionType.some(s => (s.value || s) === o.value))] })); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.warning.main, 0.02) }}>
+                                                                        <Checkbox checked={filtNV.length > 0 && filtNV.every(o => newSource.versionType.some(s => (s.value || s) === o.value))} indeterminate={filtNV.some(o => newSource.versionType.some(s => (s.value || s) === o.value)) && !filtNV.every(o => newSource.versionType.some(s => (s.value || s) === o.value))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('warning.main')} indeterminateIcon={cbIndeterminate('warning.main')} sx={{ p: 0.5 }} />
+                                                                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                                    </ListItemButton>}
+                                                                    {filtNV.length === 0 ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2 }}><Typography variant="caption" color="text.disabled">No versions found.</Typography></ListItemButton>
+                                                                    : filtNV.map(opt => {
+                                                                        const sel = newSource.versionType.some(o => (o.value || o) === opt.value);
+                                                                        return <ListItemButton key={opt.value} onClick={() => setNewSource(prev => ({ ...prev, versionType: sel ? prev.versionType.filter(o => (o.value || o) !== opt.value) : [...prev.versionType, opt] }))} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.06) } }}>
+                                                                            <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('warning.main')} sx={{ p: 0.5 }} />
+                                                                            <ListItemText primary={opt.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? theme.palette.warning.dark : 'text.primary' }} />
+                                                                        </ListItemButton>;
+                                                                    })}
+                                                                </List>
+                                                            </Popover>
+                                                        </>
+                                                    );
+                                                })()}
                                             </TableCell>
                                             <TableCell>
-                                                <Autocomplete
-                                                    multiple
-                                                    size="small"
-                                                    // ✅ CONDITIONAL LOGIC HERE
-                                                    options={
-                                                        eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER'
-                                                            ? customTableMappings
-                                                            : (dataMappingOptions[newSource.sourceTable] || [])
-                                                    }
-                                                    getOptionLabel={(option) => option.label || option}
-                                                    value={newSource.dataMapping}
-                                                    onChange={(event, newValue) => setNewSource(prev => ({ ...prev, dataMapping: newValue }))}
-                                                    renderInput={(params) => (
-                                                        <TextField
-                                                            {...params}
-                                                            placeholder="Select mappings"
-                                                            disabled={!isDataMappingEnabled(newSource.sourceTable)}
-                                                        />
-                                                    )}
-                                                    disabled={!isDataMappingEnabled(newSource.sourceTable)}
-                                                    sx={{ '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
-                                                />
+                                                {(() => {
+                                                    const nmOpts = eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' ? customTableMappings : (dataMappingOptions[newSource.sourceTable] || []);
+                                                    const nmEnabled = isDataMappingEnabled(newSource.sourceTable);
+                                                    const filtNM = nmOpts.filter(o => (o.label || o).toLowerCase().includes(nmPickerSearch.toLowerCase()));
+                                                    const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.secondary.main, 0.12), color: theme.palette.secondary.dark, border: `1px solid ${alpha(theme.palette.secondary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.secondary.main, 0.5), '&:hover': { color: theme.palette.secondary.dark } } };
+                                                    return (
+                                                        <>
+                                                            <TextField fullWidth size="small"
+                                                                value=""
+                                                                onClick={(e) => { if (nmEnabled) { setNmPickerAnchor(e.currentTarget); setNmPickerSearch(''); } }}
+                                                                inputProps={{ readOnly: true, style: { width: newSource.dataMapping.length > 0 ? 0 : undefined, padding: newSource.dataMapping.length > 0 ? 0 : undefined, cursor: nmEnabled ? 'pointer' : 'default' } }}
+                                                                InputLabelProps={{ shrink: newSource.dataMapping.length > 0 }}
+                                                                disabled={!nmEnabled}
+                                                                InputProps={{ startAdornment: newSource.dataMapping.length > 0
+                                                                    ? newSource.dataMapping.map((o, i) => <Chip key={i} label={o.label || o} size="small" sx={chipSx} onDelete={(e) => { e.stopPropagation(); setNewSource(prev => ({ ...prev, dataMapping: prev.dataMapping.filter((_, idx) => idx !== i) })); }} />)
+                                                                    : <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, ...(newSource.dataMapping.length > 0 && { flexWrap: 'wrap', gap: 0.5, py: 0.75 }) }, '& .MuiInputBase-root.Mui-disabled': { backgroundColor: '#f5f5f5' } }}
+                                                                placeholder="Search and select mappings…"
+                                                            />
+                                                            <Popover open={Boolean(nmPickerAnchor)} anchorEl={nmPickerAnchor} onClose={() => setNmPickerAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { mt: 0.75, minWidth: 240, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}>
+                                                                <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                                                                    <TextField autoFocus fullWidth size="small" placeholder="Search mappings…" value={nmPickerSearch} onChange={(e) => setNmPickerSearch(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                                                                </Box>
+                                                                <List dense disablePadding sx={{ maxHeight: 220, overflow: 'auto' }}>
+                                                                    {filtNM.length > 0 && <ListItemButton onClick={() => { const allSel = filtNM.every(o => newSource.dataMapping.some(s => (s.value || s) === (o.value || o))); setNewSource(prev => ({ ...prev, dataMapping: allSel ? prev.dataMapping.filter(s => !filtNM.some(o => (o.value || o) === (s.value || s))) : [...prev.dataMapping, ...filtNM.filter(o => !prev.dataMapping.some(s => (s.value || s) === (o.value || o)))] })); }} sx={{ py: 0.75, px: 1, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.5), bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
+                                                                        <Checkbox checked={filtNM.length > 0 && filtNM.every(o => newSource.dataMapping.some(s => (s.value || s) === (o.value || o)))} indeterminate={filtNM.some(o => newSource.dataMapping.some(s => (s.value || s) === (o.value || o))) && !filtNM.every(o => newSource.dataMapping.some(s => (s.value || s) === (o.value || o)))} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('secondary.main')} indeterminateIcon={cbIndeterminate('secondary.main')} sx={{ p: 0.5 }} />
+                                                                        <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 700 }} />
+                                                                    </ListItemButton>}
+                                                                    {filtNM.length === 0 ? <ListItemButton disabled sx={{ justifyContent: 'center', py: 2 }}><Typography variant="caption" color="text.disabled">No mappings found.</Typography></ListItemButton>
+                                                                    : filtNM.map(opt => {
+                                                                        const sel = newSource.dataMapping.some(o => (o.value || o) === (opt.value || opt));
+                                                                        return <ListItemButton key={opt.value || opt} onClick={() => setNewSource(prev => ({ ...prev, dataMapping: sel ? prev.dataMapping.filter(o => (o.value || o) !== (opt.value || opt)) : [...prev.dataMapping, opt] }))} sx={{ py: 0.5, px: 1, '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.06) } }}>
+                                                                            <Checkbox checked={sel} size="small" disableRipple icon={cbUnchecked} checkedIcon={cbChecked('secondary.main')} sx={{ p: 0.5 }} />
+                                                                            <ListItemText primary={opt.label || opt} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: sel ? 600 : 400, color: sel ? theme.palette.secondary.dark : 'text.primary' }} />
+                                                                        </ListItemButton>;
+                                                                    })}
+                                                                </List>
+                                                            </Popover>
+                                                        </>
+                                                    );
+                                                })()}
                                             </TableCell>
 
                                             <TableCell>
-                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', gap: 0.75 }}>
                                                     <Tooltip title="Save">
-                                                        <IconButton size="large" onClick={handleSaveNew}>
-                                                            <SaveIcon fontSize="medium" />
+                                                        <IconButton size="small" onClick={handleSaveNew} sx={{ color: '#16a34a', bgcolor: 'rgba(22,163,74,0.06)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(22,163,74,0.14)' } }}>
+                                                            <CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title="Cancel">
-                                                        <IconButton size="large" onClick={handleCancelNew}>
-                                                            <CancelIcon fontSize="medium" />
+                                                        <IconButton size="small" onClick={handleCancelNew} sx={{ color: '#64748B', bgcolor: 'rgba(100,116,139,0.06)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(100,116,139,0.14)' } }}>
+                                                            <HighlightOffOutlinedIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                 </Box>
