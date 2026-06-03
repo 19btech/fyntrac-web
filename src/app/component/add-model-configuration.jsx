@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { dataloaderApi } from '../services/api-client';
 import {
   Box,
   Button,
@@ -46,8 +46,8 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
     firstVersion: false,
   });
 
-  const serviceGetTransactionNamesURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/transaction/get/transactionNames'
-  const serviceGetMetricsURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/aggregation/get/metrics'
+  const serviceGetTransactionNamesURL = '/transaction/get/transactionNames'
+  const serviceGetMetricsURL = '/aggregation/get/metrics'
 
   const validateVariable = (value, variableName) => {
     if (value === null || value === undefined) {
@@ -124,13 +124,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
 
   const fetchMetricNames = () => {
 
-    axios.get(serviceGetMetricsURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(serviceGetMetricsURL)
       .then(response => {
         console.log('Metrics:', response.data);
         setAvailableMetrics(response.data);
@@ -142,13 +136,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
 
   const fetchTransactionNames = () => {
 
-    axios.get(serviceGetTransactionNamesURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(serviceGetTransactionNamesURL)
       .then(response => {
         console.log('Transactions:', response.data);
         setAvailableTransactions(response.data);
@@ -200,7 +188,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
 
   };
   const handleSaveConfiguration = async () => {
-    const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/model/save';
+    const serviceURL = '/model/save';
 
     try {
       setShowErrorMessage(false);
@@ -235,14 +223,7 @@ const AddModelConfiguration = ({ open, onClose, editData }) => {
         "modelFileId": editData.modelFileId
       };
       console.log('Model to Save:', model);
-      const response = await axios.post(serviceURL, model,
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
+      const response = await dataloaderApi.post(serviceURL, model
       );
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);

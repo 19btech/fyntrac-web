@@ -13,7 +13,7 @@ const GridHeader = ({ children, ...props }) => {
       onInput={handleInput}
       style={{
         color: '#13213c', // Custom blue color
-        fontFamily: 'Arial, sans-serif', // Custom font family
+        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', // Custom font family
         fontWeight: 'bold', // Custom font weight
         fontSize: '1.25rem', // Adjust font size as needed
         outline: 'none', // Remove default outline when focused

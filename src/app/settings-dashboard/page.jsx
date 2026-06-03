@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState } from 'react';
+import apiClient from '../services/api-client';
+import { useTenant } from '../tenant-context';
 import {
   Box,
   Typography,
   Card,
   CardActionArea,
-  Grid2 as Grid,
+  Grid,
   Container,
   Chip,
   Fade,
@@ -16,7 +18,6 @@ import {
   ArrowForward,
   AssessmentOutlined,
   ArrowBack, // Standard 'Back' icon
-  KeyboardBackspace // Alternative sleek back icon
 } from '@mui/icons-material';
 
 // Import your actual report pages
@@ -29,6 +30,7 @@ import AccountingPage from '../accounting/page';
 
 export default function ReportDashboard() {
   const [selectedReport, setSelectedReport] = useState(null);
+  const { user, tenant } = useTenant();
 
   const ComingSoon = () => (
     <Box sx={{ textAlign: 'center', py: 10, color: 'text.secondary', bgcolor: '#f9fafb', borderRadius: 2 }}>
@@ -61,7 +63,7 @@ export default function ReportDashboard() {
       reports: [
         { name: "Setup Events", description: "Define business events that aggregate required data from multple input sources.", component: EventConfigurationMain },
         { name: "Setup Custom Tables", description: "Create and manage custom operational and reference data tables to support business specific needs.", component: CustomTablesMain },
-        { name: "DSL Studio", description: "Built,test and execute custom business logic for financial workflows.", component: ComingSoon }
+        { name: "Logic Studio", description: "Built,test and execute custom business logic for financial workflows.", url: process.env.NEXT_PUBLIC_DSL_STUDIO_URL || "http://localhost:3000" }
       ]
     },
   ];
@@ -74,39 +76,6 @@ export default function ReportDashboard() {
       <Container maxWidth={false} sx={{ py: 1, px: { xs: 2, md: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Fade in={true}>
           <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-
-            {/* Header Area */}
-            <Box
-              sx={{
-                mb: 2, // Added margin bottom for spacing
-                pb: 0,
-                display: 'flex',
-                alignItems: 'left',
-                justifyContent: 'flex-end', // Pushes button to right
-                borderColor: 'divider',
-                paddingRight: 2.5
-              }}
-            >
-
-              {/* Right: Back Link Button */}
-              <Button
-                onClick={() => setSelectedReport(null)}
-                startIcon={<KeyboardBackspace fontSize="small" />} // Sleek back arrow
-                sx={{
-                  textTransform: 'none',
-                  color: 'text.secondary',
-                  fontWeight: 600,
-                  fontSize: '0.654rem',
-                  '&:hover': {
-                    bgcolor: 'transparent',
-                    color: 'primary.main',
-                    textDecoration: 'underline'
-                  }
-                }}
-              >
-                Back to Settings
-              </Button>
-            </Box>
 
             {/* The Actual Component Rendered Here */}
             <Box sx={{ flexGrow: 1, width: '100%', minHeight: '95vh' }}>
@@ -154,7 +123,30 @@ export default function ReportDashboard() {
                     }}
                   >
                     <CardActionArea
-                      onClick={() => setSelectedReport(report)}
+                      onClick={async () => {
+                        if (report.url) {
+                          try {
+                            // Fetch the ID token from the gateway and pass it to DSL Studio
+                            const response = await apiClient.get('/auth/token');
+                            const token = response.data?.token;
+                            const params = new URLSearchParams();
+                            if (token) params.set('token', token);
+
+                            const displayName = user?.firstName || user?.name || user?.email || tenant || '';
+                            if (displayName) params.set('firstName', displayName);
+
+                            if (tenant) params.set('tenant', tenant);
+                            const qs = params.toString();
+                            const url = qs ? `${report.url}?${qs}` : report.url;
+                            window.open(url, '_blank');
+                          } catch (err) {
+                            console.error('Failed to fetch token for DSL Studio, opening without token:', err);
+                            window.open(report.url, '_blank');
+                          }
+                        } else {
+                          setSelectedReport(report);
+                        }
+                      }}
                       sx={{
                         height: '100%',
                         p: 3,

@@ -20,17 +20,20 @@ import {
   Stack,
   Fade,
   Avatar,
+  Chip,
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
   Delete as DeleteIcon,
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
-  DescriptionOutlined as DescriptionIcon
+  DescriptionOutlined as DescriptionIcon,
+  Check as CheckIcon,
 } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
 import axios from "axios";
 import { useTenant } from "../tenant-context";
+import { dataloaderApi } from "../services/api-client";
 
 const ACTIVITY_TYPES = {
   STANDARD: "Standard Activity",
@@ -40,13 +43,16 @@ const ACTIVITY_TYPES = {
 export default function FileUploadComponent({
   onDrop,
   showActivitySelector = false,
-  headerMessage = "Upload activity files for secure validation, ingestion, and processing"
+  showLoadModeSelector = false,
+  headerMessage = "Upload reference data files for secure validation, ingestion, and processing"
 }) {
   const theme = useTheme();
   const { tenant, user } = useTenant();
 
   const [activityType, setActivityType] = useState(ACTIVITY_TYPES.STANDARD);
   const activityTypeRef = useRef(activityType);
+  const [loadMode, setLoadMode] = useState('OVERWRITE');
+  const loadModeRef = useRef(loadMode);
 
   const [files, setFiles] = useState([]);
   const [status, setStatus] = useState("idle");
@@ -61,8 +67,12 @@ export default function FileUploadComponent({
     activityTypeRef.current = activityType;
   }, [activityType]);
 
-  const standardURL = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/accounting/rule/upload`;
-  const customURL = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/fyntrac/custom-table/data-upload`;
+  useEffect(() => {
+    loadModeRef.current = loadMode;
+  }, [loadMode]);
+
+  const standardURL = `/accounting/rule/upload`;
+  const customURL = `/fyntrac/custom-table/data-upload`;
 
   const handleDrop = async (acceptedFiles, fileRejections) => {
     // 🔒 Prevent double upload
@@ -96,9 +106,12 @@ export default function FileUploadComponent({
 
     const formData = new FormData();
     newFiles.forEach((file) => formData.append("files", file));
+    if (showLoadModeSelector) {
+      formData.append("loadMode", loadModeRef.current);
+    }
 
     try {
-      const response = await axios.post(targetUrl, formData, {
+      const response = await dataloaderApi.post(targetUrl, formData, {
         headers: {
           "X-Tenant": tenant || "",
           "X-User-Id": user?.id || "",
@@ -199,10 +212,12 @@ export default function FileUploadComponent({
             <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
               Your files have been successfully processed and added to the queue.
             </Typography>
-            <LinearProgress
-              sx={{ mt: 4, width: '100%', maxWidth: 200, borderRadius: 2, height: 6 }}
-              color="success"
-            />
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <LinearProgress
+                sx={{ width: 200, borderRadius: 2, height: 6 }}
+                color="success"
+              />
+            </Box>
             <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: "block", fontWeight: 500 }}>
               Closing window in 5 seconds...
             </Typography>
@@ -246,6 +261,45 @@ export default function FileUploadComponent({
                 <MenuItem value={ACTIVITY_TYPES.CUSTOM}>Custom Activity</MenuItem>
               </Select>
             </FormControl>
+          )}
+
+          {showLoadModeSelector && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              {['OVERWRITE', 'APPEND'].map((mode) => {
+                const selected = loadMode === mode;
+                const label = mode === 'OVERWRITE' ? 'Overwrite' : 'Append';
+                return (
+                  <Chip
+                    key={mode}
+                    label={label}
+                    icon={selected ? <CheckIcon sx={{ fontSize: '13px !important' }} /> : undefined}
+                    onClick={() => setLoadMode(mode)}
+                    size="small"
+                    disabled={status !== 'idle'}
+                    sx={{
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                      letterSpacing: 0.2,
+                      height: 28,
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      bgcolor: selected ? alpha('#16a34a', 0.12) : alpha(theme.palette.grey[500], 0.08),
+                      color: selected ? '#16a34a' : 'text.secondary',
+                      border: '1.5px solid',
+                      borderColor: selected ? '#16a34a' : alpha(theme.palette.text.secondary, 0.2),
+                      '& .MuiChip-icon': { color: '#16a34a' },
+                      '&:hover': {
+                        bgcolor: selected ? alpha('#16a34a', 0.18) : alpha('#16a34a', 0.06),
+                        borderColor: '#16a34a',
+                        color: '#16a34a',
+                      },
+                    }}
+                  />
+                );
+              })}
+            </Stack>
           )}
         </Stack>
       </Box>

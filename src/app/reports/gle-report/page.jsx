@@ -15,6 +15,9 @@ import {
   InputAdornment,
   Tabs,
   Tab,
+  Snackbar,
+  Alert,
+  Slide,
 } from "@mui/material";
 import { DeleteOutlineOutlined } from "@mui/icons-material";
 import CachedRoundedIcon from "@mui/icons-material/CachedRounded";
@@ -23,8 +26,8 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import GridHeader from "../../component/gridHeader";
-import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import Grid from "@mui/material/Grid"; 
+import { reportingApi } from '../../services/api-client';
 import CustomDataGrid from "@/app/component/custom-data-grid";
 import CustomTabPanel from '../../component/custom-tab-panel';
 import { useTenant } from "../../tenant-context";
@@ -44,6 +47,9 @@ const GLEReportPage = () => {
 
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+  const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
   const [isAttribuesFetched, setIsAttribuesFetched] = React.useState(false);
   // Attribute options
@@ -60,15 +66,9 @@ const GLEReportPage = () => {
   };
 
   const fetchReportAttributes = () => {
-    
-    const fetchSettings = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/get/attributes`;
-    axios.get(fetchSettings, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+
+    const fetchSettings = `/jeReport/get/attributes`;
+    reportingApi.get(fetchSettings)
       .then(response => {
         setAttributeOptions(response.data);
       })
@@ -89,23 +89,17 @@ const GLEReportPage = () => {
   }, [attributeOptions]); // This will log the updated attributeOptions whenever it changes
 
   const executeReport = () => {
-      // Simulate a click anywhere on the page
-  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-       console.log('criteriaList:', criteriaList);
+    // Simulate a click anywhere on the page
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    console.log('criteriaList:', criteriaList);
 
     const filteredCriteriaList = criteriaList.filter(criteria => criteria.filters.length > 0);
     console.log('filters:', filteredCriteriaList);
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/jeReport/execute`;
-    axios.post(executeReportAPI, filteredCriteriaList, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const executeReportAPI = `/jeReport/execute`;
+    reportingApi.post(executeReportAPI, filteredCriteriaList)
       .then(response => {
 
-                const dataWithIds = response.data.map((item, index) => ({
+        const dataWithIds = response.data.map((item, index) => ({
           ...item,
           // 👇 THIS IS THE FIX: Spread the attributes to the top level
           ...(item.attributes || {}),
@@ -113,11 +107,13 @@ const GLEReportPage = () => {
         }));
 
         setReportData(dataWithIds);
+        showToast('Report data loaded successfully.');
       })
       .catch(error => {
         console.error('Error fetching data:', error);
         setErrorMessage(error.message);
         setShowErrorMessage(true);
+        showToast('Failed to execute report. Please try again.', 'error');
       });
   };
 
@@ -129,6 +125,34 @@ const GLEReportPage = () => {
   const executeFiler = () => {
     executeReport();
   }
+
+  const downloadReport = () => {
+    const filteredCriteriaList = criteriaList.filter(c => c.filters.length > 0);
+    reportingApi.post('/jeReport/download', filteredCriteriaList, {
+      headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      responseType: 'blob',
+    })
+      .then(response => {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const disposition = response.headers['content-disposition'];
+        let fileName = 'gle-report.xlsx';
+        if (disposition && disposition.includes('filename=')) {
+          fileName = disposition.split('filename=')[1].replace(/"/g, '');
+        }
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('Report downloaded successfully.');
+      })
+      .catch(error => {
+        console.error('Download error:', error);
+        showToast('Failed to download report.', 'error');
+      });
+  };
 
   const handleChange = (index, field, value) => {
     setCriteriaList((prevCriteria) => {
@@ -203,7 +227,7 @@ const GLEReportPage = () => {
     }));
   };
 
-    const toProperCase = (str) =>
+  const toProperCase = (str) =>
     str
       .replace(/_/g, ' ')
       .toLowerCase()
@@ -227,16 +251,16 @@ const GLEReportPage = () => {
                 <IconButton
                   aria-label="add"
                   onClick={handleAddCriteria}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
-                  <AddOutlinedIcon />
+                  <AddOutlinedIcon color="action" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Execute filter" arrow>
                 <IconButton
                   aria-label="execute"
                   onClick={executeFiler}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  sx={{ bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
                   <PlayCircleOutlineOutlinedIcon />
                 </IconButton>
@@ -244,9 +268,10 @@ const GLEReportPage = () => {
               <Tooltip title="Download report data" arrow>
                 <IconButton
                   aria-label="Download file"
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
+                  onClick={downloadReport}
+                  sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
-                  <FileDownloadOutlinedIcon />
+                  <FileDownloadOutlinedIcon color="action" />
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -436,18 +461,42 @@ const GLEReportPage = () => {
           </Box>
 
           <Box
-        flex="1" // Third row takes the remaining space
-        overflow="auto" // Enable scrolling if content overflows
-      >
-        <Box
-          height="100%" // Ensure the grid takes full height of the container
-          overflow="auto" // Enable scrolling for the grid if needed
-        >
-          <CustomDataGrid columns={gridHeader} rows={reportData} />
-        </Box>
-      </Box>
+            flex="1" // Third row takes the remaining space
+            overflow="auto" // Enable scrolling if content overflows
+          >
+            <Box
+              height="100%" // Ensure the grid takes full height of the container
+              overflow="auto" // Enable scrolling for the grid if needed
+            >
+              <CustomDataGrid columns={gridHeader} rows={reportData} />
+            </Box>
+          </Box>
         </Box>
       </CustomTabPanel>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+      >
+        <Alert
+          onClose={handleToastClose}
+          severity={toast.severity}
+          variant="standard"
+          sx={{
+            borderRadius: 3, fontWeight: 600, fontSize: '0.85rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: 280,
+            bgcolor: toast.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
+            border: toast.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)',
+            color: toast.severity === 'success' ? '#15803d' : '#dc2626',
+            '& .MuiAlert-icon': { color: toast.severity === 'success' ? '#16a34a' : '#dc2626' },
+          }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

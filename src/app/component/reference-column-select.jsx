@@ -1,49 +1,31 @@
 import React, { useState, useEffect } from "react";
-import { Autocomplete, TextField, Box, Typography } from "@mui/material";
+import {
+  Box, Typography, TextField, InputAdornment, IconButton,
+  Popover, List, ListItemButton, ListItemText,
+} from "@mui/material";
+import { alpha, useTheme } from '@mui/material/styles';
+import SearchIcon from '@mui/icons-material/Search';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
 const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
+  const theme = useTheme();
   const [selectedValue, setSelectedValue] = useState(null);
+  const [pickerAnchor, setPickerAnchor] = useState(null);
+  const [pickerSearch, setPickerSearch] = useState('');
 
-  // Helper function to get the reference column object from a table
   const getReferenceColumnObject = (table) => {
     if (!table || !table.columns || !table.referenceColumn) return null;
-    
-    // Find the column where columnName equals referenceColumn
-    return table.columns.find(
-      column => column.columnName === table.referenceColumn
-    );
+    return table.columns.find(col => col.columnName === table.referenceColumn);
   };
 
-  // Sync external value prop with internal state
   useEffect(() => {
-    console.log('🔍 ReferenceColumnAutocomplete props:', { 
-      tables, 
-      value, 
-      tablesCount: tables.length 
-    });
-    
     if (value) {
-      // If value is a string (table name), find the matching table object
       if (typeof value === 'string') {
         const foundTable = tables.find(table => table.tableName === value);
-        if (foundTable) {
-          console.log('✅ Found table for string value:', foundTable);
-          console.log('📊 Reference column object:', getReferenceColumnObject(foundTable));
-          setSelectedValue(foundTable);
-        } else {
-          console.log('❌ No table found for string value:', value);
-          setSelectedValue(null);
-        }
-      } 
-      // If value is already a table object
-      else if (value.tableName && value.columns) {
-        console.log('✅ Using provided table object:', value);
-        console.log('📊 Reference column object:', getReferenceColumnObject(value));
+        setSelectedValue(foundTable || null);
+      } else if (value.tableName && value.columns) {
         setSelectedValue(value);
-      }
-      // If value is null/undefined
-      else {
-        console.log('📭 Value is null/undefined');
+      } else {
         setSelectedValue(null);
       }
     } else {
@@ -51,140 +33,90 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
     }
   }, [value, tables]);
 
-  const handleChange = (event, selectedTable) => {
-    console.log('🔄 Autocomplete changed - Selected table:', selectedTable);
-    
-    if (selectedTable) {
-      // Get the reference column object
-      const referenceColumnObj = getReferenceColumnObject(selectedTable);
-      console.log('📊 Reference column object found:', referenceColumnObj);
-      
-      setSelectedValue(selectedTable);
-      
-      if (onSelect) {
-        // Pass both the table and the column object
-        onSelect(
-          {
-            tableName: selectedTable.tableName,
-            referenceColumn: selectedTable.referenceColumn,
-            tableData: selectedTable // Pass full table data if needed
-          },
-          referenceColumnObj // Pass the column object
-        );
-      }
-    } else {
-      // Handle clear
-      setSelectedValue(null);
-      if (onSelect) {
-        onSelect(null, null);
-      }
+  const handleSelect = (table) => {
+    const referenceColumnObj = getReferenceColumnObject(table);
+    setSelectedValue(table);
+    if (onSelect) {
+      onSelect(
+        { tableName: table.tableName, referenceColumn: table.referenceColumn, tableData: table },
+        referenceColumnObj
+      );
     }
+    setPickerAnchor(null);
   };
 
-  // Format the label to show table name and reference column
-  const getOptionLabel = (option) => {
-    if (!option) return '';
-    return `${option.tableName} • ${option.referenceColumn}`;
+  const handleClear = (e) => {
+    e.stopPropagation();
+    setSelectedValue(null);
+    if (onSelect) onSelect(null, null);
   };
+
+  const filteredTables = tables.filter(t =>
+    t.tableName?.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+    t.referenceColumn?.toLowerCase().includes(pickerSearch.toLowerCase())
+  );
+
+  const displayValue = selectedValue
+    ? `${selectedValue.tableName} • ${selectedValue.referenceColumn}`
+    : '';
 
   return (
-    <Box sx={{ width: "30%" }}>
-      <Autocomplete
-        size="medium"
-        options={tables}
-        value={selectedValue}
-        onChange={handleChange}
-        getOptionLabel={getOptionLabel}
-        slotProps={{
-          paper: {
-            elevation: 3,
-            sx: {
-              borderRadius: 2,
-              mt: 1,
-            },
-          },
+    <Box sx={{ width: '100%' }}>
+      <TextField
+        fullWidth size="small"
+        label="Select Reference Table"
+        value={displayValue}
+        onClick={(e) => { setPickerAnchor(e.currentTarget); setPickerSearch(''); }}
+        inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+        InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
+        InputProps={{
+          startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+          endAdornment: selectedValue ? (
+            <InputAdornment position="end">
+              <IconButton size="small" onClick={handleClear} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+              </IconButton>
+            </InputAdornment>
+          ) : null,
         }}
-        renderOption={(props, option) => {
-          const { key, ...rest } = props;
-          const refColumnObj = getReferenceColumnObject(option);
-          
-          return (
-            <Box
-              component="li"
-              key={key}
-              {...rest}
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                py: 1,
-                px: 1.5,
-                cursor: "pointer",
-                "&:hover": {
-                  backgroundColor: "action.hover",
-                },
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600}>
-                {option.tableName}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ fontSize: "0.8rem" }}
-                >
-                  Reference Column: {option.referenceColumn}
-                </Typography>
-
-              </Box>
-
-            </Box>
-          );
-        }}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            size="medium"
-            label="Select Reference Table"
-            placeholder="Search table..."
-            variant="outlined"
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-              },
-            }}
-          />
-        )}
-        noOptionsText="No reference tables available"
-        isOptionEqualToValue={(option, value) => {
-          if (!option || !value) return false;
-          return option.tableName === value.tableName;
-        }}
-        clearOnBlur={false}
-        blurOnSelect
       />
-      
-      {/* Debug info */}
-      {selectedValue && (
-        <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            Selected: {selectedValue.tableName}
-          </Typography>
-          {(() => {
-            const refColumnObj = getReferenceColumnObject(selectedValue);
-            return refColumnObj && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Column Details: {refColumnObj.columnName}
-              </Typography>
-            );
-          })()}
+      <Popover
+        open={Boolean(pickerAnchor)} anchorEl={pickerAnchor}
+        onClose={() => setPickerAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { mt: 0.75, width: pickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
+      >
+        <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+          <TextField autoFocus fullWidth size="small" placeholder="Search tables..."
+            value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+          />
         </Box>
-      )}
+        <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+          {filteredTables.length === 0 ? (
+            <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+              <Typography variant="caption" color="text.disabled">No reference tables available.</Typography>
+            </ListItemButton>
+          ) : filteredTables.map((table) => (
+            <ListItemButton
+              key={table.tableName}
+              selected={selectedValue?.tableName === table.tableName}
+              onClick={() => handleSelect(table)}
+              sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+            >
+              <ListItemText
+                primary={<Typography sx={{ fontSize: '0.9rem', fontWeight: 600, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>{table.tableName}</Typography>}
+                secondary={<Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>Reference Column: {table.referenceColumn}</Typography>}
+              />
+            </ListItemButton>
+          ))}
+        </List>
+      </Popover>
     </Box>
   );
 };
-
-// Add Chip import at the top
-import Chip from '@mui/material/Chip';
 
 export default ReferenceColumnAutocomplete;

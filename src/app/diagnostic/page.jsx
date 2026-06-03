@@ -2,24 +2,34 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
+  Container,
   MenuItem,
   TextField,
   IconButton,
   Divider,
-  Stack,
   Tooltip,
   Tabs,
   Tab,
-  ReturnType,
   FormControl,
   InputLabel,
   Select,
+  Snackbar,
+  Alert,
+  Slide,
+  Typography,
+  Popover,
+  List,
+  ListItemButton,
+  ListItemText,
+  InputAdornment,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
-import GridHeader from "../component/gridHeader";
-import Grid from "@mui/material/Grid2"; // Import stable Grid2
-import axios from 'axios';
+import Grid from "@mui/material/Grid"; 
+import { dataloaderApi, reportingApi } from '../services/api-client';
 import CustomTabPanel from '../component/custom-tab-panel';
 import CircularProgress from '@mui/material/CircularProgress';
 import { green } from '@mui/material/colors';
@@ -30,6 +40,7 @@ import { useTenant } from "../tenant-context";
 import EnhancedDataGridTabs from "../component/map-tabs";
 
 const InstrumentDiagnosticPage = () => {
+  const theme = useTheme();
   const { tenant } = useTenant();
   // State to manage the list of criteria
   const [criteriaList, setCriteriaList] = useState([
@@ -44,6 +55,9 @@ const InstrumentDiagnosticPage = () => {
 
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
+  const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
   // Attribute options
   const [attributeOptions, setAttributeOptions] = useState([]);
@@ -53,10 +67,21 @@ const InstrumentDiagnosticPage = () => {
   const [model, setModel] = useState(models.length > 0 ? models[0]._id : "");
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
-  const timer = React.useRef < ReturnType < typeof setTimeout >> (undefined);
+  const timer = React.useRef(undefined);
   const [postingDates, setPostingDates] = React.useState([]);
   const [postingDate, setPostingDate] = React.useState('');
   const [diagnosticData, setDiagnosticData] = React.useState({});
+  const [datepickerAnchor, setDatepickerAnchor] = React.useState(null);
+  const [datepickerSearch, setDatepickerSearch] = React.useState('');
+  const [modelpickerAnchor, setModelpickerAnchor] = React.useState(null);
+  const [modelpickerSearch, setModelpickerSearch] = React.useState('');
+
+  const filteredPostingDates = postingDates.filter(d =>
+    d.label.toLowerCase().includes(datepickerSearch.toLowerCase())
+  );
+  const filteredModels = models.filter(m =>
+    m.modelName.toLowerCase().includes(modelpickerSearch.toLowerCase())
+  );
 
 
 
@@ -89,14 +114,8 @@ const InstrumentDiagnosticPage = () => {
   }
 
   const fetchAllModels = () => {
-    const fetchModels = `${process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI}/model/get/all`;
-    axios.get(fetchModels, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchModels = `/model/get/all`;
+    dataloaderApi.get(fetchModels)
       .then(response => {
         setModels(response.data);
       })
@@ -107,14 +126,8 @@ const InstrumentDiagnosticPage = () => {
 
 
   const fetchAllPostingDates = () => {
-    const fetchPostingDates = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/get/event-postingdates`;
-    axios.get(fetchPostingDates, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    const fetchPostingDates = `/diagnostic/get/event-postingdates`;
+    reportingApi.get(fetchPostingDates)
       .then(response => {
         setPostingDates(response.data);
         console.info('Posting Dates:', response.data);
@@ -125,7 +138,7 @@ const InstrumentDiagnosticPage = () => {
   };
 
   const downloadDiagnostic = () => {
-    const downloadFile = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/download`;
+    const downloadFile = `/diagnostic/download`;
     console.info('postingDate:', postingDate);
     const diagnosticRequest = {
       tenant: tenant,
@@ -136,7 +149,7 @@ const InstrumentDiagnosticPage = () => {
 
     console.log('Download Request:', diagnosticRequest);
 
-    axios.post(downloadFile, diagnosticRequest, {
+    reportingApi.post(downloadFile, diagnosticRequest, {
       headers: {
         'X-Tenant': tenant,
         Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -164,9 +177,11 @@ const InstrumentDiagnosticPage = () => {
         // cleanup
         link.remove();
         window.URL.revokeObjectURL(url);
+        showToast('Diagnostic file downloaded successfully.');
       })
       .catch(error => {
         console.error('Error downloading Excel file:', error);
+        showToast('Failed to download diagnostic file.', 'error');
       });
   };
 
@@ -200,27 +215,24 @@ const InstrumentDiagnosticPage = () => {
 
     console.log('request:', diagnosticRequest);
 
-    const executeReportAPI = `${process.env.NEXT_PUBLIC_REPORTING_SERVICE_URI}/diagnostic/generate`;
+    const executeReportAPI = `/diagnostic/generate`;
 
-    axios.post(executeReportAPI, diagnosticRequest, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-      }
-    })
+    reportingApi.post(executeReportAPI, diagnosticRequest)
       .then(response => {
         const data = response.data;
 
         setDiagnosticData(data.valueMapList);
         setSuccess(true);
         setLoading(false);
-
         console.log('Full Response:', data);
+        showToast('Diagnostic report loaded successfully.');
       })
       .catch(error => {
         console.error('Error fetching data:', error);
         setErrorMessage(error.message);
         setShowErrorMessage(true);
+        setLoading(false);
+        showToast('Failed to run diagnostic. Please check your filters.', 'error');
       });
   };
 
@@ -246,67 +258,72 @@ const InstrumentDiagnosticPage = () => {
   };
 
   const generateGridColumns = (columnDefs) => {
-    return columnDefs.map((col) => ({
-      field: col.attributeName, // Use attributeName as the field
-      headerName: col.attributeAlias, // Use attributeAlias as the header name
-      width: 200, // Set a default width (you can customize this)
-      editable: false, // Set editable to false or true based on your requirements
-    }));
+    return columnDefs
+      .filter((col) => !col.attributeName?.startsWith('_'))
+      .map((col) => ({
+        field: col.attributeName,
+        headerName: col.attributeAlias,
+        width: 200,
+        editable: false,
+      }));
   };
 
   return (
-    <div>
-      <Grid container spacing={3}>
-        <Grid size="auto">
-          <div className="left">
-            <GridHeader>Diagnostic Report</GridHeader>
-          </div>
-        </Grid>
-        <Grid size={6} />
-        <Grid size="grow">
-          <div className="right">
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="Execute filter" arrow>
-                <IconButton
-                  aria-label="execute"
-                  onClick={executeFiler}
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
-                >
-                  <PlayCircleOutlineOutlinedIcon />
+    <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
+      <Container maxWidth={false} sx={{ py: 1, px: 2 }}>
 
-                  {loading && (
-                    <CircularProgress
-                      size={24}
-                      sx={{
-                        color: green[500],
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        marginTop: '-12px',
-                        marginLeft: '-12px',
-                        size: 'small',
-                      }}
-                    />
-                  )}
-
-
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Download Diagnostic" arrow>
-                <IconButton
-                  onClick={downloadDiagnostic}
-                  aria-label="Download file"
-                  sx={{ "&:hover": { backgroundColor: "darkgrey" } }}
-                >
-                  <FileDownloadOutlinedIcon />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          </div>
-        </Grid>
-      </Grid>
-
-      <Divider />
+        {/* Header Section */}
+        <Box sx={{
+          p: 1.5,
+          borderBottom: '1.5px solid',
+          borderColor: (t) => alpha(t.palette.divider, 0.2),
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { sm: 'center' },
+          gap: 2,
+          mb: 4,
+        }}>
+          <Box>
+            <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ letterSpacing: '-0.5px' }}>
+              Diagnostic Report
+            </Typography>
+          </Box>
+          <Divider />
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Execute filter" arrow>
+              <IconButton
+                aria-label="execute"
+                onClick={executeFiler}
+                sx={{ bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
+              >
+                <PlayCircleOutlineOutlinedIcon />
+                {loading && (
+                  <CircularProgress
+                    size={24}
+                    sx={{
+                      color: green[500],
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      marginTop: '-12px',
+                      marginLeft: '-12px',
+                    }}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download Diagnostic" arrow>
+              <IconButton
+                onClick={downloadDiagnostic}
+                aria-label="Download file"
+                sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
+              >
+                <FileDownloadOutlinedIcon color="action" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
       <Box sx={{ width: '100%', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
         <Tabs sx={{ width: '90rem' }} value={0} aria-label="Filter">
           <Tab label="Filter" sx={{ textTransform: 'none' }} />
@@ -335,50 +352,192 @@ const InstrumentDiagnosticPage = () => {
                     value={instrumentId}
                     onChange={(e) => setInstrumentId(e.target.value)}
                     size="small"
-                    sx={{ minWidth: 350 }}
-                  >
-
-                  </TextField>
+                    sx={{ minWidth: 350, '& .MuiInputLabel-root:not(.MuiInputLabel-shrink)': { fontSize: '0.875rem' } }}
+                  />
                 </Grid>
 
                 <Grid xs={12} sm={3}>
-                  <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
-                    <InputLabel id="sort-by-select-model">Select Model</InputLabel>
-                    <Select
-                      labelId="sort-by-select-model"
-                      id="sort-by-select"
-                      value={model}
-                      label="Select Model"
-                      onChange={(e) => setModel(e.target.value)}
-                    >
-                      {models.map((model) => (
-                        <MenuItem key={model.id} value={model.id}>
-                          {model.modelName}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Select Model"
+                    value={model ? (models.find(m => m.id === model)?.modelName || model) : ''}
+                    onClick={(e) => { setModelpickerAnchor(e.currentTarget); setModelpickerSearch(''); }}
+                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+                    sx={{ m: 1, minWidth: 350 }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: model ? (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setModel(''); }}
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                          >
+                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
                 </Grid>
 
+                <Popover
+                  open={Boolean(modelpickerAnchor)}
+                  anchorEl={modelpickerAnchor}
+                  onClose={() => setModelpickerAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.75,
+                        width: 350,
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                        border: '1px solid', borderColor: 'divider',
+                        overflow: 'hidden',
+                      },
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                    <TextField
+                      autoFocus
+                      fullWidth
+                      size="small"
+                      placeholder="Search models..."
+                      value={modelpickerSearch}
+                      onChange={(e) => setModelpickerSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                  </Box>
+                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                    {filteredModels.length === 0 ? (
+                      <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                        <Typography variant="caption" color="text.disabled">No models found.</Typography>
+                      </ListItemButton>
+                    ) : filteredModels.map((m) => (
+                      <ListItemButton
+                        key={m.id}
+                        selected={m.id === model}
+                        onClick={() => { setModel(m.id); setModelpickerAnchor(null); }}
+                        sx={{
+                          py: 1, px: 2,
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                          '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                        }}
+                      >
+                        <ListItemText
+                          primary={m.modelName}
+                          primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
+                        />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Popover>
+
                 <Grid xs={12} sm={3}>
-                  <FormControl fullWidth size="small" sx={{ m: 1, minWidth: 350 }}>
-                    <InputLabel id="sort-by-select-model">Select Date</InputLabel>
-                    <Select
-                      labelId="sort-by-select-posting-date"
-                      id="sort-by-select-posting-date"
-                      value={postingDate}
-                      label="Select Posting"
-                      // size="small"  <-- You can remove this as it inherits from FormControl, or keep it.
-                      onChange={(e) => setPostingDate(e.target.value)}
-                    >
-                      {postingDates.map((pdate) => (
-                        <MenuItem key={pdate.value} value={pdate.value}>
-                          {pdate.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Select Posting Date"
+                    value={postingDate ? (postingDates.find(d => d.value === postingDate)?.label || postingDate) : ''}
+                    onClick={(e) => { setDatepickerAnchor(e.currentTarget); setDatepickerSearch(''); }}
+                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+                    sx={{ m: 1, minWidth: 350 }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: postingDate ? (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setPostingDate(''); }}
+                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                          >
+                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
                 </Grid>
+
+                <Popover
+                  open={Boolean(datepickerAnchor)}
+                  anchorEl={datepickerAnchor}
+                  onClose={() => setDatepickerAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        mt: 0.75,
+                        width: 350,
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+                        border: '1px solid', borderColor: 'divider',
+                        overflow: 'hidden',
+                      },
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+                    <TextField
+                      autoFocus
+                      fullWidth
+                      size="small"
+                      placeholder="Search dates..."
+                      value={datepickerSearch}
+                      onChange={(e) => setDatepickerSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Box>
+                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+                    {filteredPostingDates.length === 0 ? (
+                      <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                        <Typography variant="caption" color="text.disabled">No dates found.</Typography>
+                      </ListItemButton>
+                    ) : filteredPostingDates.map((pdate) => (
+                      <ListItemButton
+                        key={pdate.value}
+                        selected={pdate.value === postingDate}
+                        onClick={() => { setPostingDate(pdate.value); setDatepickerAnchor(null); }}
+                        sx={{
+                          py: 1, px: 2,
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                          '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                        }}
+                      >
+                        <ListItemText
+                          primary={pdate.label}
+                          primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
+                        />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Popover>
 
                 <Grid xs={12} sm={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -433,7 +592,32 @@ const InstrumentDiagnosticPage = () => {
         </Box>
       </CustomTabPanel>
 
-    </div>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={handleToastClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ top: '55px', '@media (min-width:600px)': { top: '55px' } }}
+        slots={{ transition: Slide }} slotProps={{ transition: { direction: 'left' } }}
+      >
+        <Alert
+          onClose={handleToastClose}
+          severity={toast.severity}
+          variant="standard"
+          sx={{
+            borderRadius: 3, fontWeight: 600, fontSize: '0.85rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)', minWidth: 280,
+            bgcolor: toast.severity === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
+            border: toast.severity === 'success' ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(220,38,38,0.3)',
+            color: toast.severity === 'success' ? '#15803d' : '#dc2626',
+            '& .MuiAlert-icon': { color: toast.severity === 'success' ? '#16a34a' : '#dc2626' },
+          }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
+      </Container>
+    </Box>
   );
 };
 

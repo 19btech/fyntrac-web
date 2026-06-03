@@ -20,7 +20,7 @@ import CustomRefDataReportPage from '../reports/custom-ref-data-report/page';
 import CustomOperationalDataReportPage from '../reports/custom-operational-data-report/page';
 import SettingsDashboard from '../settings-dashboard/page';
 import ReportDashboard from '../report-dashboard/page';
-export default function PageContent({ pathname, method }) {
+export default function PageContent({ pathname, method, settingsKey, rulesInitialTab, journalInitialTab }) {
 
   const renderContent = () => {
     console.log('pathName:', pathname);
@@ -32,7 +32,7 @@ export default function PageContent({ pathname, method }) {
       case '/mapping':
         return <AccountingPage />
       case '/settings/accounting-rules/reference-data':
-        return <RulePage />
+        return <RulePage initialTab={rulesInitialTab} />
       case '/settings/accounting-rules/event-configuration':
         return <EventConfigurationMain />
       case '/settings/accounting-rules/custom-table':
@@ -43,6 +43,8 @@ export default function PageContent({ pathname, method }) {
         return <ModelPage />
       case '/settings/configure':
         return <SettingsPage />
+      case '/journal-mapping':
+        return <AccountingPage initialTab={journalInitialTab} />
       case '/sync':
         return <SyncPage />
       case '/report-dashboard':
@@ -60,7 +62,7 @@ export default function PageContent({ pathname, method }) {
       case '/diagnostic':
         return <InstrumentDiagnosticPage />
       case '/settings-dashboard':
-        return <SettingsDashboard />
+        return <SettingsDashboard key={settingsKey} />
       case '/python-model':
         return <PythonModel setOpenPythonModel={method} />
       default:

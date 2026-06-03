@@ -104,7 +104,7 @@ export default function HomeDrawer() {
   const router = useRouter();
   const pathName = usePathname();
 
-  
+
   const handleDrawerOpen = () => {
     setOpen(true);
   };
@@ -114,18 +114,18 @@ export default function HomeDrawer() {
   };
 
   return (
-    
+
     <Box sx={{ display: 'flex' }}>
-      
+
       <CssBaseline />
-      <AppBar  position="fixed" open={open}>
-        
-        <Toolbar   sx={{
-    background: '#a2cbe8',
-  }}>
-         
+      <AppBar position="fixed" open={open}>
+
+        <Toolbar sx={{
+          background: '#a2cbe8',
+        }}>
+
           <IconButton
-          
+
             color="inherit"
             aria-label="open drawer"
             onClick={handleDrawerOpen}
@@ -135,59 +135,59 @@ export default function HomeDrawer() {
               ...(open && { display: 'none' }),
             }}
           >
-            
+
             <MenuIcon />
-           
+
           </IconButton>
           <Typography variant="h6" noWrap component="div">
             Admin drawer
           </Typography>
         </Toolbar>
-        
+
       </AppBar>
       <Drawer variant="permanent" open={open}>
         <DrawerHeader>
           <IconButton align='left' onClick={handleDrawerClose}>
-          <Typography  variant="h6" noWrap component="div">
-          <img src="fyntrac.png" alt="SVG Image"/>
-          </Typography>
+            <Typography variant="h6" noWrap component="div">
+              <img src="fyntrac.png" alt="SVG Image" />
+            </Typography>
             {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </IconButton>
         </DrawerHeader>
         <Divider />
         <DrawerHeader>
-        <ListItemButton 
-                sx={{
-                  minHeight: 48,
-                  justifyContent: open ? 'initial' : 'center',
-                  px: 1.5,
-                }}
-              >
-                <ListItemIcon 
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 3 : 'auto',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CompareArrowsOutlinedIcon />
-                  </ListItemIcon>
-                <ListItemText primary='Producton'sx={{ color: '#61038B', opacity: open ? 1 : 0 }} />
-              </ListItemButton>
+          <ListItemButton
+            sx={{
+              minHeight: 48,
+              justifyContent: open ? 'initial' : 'center',
+              px: 1.5,
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: 0,
+                mr: open ? 3 : 'auto',
+                justifyContent: 'center',
+              }}
+            >
+              <CompareArrowsOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText primary='Producton' sx={{ color: '#61038B', opacity: open ? 1 : 0 }} />
+          </ListItemButton>
 
         </DrawerHeader>
         <Divider />
         <List>
-          {[{label:'Get Started',icon:'start'}, 
-            {label:'Home',icon:'HomeOutlinedIcon'}, 
-            {label:'Pipeline',icon:'AccountTreeOutlinedIcon'}, 
-            {label:'Model',icon:'TocOutlinedIcon'},
-            {label:'Accounting',icon:'PersonOutlineOutlinedIcon'},
-            {label:'Sync',icon:'SyncOutlinedIcon'},
-            {label:'Reports',icon:'TimelineOutlinedIcon'},
-            {label:'Settings',icon:'ConstructionOutlinedIcon'}].map((text, index) => (
-            <ListItem key={text.label} disablePadding sx={{ display: 'block' }} 
-            className={ pathName.startsWith('/' + text.label.toLowerCase()) ? "text-sky-600" : "text-slate-700"}>
+          {[{ label: 'Get Started', icon: 'start' },
+          { label: 'Home', icon: 'HomeOutlinedIcon' },
+          { label: 'Pipeline', icon: 'AccountTreeOutlinedIcon' },
+          { label: 'Model', icon: 'TocOutlinedIcon' },
+          { label: 'Accounting', icon: 'PersonOutlineOutlinedIcon' },
+          { label: 'Sync', icon: 'SyncOutlinedIcon' },
+          { label: 'Reports', icon: 'TimelineOutlinedIcon' },
+          { label: 'Settings', icon: 'ConstructionOutlinedIcon' }].map((text, index) => (
+            <ListItem key={text.label} disablePadding sx={{ display: 'block' }}
+              className={pathName.startsWith('/' + text.label.toLowerCase()) ? "text-sky-600" : "text-slate-700"}>
               <ListItemButton
                 sx={{
                   minHeight: 48,
@@ -200,15 +200,15 @@ export default function HomeDrawer() {
                     minWidth: 0,
                     mr: open ? 3 : 'auto',
                     justifyContent: 'center',
-                  }} className={ pathName.startsWith('/' + text.label.toLowerCase()) ? "text-sky-600" : "text-slate-700"}
+                  }} className={pathName.startsWith('/' + text.label.toLowerCase()) ? "text-sky-600" : "text-slate-700"}
                 >
-                  {index === 0 ? <StartOutlinedIcon />  : index === 1 ? <HomeOutlinedIcon/> 
-                                                        : index === 2 ? <AccountTreeOutlinedIcon/> 
-                                                        : index === 3 ? <TocOutlinedIcon/> 
-                                                        : index === 4 ? <PersonOutlineOutlinedIcon/> 
-                                                        : index === 5 ? <SyncOutlinedIcon/> 
-                                                        : index == 6 ? <TimelineOutlinedIcon/>
-                                                        : <ConstructionOutlinedIcon/>}
+                  {index === 0 ? <StartOutlinedIcon /> : index === 1 ? <HomeOutlinedIcon />
+                    : index === 2 ? <AccountTreeOutlinedIcon />
+                      : index === 3 ? <TocOutlinedIcon />
+                        : index === 4 ? <PersonOutlineOutlinedIcon />
+                          : index === 5 ? <SyncOutlinedIcon />
+                            : index == 6 ? <TimelineOutlinedIcon />
+                              : <ConstructionOutlinedIcon />}
                 </ListItemIcon>
                 <ListItemText primary={text.label} sx={{ opacity: open ? 1 : 0 }} />
               </ListItemButton>

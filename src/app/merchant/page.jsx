@@ -4,7 +4,7 @@ import Layout from '../component/layout'
 import Header from '../component/header'
 import Body from '../component/body'
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 import { DataGrid } from '@mui/x-data-grid';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import AddBoxRoundedIcon from '@mui/icons-material/AddBoxRounded';
@@ -174,16 +174,14 @@ backgroundColor: 'lightgrey',
   <Dialog
         open={open}
         onClose={handleClose}
-        PaperProps={{
-          component: 'form',
+        slotProps={{ paper: { component: 'form',
           onSubmit: (event) => {
             event.preventDefault();
             const formData = new FormData(event.currentTarget);
             const formJson = Object.fromEntries(formData.entries());
             const text = formJson.email;
             handleClose();
-          },
-        }}
+          }, } }}
       >
         <DialogTitle>Add Merchant</DialogTitle>
         <Divider />

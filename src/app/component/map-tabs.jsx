@@ -10,6 +10,7 @@ import {
   Chip,
   Stack
 } from '@mui/material';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 
 // Helper function moved to top level
@@ -48,9 +49,22 @@ function MapAsRowsDataGridTabs({ data }) {
   if (tabData.length === 0) {
     return (
       <Card variant="outlined">
-        <CardContent sx={{ padding: 3, textAlign: 'center' }}>
-          <Typography color="textSecondary">
-            No data available to display
+        <CardContent
+          sx={{
+            padding: 6,
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
+          <FilterAltOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
+          <Typography variant="subtitle1" fontWeight={600} color="text.secondary">
+            No results to display
+          </Typography>
+          <Typography variant="body2" color="text.disabled" sx={{ maxWidth: 340 }}>
+            Select an instrument, model, and posting date above, then run the diagnostic to see results.
           </Typography>
         </CardContent>
       </Card>
@@ -94,19 +108,33 @@ function DataGridTable({ rows, tabName }) {
   const columns = useMemo(() => {
     if (!rows || !Array.isArray(rows) || rows.length === 0) return [];
 
+    // Detect reference custom table events: instrumentid or attributeid field value === 'system'
+    const isReferenceEvent = rows.some(row => {
+      const instrumentVal = Object.entries(row).find(([k]) => k.toLowerCase() === 'instrumentid')?.[1];
+      const attributeVal = Object.entries(row).find(([k]) => k.toLowerCase() === 'attributeid')?.[1];
+      return instrumentVal === 'system' || attributeVal === 'system';
+    });
+
+    // Lowercase versions of cols hidden for reference custom table events
+    const referenceHiddenCols = new Set(['attributeid', 'instrumentid', 'postingdate', 'effectivedate']);
+
     // Get all unique keys from all rows for columns
     const allKeys = Array.from(
       new Set(rows.flatMap(row => 
         row && typeof row === 'object' ? Object.keys(row) : []
       ))
-    ).filter(key => key !== 'id'); // Remove 'id' as it's our row identifier
+    )
+      .filter(key => key.replace(/^_+/, '').toLowerCase() !== 'id') // Hide 'id'/'_id' column for all events
+      .filter(key => !isReferenceEvent || !referenceHiddenCols.has(key.toLowerCase())); // Hide extra cols for reference events
 
     // Define the priority columns that should come first
     const priorityColumns = ['InstrumentId', 'AttributeId', 'PostingDate', 'EffectiveDate'];
     
-    // Separate priority columns from other columns
-    const priorityCols = priorityColumns.filter(col => allKeys.includes(col));
-    const otherCols = allKeys.filter(col => !priorityColumns.includes(col));
+    // Separate priority columns from other columns (case-insensitive, use actual key from data)
+    const priorityCols = priorityColumns
+      .map(p => allKeys.find(k => k.toLowerCase() === p.toLowerCase()))
+      .filter(Boolean);
+    const otherCols = allKeys.filter(key => !priorityColumns.some(p => p.toLowerCase() === key.toLowerCase()));
 
     // Create columns array with priority columns first
     return [

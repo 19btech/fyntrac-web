@@ -1,35 +1,21 @@
 import React, { useState } from 'react';
 import {
-  Dialog
-  , DialogTitle
-  , DialogContent
-  , DialogActions
-  , Button
-  , TextField
-  , Autocomplete
-  , IconButton
-  , Typography
-  , Tooltip
-  , Box
-  , Divider
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField,
+  IconButton, Typography, Tooltip, Box,
+  Chip, Alert, Slide, Stack,
+  Popover, List, ListItemButton, ListItemText, InputAdornment,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
-
-import axios from 'axios';
-import SuccessAlert from '../component/success-alert'
-import ErrorAlert from '../component/error-alert'
+import SearchIcon from '@mui/icons-material/Search';
+import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
+import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
-
-function sleep(duration) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve();
-    }, duration);
-  }); setIsAddAttributeDialogOpen
-}
 
 const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
+  const theme = useTheme();
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accountSubtype, setAccountSubtype] = useState('');
@@ -39,13 +25,29 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [showErrorMessage, setShowErrorMessage] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [accountSubtypes, setAccountSubtypes] = useState([]);
+  const [accountNameError, setAccountNameError] = useState('');
+  const [accountNumberError, setAccountNumberError] = useState('');
+  const [subtypePickerAnchor, setSubtypePickerAnchor] = useState(null);
+  const [subtypePickerSearch, setSubtypePickerSearch] = useState('');
+  const filteredAccountSubtypes = accountSubtypes.filter(st =>
+    st.toLowerCase().includes(subtypePickerSearch.toLowerCase())
+  );
 
-  const serviceURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/chartofaccount/add';
-  const sericeGetSubTypeURL = process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/accounttype/get/subtypes'
+  const serviceURL = '/chartofaccount/add';
+  const sericeGetSubTypeURL = '/accounttype/get/subtypes'
 
   const [attributeMetadata, setAttributeMetadata] = useState([]);
   const [formValues, setFormValues] = useState({});
   const [formErrors, setFormErrors] = useState({});
+
+  const subtypeRegex = /^[a-zA-Z0-9_ ]+$/;
+  const validateTextField = (value) => {
+    if (!value) return '';
+    if (/\s{2,}/.test(value)) return 'Double spacing is not allowed.';
+    if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
+    if (!subtypeRegex.test(value)) return 'Special characters are not allowed.';
+    return '';
+  };
 
   React.useEffect(() => {
     // Fetch attribute metadata from backend on component mount
@@ -53,13 +55,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   }, []);
 
   const fetchAttributeMetadata = () => {
-    axios.get(process.env.NEXT_PUBLIC_SUBLEDGER_SERVICE_URI + '/attribute/get/isreclassable/attributes', {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get('/attribute/get/isreclassable/attributes')
       .then(response => {
         const metadata = response.data;
         setAttributeMetadata(metadata);
@@ -80,49 +76,27 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-    setFormValues({
-      ...formValues,
-      [name]: value
-    });
-
-    // Validate input based on attribute data type
+    setFormValues(prev => ({ ...prev, [name]: value }));
     validateInput(name, value);
   };
 
   const validateInput = (name, value) => {
     const attribute = attributeMetadata.find(attr => attr.attributeName === name);
-    if (attribute) {
-      const { dataType } = attribute;
-      let isValid = true;
+    if (!attribute) return;
+    const { dataType } = attribute;
+    let errMsg = '';
 
-      switch (dataType) {
-        case 'String':
-          // Example string validation logic
-          isValid = typeof value === 'string';
-          break;
-        case 'Number':
-          // Example number validation logic
-          isValid = !isNaN(value);
-          break;
-        case 'Date':
-          // Example date validation logic (you can use libraries like moment.js for date validation)
-          isValid = !isNaN(Date.parse(value));
-          break;
-        case 'Boolean':
-          // Example boolean validation logic
-          isValid = value === 'true' || value === 'false';
-          break;
-        default:
-          isValid = true;
-          break;
-      }
-
-      // Update form errors based on validation result
-      setFormErrors({
-        ...formErrors,
-        [name]: isValid ? '' : `Invalid ${dataType} value`
-      });
+    if (dataType === 'String' || !dataType) {
+      errMsg = validateTextField(value);
+    } else if (dataType === 'Number') {
+      if (value && isNaN(value)) errMsg = 'Invalid number value.';
+    } else if (dataType === 'Date') {
+      if (value && isNaN(Date.parse(value))) errMsg = 'Invalid date value.';
+    } else if (dataType === 'Boolean') {
+      if (value && value !== 'true' && value !== 'false') errMsg = 'Invalid boolean value.';
     }
+
+    setFormErrors(prev => ({ ...prev, [name]: errMsg }));
   };
 
   const handleSubmit = (event) => {
@@ -146,19 +120,18 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
       setAccountName('');
       setAccountNumber('');
       setAccountSubtype('');
-
+      setFormValues(attributeMetadata.reduce((acc, a) => ({ ...acc, [a.attributeName]: '' }), {}));
     }
-  }, [editData]);
+    setAccountNameError('');
+    setAccountNumberError('');
+    setFormErrors({});
+    setShowErrorMessage(false);
+    setShowSuccessMessage(false);
+  }, [editData, open]);
 
   const fetchAccountSubtypes = () => {
 
-    axios.get(sericeGetSubTypeURL, {
-      headers: {
-        'X-Tenant': tenant,
-        Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-      }
-    })
+    dataloaderApi.get(sericeGetSubTypeURL)
       .then(response => {
         setAccountSubtypes(response.data);
         // Handle success response if needed
@@ -170,35 +143,86 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
 
   const handleAddChartOfAccount = async () => {
+    setShowErrorMessage(false);
+
+    // ── Field-level validation ────────────────────────────────────────────
+    const nameErr = validateTextField(accountName);
+    const numErr = validateTextField(accountNumber);
+    if (nameErr) { setAccountNameError(nameErr); return; }
+    if (numErr) { setAccountNumberError(numErr); return; }
+    const hasAttrError = Object.values(formErrors).some(e => !!e);
+    if (hasAttrError) {
+      setErrorMessage('Please fix field errors before saving.');
+      setShowErrorMessage(true);
+      return;
+    }
+
+    // ── Duplicate validation ──────────────────────────────────────────────
     try {
-      const response = await axios.post(serviceURL, {
+      const allRes = await dataloaderApi.get('/chartofaccount/get/all');
+      const existing = (allRes.data || []).filter(r => !id || r.id !== id);
+
+      const myNumLower = accountNumber.trim().toLowerCase();
+      const myNameLower = accountName.trim().toLowerCase();
+      const mySubtypeLower = accountSubtype.toLowerCase();
+
+      // Build a comparable signature of all custom field values
+      const attrSignature = (attrs) =>
+        attributeMetadata.map(a => String(attrs?.[a.attributeName] ?? '').toLowerCase()).join('||');
+      const myAttrSig = attrSignature(formValues);
+
+      for (const r of existing) {
+        const rNumLower = String(r.accountNumber ?? '').toLowerCase();
+        const rNameLower = String(r.accountName ?? '').toLowerCase();
+        const rSubtypeLower = String(r.accountSubtype ?? '').toLowerCase();
+        const rAttrSig = attrSignature(r.attributes);
+
+        // Rule A: complete duplicate
+        if (rNumLower === myNumLower && rNameLower === myNameLower &&
+            rSubtypeLower === mySubtypeLower && rAttrSig === myAttrSig) {
+          setErrorMessage('Duplicate chart of account entry found. All fields match an existing record.');
+          setShowErrorMessage(true);
+          return;
+        }
+
+        // Rule B: same account subtype + custom fields combo exists with different account number or name
+        if (rSubtypeLower === mySubtypeLower && rAttrSig === myAttrSig &&
+            (rNumLower !== myNumLower || rNameLower !== myNameLower)) {
+          setErrorMessage('A record already exists with this account subtype and attribute combination. Account number and name must be unique per subtype and attribute set.');
+          setShowErrorMessage(true);
+          return;
+        }
+      }
+    } catch (validationErr) {
+      console.error('Pre-save validation fetch failed:', validationErr);
+      // Proceed rather than blocking if fetch fails
+    }
+
+    try {
+      const response = await dataloaderApi.post(serviceURL, {
         accountName: accountName,
         accountSubtype: accountSubtype,
         accountNumber: accountNumber,
         id: id,
         attributes: formValues,
-      },
-        {
-          headers: {
-            'X-Tenant': tenant,
-            Accept: '*/*',
-            'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
-          }
-        }
-      );
+      });
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
 
       setTimeout(() => {
         setShowSuccessMessage(false);
         setShowErrorMessage(false);
-        onClose(false);
-      }, 3000);
+        onClose(true);
+      }, 600);
     } catch (error) {
-      // Handle error if needed
-      setErrorMessage(error);
+      const status = error.response?.status;
+      const responseText = JSON.stringify(error.response?.data ?? '').toLowerCase();
+      const isDuplicate = status === 409 || responseText.includes('duplicate') ||
+        responseText.includes('already exists') || responseText.includes('unique');
+      setErrorMessage(isDuplicate
+        ? 'Duplicate chart of account entry found. Please check your data.'
+        : 'Server error. Please try again later.');
       setShowErrorMessage(true);
-
     }
   };
 
@@ -209,121 +233,214 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
     onClose(false);
   };
 
+  const isEditMode = !!editData;
+  const canSave = accountNumber.trim() && accountName.trim() && accountSubtype &&
+    !accountNameError && !accountNumberError && !Object.values(formErrors).some(e => !!e);
+
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      slots={{ transition: Slide }}
+      slotProps={{
+        transition: { direction: 'up' },
+        paper: {
+          sx: {
+          borderRadius: 4,
+          boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
+          overflow: 'hidden',
+          border: '1px solid',
+          borderColor: 'divider',
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & .MuiFormHelperText-root': {
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          },
+          },
+        },
+      }}
+    >
+      <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
         <Box
           sx={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'start',
+            alignItems: 'center',
+            px: 3, pt: 3, pb: 2.5,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
           }}
         >
-          {/* Top Left: Image */}
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',  // Change 'left' to 'flex-start'
-              gap: 1,
-              width: 'fit-content' // Ensures the Box doesn't take more space than needed
-            }}
-          >
-            <img
-              src="fyntrac.png"
-              alt="Logo"
-              style={{
-                width: '100px',
-                height: 'auto',  // Maintain aspect ratio
-                maxWidth: '100%' // Ensures responsiveness
-              }}
-            />
-            <Typography variant="h6">Charts of Accounts</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Chip
+                  icon={<ListAltOutlinedIcon sx={{ fontSize: '12px !important' }} />}
+                  label="Chart of Accounts"
+                  size="small"
+                  sx={{
+                    height: 20, fontSize: '0.6rem', fontWeight: 700,
+                    letterSpacing: 0.8, textTransform: 'uppercase',
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main, borderRadius: 1,
+                  }}
+                />
+                {isEditMode && (
+                  <Chip label="Edit Mode" size="small" sx={{
+                    height: 20, fontSize: '0.6rem', fontWeight: 700,
+                    letterSpacing: 0.8, textTransform: 'uppercase',
+                    bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    color: theme.palette.warning.dark, borderRadius: 1,
+                  }} />
+                )}
+              </Box>
+              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                {isEditMode ? 'Edit' : 'Add'} Chart of Account
+              </Typography>
+            </Box>
           </Box>
-          <Tooltip title='Close'>
-            <IconButton
-              onClick={handleClose}
-              edge="end"
-              aria-label="close"
-              sx={{
-                color: 'grey.500',
-                '&:hover': { color: 'black' },
-              }}
-            >
-              <HighlightOffOutlinedIcon />
+          <Tooltip title="Close" placement="left">
+            <IconButton onClick={handleClose} size="small" sx={{
+              color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+              '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+            }}>
+              <HighlightOffOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
       </DialogTitle>
 
-      <Divider />
-      <DialogContent sx={{  display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <TextField
-        sx={{ width: '500px' }}
-          label="Account Number"
-          fullWidth
-          value={accountNumber}
-          onChange={(e) => setAccountNumber(e.target.value)}
-        />
-        <TextField
-        sx={{ width: '500px' }}
-          label="Account Name"
-          fullWidth
-          value={accountName}
-          onChange={(e) => setAccountName(e.target.value)}
-        />
-
-        <Autocomplete
-        sx={{ width: '500px' }}
-          disablePortal
-          id="dataType-combo"
-          options={accountSubtypes}
-          value={accountSubtype}
-          getOptionLabel={(option) => option}
-          onChange={(event, newValue) => { setAccountSubtype(newValue) }} // newValue will be the selected option object
-          renderInput={(params) => <TextField {...params} label="Account Subtype" />}
-        />
-
-        {attributeMetadata.map(attribute => (
+      <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03) }}>
+        <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {showSuccessMessage && (
+            <Alert severity="success" variant="outlined" sx={{ borderRadius: 2.5, py: 0.5, fontSize: '0.8rem', bgcolor: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.35)' }}>
+              {successMessage || 'Chart of account saved successfully.'}
+            </Alert>
+          )}
+          {showErrorMessage && (
+            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2.5, py: 0.5, fontSize: '0.8rem', bgcolor: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.35)' }}>
+              {String(errorMessage) || 'An error occurred.'}
+            </Alert>
+          )}
+          <Stack direction="row" spacing={2}>
+            <TextField
+              label="Account Number"
+              fullWidth required size="small"
+              value={accountNumber}
+              onChange={(e) => { setAccountNumber(e.target.value); setAccountNumberError(validateTextField(e.target.value)); }}
+              error={!!accountNumberError}
+              helperText={accountNumberError}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
+                '& .MuiInputLabel-root': { fontSize: '0.9rem' },
+              }}
+            />
+            <TextField
+              label="Account Name"
+              fullWidth required size="small"
+              value={accountName}
+              onChange={(e) => { setAccountName(e.target.value); setAccountNameError(validateTextField(e.target.value)); }}
+              error={!!accountNameError}
+              helperText={accountNameError}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
+                '& .MuiInputLabel-root': { fontSize: '0.9rem' },
+              }}
+            />
+          </Stack>
           <TextField
-          sx={{ width: '500px' }}
-            key={attribute.attributeName}
-            name={attribute.attributeName}
-            label={attribute.attributeName}
-            type={attribute.dataType === 'Number' ? 'number' : 'text'}
-            value={formValues[attribute.attributeName]}
-            onChange={handleInputChange}
-            error={!!formErrors[attribute.attributeName]}
-            helperText={formErrors[attribute.attributeName] || ''}
-            fullWidth
-            margin="normal"
-            variant="outlined"
-          />
-        ))}
-
-      </DialogContent>
-      <DialogActions sx={{ justifyContent: "center" }}>
-        <Tooltip title='Save'>
-          <Button
-            onClick={handleAddChartOfAccount}
-            sx={{
-              bgcolor: '#14213d',
-              color: 'white',
-              '&:hover': {
-                color: '#E6E6EF', // Prevent text color from changing on hover
-              },
+            fullWidth label="Account Subtype" required size="small"
+            value={accountSubtype}
+            onClick={(e) => { setSubtypePickerAnchor(e.currentTarget); setSubtypePickerSearch(''); }}
+            inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' }, '& .MuiInputLabel-root': { fontSize: '0.9rem' } }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
+              endAdornment: accountSubtype ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setAccountSubtype(''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                    <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
             }}
+          />
+          <Popover
+            open={Boolean(subtypePickerAnchor)} anchorEl={subtypePickerAnchor}
+            onClose={() => setSubtypePickerAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+            slotProps={{ paper: { sx: { mt: 0.75, width: subtypePickerAnchor?.offsetWidth, borderRadius: 3, boxShadow: '0 8px 32px rgba(15,23,42,0.16)', border: '1px solid', borderColor: 'divider', overflow: 'hidden' } } }}
           >
-            Save
-          </Button>
-        </Tooltip>
-      </DialogActions>
+            <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+              <TextField autoFocus fullWidth size="small" placeholder="Search subtypes..."
+                value={subtypePickerSearch} onChange={(e) => setSubtypePickerSearch(e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment> }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+            </Box>
+            <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+              {filteredAccountSubtypes.length === 0 ? (
+                <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+                  <Typography variant="caption" color="text.disabled">No subtypes found.</Typography>
+                </ListItemButton>
+              ) : filteredAccountSubtypes.map((st) => (
+                <ListItemButton key={st} selected={st === accountSubtype}
+                  onClick={() => { setAccountSubtype(st); setSubtypePickerAnchor(null); }}
+                  sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
+                >
+                  <ListItemText primary={st} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500, fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Popover>
+          {attributeMetadata.length > 0 && (
+            <Stack spacing={2}>
+              {attributeMetadata.map(attribute => (
+                <TextField
+                  key={attribute.attributeName}
+                  name={attribute.attributeName}
+                  label={attribute.attributeName}
+                  size="small"
+                  type={attribute.dataType === 'Number' ? 'number' : 'text'}
+                  value={formValues[attribute.attributeName] ?? ''}
+                  onChange={handleInputChange}
+                  error={!!formErrors[attribute.attributeName]}
+                  helperText={formErrors[attribute.attributeName] || ''}
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' },
+                    '& .MuiInputLabel-root': { fontSize: '0.9rem' },
+                  }}
+                />
+              ))}
+            </Stack>
+          )}
+        </Box>
+      </DialogContent>
 
-      <Divider />
-      <div>
-        {showSuccessMessage && <SuccessAlert title={'Data saved successfully.'} message={successMessage} onClose={() => setOpen(false)} />}
-        {showErrorMessage && <ErrorAlert title={'Error!'} message={errorMessage} onClose={() => setOpen(false)} />}
-      </div>
+      <DialogActions sx={{
+        px: 3.5, py: 2, borderTop: '1px solid', borderColor: 'divider',
+        bgcolor: 'background.paper', justifyContent: 'flex-end', gap: 1.25,
+      }}>
+        <Button onClick={handleClose} variant="text" sx={{
+          borderRadius: 2, textTransform: 'none', fontWeight: 600,
+          color: 'text.secondary', px: 2.5, '&:hover': { bgcolor: 'action.hover' },
+        }}>
+          Cancel
+        </Button>
+        <Button onClick={handleAddChartOfAccount} variant="contained" disabled={!canSave} sx={{
+          borderRadius: 2, textTransform: 'none', fontWeight: 700, minWidth: 150, px: 3,
+          background: '#14213d', color: '#fff', boxShadow: '0 6px 16px rgba(20,33,61,0.35)',
+          '&:hover': { background: '#0d1628', boxShadow: '0 8px 22px rgba(20,33,61,0.45)' },
+          '&.Mui-disabled': { background: 'rgba(20,33,61,0.35)', color: '#fff', boxShadow: 'none' },
+        }}>
+          {isEditMode ? 'Update Account' : 'Save Account'}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 };

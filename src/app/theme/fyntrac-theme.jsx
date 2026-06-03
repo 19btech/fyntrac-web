@@ -36,11 +36,11 @@ const palette = {
 // ----------------------------------------------------------------------
 // ✒️ TYPOGRAPHY: Clean & Geometric
 // ----------------------------------------------------------------------
-const fontFamily = "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif";
+const fontFamily = '"Inter", "Helvetica Neue", Arial, sans-serif';
 
 const fyntracTheme = createTheme({
   palette,
-  
+
   typography: {
     fontFamily,
     h1: { fontWeight: 800, letterSpacing: -1 },
@@ -90,6 +90,8 @@ const fyntracTheme = createTheme({
       styleOverrides: {
         body: {
           backgroundColor: "#F0F0F7",
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
           scrollbarColor: "#CBD5E1 transparent",
           "&::-webkit-scrollbar, & *::-webkit-scrollbar": {
             backgroundColor: "transparent",
@@ -124,16 +126,12 @@ const fyntracTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 8,
-          margin: "4px 8px", // Breathing room around items
+          margin: 0,
           padding: "8px 12px",
-          transition: "all 0.2s ease-in-out",
-          "&:hover": {
-            backgroundColor: alpha(palette.primary.main, 0.04),
-            transform: "translateX(2px)", // Subtle movement
-          },
+          transition: "background-color 160ms, color 160ms",
           "&.Mui-selected": {
-            backgroundColor: alpha(palette.primary.main, 0.08),
-            "&:hover": { backgroundColor: alpha(palette.primary.main, 0.12) },
+            backgroundColor: '#14213d',
+            "&:hover": { backgroundColor: '#789dedff' },
           },
         },
       },
@@ -141,19 +139,25 @@ const fyntracTheme = createTheme({
     MuiListItemText: {
       styleOverrides: {
         primary: {
-          fontSize: "0.9rem",
-          fontWeight: 500, // Slightly bolder for readability (300 is too thin)
-          color: palette.text.secondary,
+          fontSize: "0.875rem",
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
         },
       },
     },
     MuiListItemIcon: {
       styleOverrides: {
         root: {
-          minWidth: "40px",
-          color: palette.text.secondary, // Gray by default
-          "&.Mui-selected": { color: palette.primary.main },
-          "& .MuiSvgIcon-root": { fontSize: "1.3rem" },
+          minWidth: "32px",
+          "& .MuiSvgIcon-root": { fontSize: "1.25rem" },
+        },
+      },
+    },
+
+    // --- TABS ---
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700,
         },
       },
     },
@@ -173,7 +177,18 @@ const fyntracTheme = createTheme({
           },
         },
         contained: {
-          background: `linear-gradient(135deg, ${palette.primary.main} 0%, ${palette.primary.dark} 100%)`,
+          background: "#14213d",
+          color: "#fff",
+          boxShadow: "0 6px 16px rgba(20, 33, 61, 0.25)",
+          "&:hover": {
+            background: "#0d1628",
+            boxShadow: "0 8px 22px rgba(20, 33, 61, 0.35)",
+          },
+          "&.Mui-disabled": {
+            background: "rgba(20, 33, 61, 0.35)",
+            color: "#fff",
+            boxShadow: "none",
+          },
         }
       },
     },
@@ -247,7 +262,7 @@ const fyntracTheme = createTheme({
         },
       },
     },
-    
+
     // --- TOOLTIP ---
     MuiTooltip: {
       styleOverrides: {
@@ -267,9 +282,9 @@ const fyntracTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundColor: "#FFFFFF !important",
-          backdropFilter: "none", 
+          backdropFilter: "none",
           boxShadow: "none",
-          borderBottom: "none", 
+          borderBottom: "none",
           color: palette.text.primary, // Ensures text/icons remain visible (dark)
         },
       },

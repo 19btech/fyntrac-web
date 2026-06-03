@@ -1,33 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import ViewHeadlineIcon from '@mui/icons-material/ViewHeadline';
+import ViewStreamIcon from '@mui/icons-material/ViewStream';
+import TableRowsIcon from '@mui/icons-material/TableRows';
+import DensitySmallIcon from '@mui/icons-material/DensitySmall';
 import {
   DataGrid,
-  GridToolbarContainer,
-  GridToolbarColumnsButton,
-  GridToolbarFilterButton,
-  GridToolbarExport,
-  GridToolbarDensitySelector,
+  Toolbar,
+  ToolbarButton,
+  ColumnsPanelTrigger,
+  FilterPanelTrigger,
+  useGridApiContext,
+  gridDensitySelector,
+  useGridSelector,
 } from '@mui/x-data-grid';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import CustomTabPanel from '../component/custom-tab-panel';
+
+// Density options matching the old GridToolbarDensitySelector
+const DENSITY_OPTIONS = [
+  { value: 'compact',    label: 'Compact',    icon: <ViewHeadlineIcon fontSize="small" /> },
+  { value: 'standard',   label: 'Standard',   icon: <TableRowsIcon fontSize="small" />   },
+  { value: 'comfortable',label: 'Comfortable',icon: <ViewStreamIcon fontSize="small" />   },
+];
+
 // Custom Toolbar Component
 function CustomToolbar() {
-  return (
-    <GridToolbarContainer>
-      <GridToolbarColumnsButton />
-      <GridToolbarDensitySelector
-        slotProps={{ tooltip: { title: 'Change density',  } }}
-      />
-      <Box sx={{ flexGrow: 1 }} /> {/* Spacer to push the export button to the right */}
-      {/* <GridToolbarExport
-        sx={{ color: 'lightgrey', "&:hover": { backgroundColor: "darkgrey" } }}
-        slotProps={{
-          tooltip: { title: 'Export data' },
-          button: { variant: 'outlined' },
+  const apiRef = useGridApiContext();
+  const currentDensity = useGridSelector(apiRef, gridDensitySelector);
+  const [densityAnchor, setDensityAnchor] = useState(null);
 
-        }}
-      /> */}
-    </GridToolbarContainer>
+  return (
+    <Toolbar>
+      {/* Columns panel trigger — replaces deprecated GridToolbarColumnsButton */}
+      <Tooltip title="Columns">
+        <ColumnsPanelTrigger render={<ToolbarButton />}>
+          <ViewColumnIcon fontSize="small" />
+        </ColumnsPanelTrigger>
+      </Tooltip>
+
+      {/* Filter panel trigger — replaces deprecated GridToolbarFilterButton */}
+      <Tooltip title="Filters">
+        <FilterPanelTrigger render={<ToolbarButton />}>
+          <FilterListIcon fontSize="small" />
+        </FilterPanelTrigger>
+      </Tooltip>
+
+      {/* Density selector — replaces deprecated GridToolbarDensitySelector */}
+      <Tooltip title="Change density">
+        <ToolbarButton onClick={(e) => setDensityAnchor(e.currentTarget)}>
+          <DensitySmallIcon fontSize="small" />
+        </ToolbarButton>
+      </Tooltip>
+      <Menu
+        anchorEl={densityAnchor}
+        open={Boolean(densityAnchor)}
+        onClose={() => setDensityAnchor(null)}
+      >
+        {DENSITY_OPTIONS.map((opt) => (
+          <MenuItem
+            key={opt.value}
+            selected={currentDensity === opt.value}
+            onClick={() => {
+              apiRef.current.setDensity(opt.value);
+              setDensityAnchor(null);
+            }}
+          >
+            <ListItemIcon>{opt.icon}</ListItemIcon>
+            <ListItemText>{opt.label}</ListItemText>
+          </MenuItem>
+        ))}
+      </Menu>
+
+      <Box sx={{ flexGrow: 1 }} />
+    </Toolbar>
   );
 }
 

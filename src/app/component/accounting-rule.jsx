@@ -4,8 +4,10 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import Typography from '@mui/material/Typography';
 import Transaction from './transaction';
+import Attribute from './attribute';
+import Aggregation from './aggregation';
+import AccountType from './account-type';
 
 function CustomTabPanel(props) {
     const { children, value, index, ...other } = props;
@@ -62,16 +64,16 @@ function AccountingRule(props){
         </Tabs>
       </Box>
       <CustomTabPanel value={value} index={0}>
-       <Transaction></Transaction>
+       <Transaction />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
-        Attributes
+        <Attribute />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={2}>
-        Balance
+        <Aggregation />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={3}>
-        Account Type
+        <AccountType />
       </CustomTabPanel>
 
      
