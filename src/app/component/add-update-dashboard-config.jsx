@@ -11,7 +11,7 @@ import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CheckIcon from '@mui/icons-material/Check';
-import { List as FixedSizeList } from 'react-window';
+import { FixedSizeList } from 'react-window';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
