@@ -1025,12 +1025,14 @@ export default function SettingsPage() {
                   </Box>
                 </Box>
                 <Tooltip title="Close" placement="left">
-                  <IconButton onClick={() => setShowReopenConfirm(false)} disabled={isReopening} size="small" sx={{
-                    color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
-                    '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
-                  }}>
-                    <HighlightOffOutlinedIcon fontSize="small" />
-                  </IconButton>
+                  <span>
+                    <IconButton onClick={() => setShowReopenConfirm(false)} disabled={isReopening} size="small" sx={{
+                      color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                      '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                    }}>
+                      <HighlightOffOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
                 </Tooltip>
               </Box>
             </DialogTitle>

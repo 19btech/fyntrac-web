@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField,
@@ -20,21 +20,47 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [date, setDate] = useState('');
   const [error, setError] = useState(false);
+  const [latestExecutionState, setLatestExecutionState] = useState(null);
+  const [showWarningMessage, setShowWarningMessage] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+
+  const fetchLatestExecutionState = async () => {
+    try {
+      const response = await dataloaderApi.get('/execution/state/get/latest', {
+        headers: { 'X-Tenant': tenant },
+      });
+      setLatestExecutionState(response.data);
+    } catch (err) {
+      console.error('Failed to fetch latest execution state:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchLatestExecutionState();
+    }
+  }, [open, tenant]);
 
   const handleChange = (event) => {
     const value = event.target.value;
     setDate(value);
     const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
     setError(!regex.test(value));
+    setShowWarningMessage(false);
   };
 
   const handleClose = () => {
     setShowErrorMessage(false);
     setShowSuccessMessage(false);
+    setShowWarningMessage(false);
     setDate('');
     setError(false);
     onClose(false);
   };
+
+  const WARNING_DESTRUCTIVE = `Critical Warning: Destructive Action > Continuing will permanently delete all data after this posting date from the system. This action cannot be undone.
+
+if you want to proceed then press Execute Model button`;
 
   const handleModelExecution = async () => {
     if (date.length === 0) {
@@ -42,6 +68,25 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
       return;
     }
     if (error) return;
+
+    // Check warning condition (execution date < latest execution date)
+    const parts = date.split('/');
+    let isWarningCondition = false;
+    if (parts.length === 3 && latestExecutionState && latestExecutionState.executionDate) {
+      const month = parts[0];
+      const day = parts[1];
+      const year = parts[2];
+      const dateInt = parseInt(`${year}${month}${day}`, 10);
+      if (dateInt < latestExecutionState.executionDate) {
+        isWarningCondition = true;
+      }
+    }
+
+    if (isWarningCondition && !showWarningMessage) {
+      setShowWarningMessage(true);
+      setWarningMessage(WARNING_DESTRUCTIVE);
+      return;
+    }
 
     const isDsl = modelType === 'DSL' || modelType === 'PYTHON';
     const serviceURL = isDsl ? '/model/execute/dsl' : '/model/execute';
@@ -54,6 +99,8 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
 
       setSuccessMessage(response.data);
       setShowSuccessMessage(true);
+      setShowWarningMessage(false);
+      fetchLatestExecutionState();
 
       setTimeout(() => {
         setShowSuccessMessage(false);
@@ -61,12 +108,17 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
         onClose(false);
       }, 3000);
     } catch (err) {
+      console.log("err", err);
+      const data = err?.response?.data;
       const msg =
-        err?.response?.data?.message ||
+        (typeof data === 'string' && data) ||
+        data?.message ||
+        data?.error ||
         err?.message ||
         'An unexpected error occurred.';
       setErrorMessage(msg);
       setShowErrorMessage(true);
+      setShowWarningMessage(false);
     }
   };
 
@@ -81,15 +133,15 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
         transition: { direction: 'up' },
         paper: {
           sx: {
-          borderRadius: 4,
-          boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
-          overflow: 'hidden',
-          border: '1px solid',
-          borderColor: 'divider',
-          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-          '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & .MuiFormHelperText-root': {
-          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-          },
+            borderRadius: 4,
+            boxShadow: '0 32px 64px rgba(15,23,42,0.18)',
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+            '& .MuiTypography-root, & .MuiInputBase-root, & .MuiButton-root, & .MuiChip-root, & .MuiFormHelperText-root': {
+              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+            },
           },
         },
       }}
@@ -179,6 +231,24 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
           {showErrorMessage && (
             <Alert severity="error" variant="outlined" sx={{ borderRadius: 2.5 }}>
               {String(errorMessage) || 'An error occurred.'}
+            </Alert>
+          )}
+          {showWarningMessage && (
+            <Alert
+              severity="warning"
+              variant="outlined"
+              onClose={() => setShowWarningMessage(false)}
+              sx={{
+                borderRadius: 2.5,
+                bgcolor: 'rgba(245,158,11,0.05)',
+                borderColor: 'rgba(245,158,11,0.3)',
+                color: '#b45309',
+                fontWeight: 600,
+                whiteSpace: 'pre-line',
+                '& .MuiAlert-icon': { color: '#d97706' },
+              }}
+            >
+              {warningMessage}
             </Alert>
           )}
 
