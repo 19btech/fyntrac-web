@@ -58,10 +58,7 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
     onClose(false);
   };
 
-  const WARNING_DESTRUCTIVE = `Critical Warning: Destructive Action > Continuing will permanently delete all data after this posting date from the system. This action cannot be undone.
-
-if you want to proceed then press Execute Model button`;
-
+  const WARNING_DESTRUCTIVE = `DESTRUCTIVE ACTION: Continuing permanently deletes all future data after this date. This cannot be undone. Press "Execute Model" to proceed.`;
   const handleModelExecution = async () => {
     if (date.length === 0) {
       setError(true);
