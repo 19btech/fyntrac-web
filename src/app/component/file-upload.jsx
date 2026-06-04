@@ -94,6 +94,32 @@ export default function FileUploadComponent({
       ? activityTypeRef.current
       : ACTIVITY_TYPES.STANDARD;
 
+    if (showActivitySelector) {
+      const isStandardFile = (fileName) => {
+        const name = fileName.toLowerCase();
+        return name.includes("transactionactivity") || name.includes("instrumentattribute");
+      };
+
+      const csvFiles = acceptedFiles.filter(f => f.name.toLowerCase().endsWith(".csv"));
+      if (csvFiles.length > 0) {
+        if (currentActivityType === ACTIVITY_TYPES.STANDARD) {
+          const hasInvalidFile = csvFiles.some(f => !isStandardFile(f.name));
+          if (hasInvalidFile) {
+            setErrorMessage("Standard Activity upload only accepts 'transactionactivity' or 'instrumentattribute' files.");
+            uploadLock.current = false;
+            return;
+          }
+        } else if (currentActivityType === ACTIVITY_TYPES.CUSTOM) {
+          const hasStandardFile = csvFiles.some(f => isStandardFile(f.name));
+          if (hasStandardFile) {
+            setErrorMessage("Custom Activity upload does not accept standard activity files. Please select Standard Activity type.");
+            uploadLock.current = false;
+            return;
+          }
+        }
+      }
+    }
+
     const targetUrl = (() => {
       console.log("Mode:", loadMode, "Activity Type:", currentActivityType);
 
@@ -256,65 +282,89 @@ export default function FileUploadComponent({
     >
       {/* HEADER SECTION */}
       <Box sx={{ p: 3, bgcolor: alpha(theme.palette.primary.main, 0.02), borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
+
+        {/* Main Outer Container - Forces a vertical stack top-to-bottom */}
+        <Stack direction="column" spacing={2} sx={{ width: '100%' }}>
+
+          {/* TOP ROW: Header Title Message */}
           <Box>
             <Typography variant="body2" color="text.secondary">
               {headerMessage}
             </Typography>
           </Box>
 
-          {showActivitySelector && (
-            <FormControl size="small" sx={{ minWidth: 240 }}>
-              <InputLabel>Activity Type</InputLabel>
-              <Select
-                value={activityType}
-                label="Activity Type"
-                disabled={status !== "idle"}
-                onChange={(e) => setActivityType(e.target.value)}
-                sx={{ bgcolor: 'background.paper' }}
-              >
-                <MenuItem value={ACTIVITY_TYPES.STANDARD}>Standard Activity</MenuItem>
-                <MenuItem value={ACTIVITY_TYPES.CUSTOM}>Custom Activity</MenuItem>
-              </Select>
-            </FormControl>
+          {/* MIDDLE ROW: Full-Width Error Alert (breaks to its own clean line completely) */}
+          {errorMessage && (
+            <Box sx={{ width: '100%' }}>
+              <Alert severity="error" variant="outlined" sx={{ borderRadius: 2 }}>
+                {errorMessage}
+              </Alert>
+            </Box>
           )}
 
-          {showLoadModeSelector && (
-            <Stack direction="row" spacing={1} alignItems="center">
-              {['OVERWRITE', 'APPEND'].map((mode) => {
-                const selected = loadMode === mode;
-                const label = mode === 'OVERWRITE' ? 'Overwrite' : 'Append';
-                return (
-                  <Chip
-                    key={mode}
-                    label={label}
-                    icon={selected ? <CheckIcon sx={{ fontSize: '13px !important' }} /> : undefined}
-                    onClick={() => setLoadMode(mode)}
-                    size="small"
-                    disabled={status !== 'idle'}
-                    sx={{
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-                      letterSpacing: 0.2,
-                      height: 28,
-                      borderRadius: 2,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      bgcolor: selected ? alpha('#16a34a', 0.12) : alpha(theme.palette.grey[500], 0.08),
-                      color: selected ? '#16a34a' : 'text.secondary',
-                      border: '1.5px solid',
-                      borderColor: selected ? '#16a34a' : alpha(theme.palette.text.secondary, 0.2),
-                      '& .MuiChip-icon': { color: '#16a34a' },
-                      '&:hover': {
-                        bgcolor: selected ? alpha('#16a34a', 0.18) : alpha('#16a34a', 0.06),
-                        borderColor: '#16a34a',
-                        color: '#16a34a',
-                      },
-                    }}
-                  />
-                );
-              })}
+          {/* BOTTOM ROW: Controls Bar - Selectors align side-by-side or stack on mobile */}
+          {(showActivitySelector || showLoadModeSelector) && (
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              justifyContent="flex-start"
+              alignItems={{ sm: 'center' }}
+              spacing={2}
+              sx={{ mt: errorMessage ? 0 : 1 }} // Fine-tunes spacing if alert is missing
+            >
+              {showActivitySelector && (
+                <FormControl size="small" sx={{ minWidth: 240 }}>
+                  <InputLabel>Activity Type</InputLabel>
+                  <Select
+                    value={activityType}
+                    label="Activity Type"
+                    disabled={status !== "idle"}
+                    onChange={(e) => setActivityType(e.target.value)}
+                    sx={{ bgcolor: 'background.paper' }}
+                  >
+                    <MenuItem value={ACTIVITY_TYPES.STANDARD}>Standard Activity</MenuItem>
+                    <MenuItem value={ACTIVITY_TYPES.CUSTOM}>Custom Activity</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+
+              {showLoadModeSelector && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {['OVERWRITE', 'APPEND'].map((mode) => {
+                    const selected = loadMode === mode;
+                    const label = mode === 'OVERWRITE' ? 'Overwrite' : 'Append';
+                    return (
+                      <Chip
+                        key={mode}
+                        label={label}
+                        icon={selected ? <CheckIcon sx={{ fontSize: '13px !important' }} /> : undefined}
+                        onClick={() => setLoadMode(mode)}
+                        size="small"
+                        disabled={status !== 'idle'}
+                        sx={{
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                          letterSpacing: 0.2,
+                          height: 28,
+                          borderRadius: 2,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          bgcolor: selected ? alpha('#16a34a', 0.12) : alpha(theme.palette.grey[500], 0.08),
+                          color: selected ? '#16a34a' : 'text.secondary',
+                          border: '1.5px solid',
+                          borderColor: selected ? '#16a34a' : alpha(theme.palette.text.secondary, 0.2),
+                          '& .MuiChip-icon': { color: '#16a34a' },
+                          '&:hover': {
+                            bgcolor: selected ? alpha('#16a34a', 0.18) : alpha('#16a34a', 0.06),
+                            borderColor: '#16a34a',
+                            color: '#16a34a',
+                          },
+                        }}
+                      />
+                    );
+                  })}
+                </Stack>
+              )}
             </Stack>
           )}
         </Stack>
@@ -323,12 +373,6 @@ export default function FileUploadComponent({
       {/* CONTENT SECTION */}
       <Box sx={{ p: 4 }}>
         <Stack spacing={3}>
-
-          {errorMessage && (
-            <Alert severity="error" variant="outlined" sx={{ borderRadius: 2 }}>
-              {errorMessage}
-            </Alert>
-          )}
 
           {/* DROPZONE */}
           <Box
