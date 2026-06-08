@@ -33,7 +33,7 @@ import {
 } from '@mui/material';
 import { useTenant } from "../tenant-context";
 import PageContent from '../component/pageContent';
-import { dataloaderApi } from '../services/api-client';
+import { dataloaderApi, reportingApi } from '../services/api-client';
 import fyntracTheme from "../theme/fyntrac-theme";
 // Icons
 import MenuIcon from '@mui/icons-material/Menu';
@@ -430,6 +430,35 @@ export default function DashboardLayoutModern() {
       const eventNames = Array.isArray(events) ? events.map(e => e.eventName || e.name).filter(Boolean) : [];
       const activeModels = Array.isArray(models) ? models : [];
       const primaryModel = activeModels[0] ?? null;
+
+      // Reference Table Data: for every reference custom table, confirm its data has been
+      // ingested. The reporting "execute" endpoint returns the actual loaded rows, keyed by the
+      // table's id (not its name — a name-keyed call returns []). Empty rows = data not loaded.
+      let referenceTableData;
+      const refTablesMissingData = [];
+      const refTablesToCheck = customTablesArr
+        .map(t => ({ id: t.id || t._id, name: t.tableName || t.name }))
+        .filter(t => t.id && t.name);
+      if (refTablesToCheck.length > 0) {
+        const dataResults = await Promise.allSettled(
+          refTablesToCheck.map(t => reportingApi.post(`/custom-ref-data/execute/${t.id}`, []))
+        );
+        dataResults.forEach((r, i) => {
+          const { name } = refTablesToCheck[i];
+          if (r.status !== 'fulfilled') {
+            console.warn('Reference data check failed for', name, r.reason);
+            refTablesMissingData.push(name);
+            return;
+          }
+          const rows = Array.isArray(r.value?.data) ? r.value.data : [];
+          if (rows.length === 0) refTablesMissingData.push(name);
+        });
+        referenceTableData = refTablesMissingData.length === 0 ? 'done' : 'warning';
+      } else {
+        // No reference tables to load: 'done' when the Custom Tables phase is otherwise
+        // populated (e.g. operational-only), else 'pending' so a fully empty phase stays optional.
+        referenceTableData = operationalTableNames.length > 0 ? 'done' : 'pending';
+      }
       setReadinessStatus({
         currency: (settings?.currency || settings?.homeCurrency || settings?.fiscalPeriodStartDate) ? 'done' : 'pending',
         fiscal: cnt(periods) > 0 ? 'done' : 'pending',
@@ -445,6 +474,8 @@ export default function DashboardLayoutModern() {
         customtables: (tableNames.length + operationalTableNames.length) > 0 ? 'done' : 'pending',
         customTableNames: tableNames,
         operationalTableNames,
+        referenceTableData,
+        referenceTableDataMissing: refTablesMissingData,
         model: primaryModel ? 'done' : 'pending',
         modelName: primaryModel?.modelName ?? null,
         modelType: primaryModel?.modelType ?? null,
@@ -464,6 +495,17 @@ export default function DashboardLayoutModern() {
   const [journalInitialTab, setJournalInitialTab] = React.useState(0);
 
   React.useEffect(() => setMounted(true), []);
+
+  // Allow deeply-nested components (e.g. the event-configuration modal) to
+  // request in-app navigation without prop drilling, via a global custom event.
+  React.useEffect(() => {
+    const onNavigateRequest = (e) => {
+      const segment = e?.detail?.segment;
+      if (segment) handleNavigation(segment);
+    };
+    window.addEventListener('fyntrac:navigate', onNavigateRequest);
+    return () => window.removeEventListener('fyntrac:navigate', onNavigateRequest);
+  }, []);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
   const handleCollapseToggle = () => setIsCollapsed(!isCollapsed);
@@ -790,6 +832,7 @@ export default function DashboardLayoutModern() {
               id: 'customtables', label: 'Custom Tables', route: 'settings/accounting-rules/custom-table', mandatory: false,
               items: [
                 { id: 'customtables', label: 'Custom Tables', namesKey: 'customTableNames', opNamesKey: 'operationalTableNames', route: 'settings/accounting-rules/custom-table' },
+                { id: 'referenceTableData', label: 'Reference Table Data', missingKey: 'referenceTableDataMissing', route: 'sync' },
               ],
             },
             {
@@ -1026,10 +1069,34 @@ export default function DashboardLayoutModern() {
                                     </Typography>
                                   );
                                 })()}
+                                {/* Reference Table Data: list of tables still missing ingested data */}
+                                {item.missingKey && (() => {
+                                  const missing = readinessStatus[item.missingKey] ?? [];
+                                  if (status === 'done') {
+                                    return (
+                                      <Typography variant="caption" sx={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, display: 'block', mt: 0.5 }}>
+                                        All reference tables have data loaded
+                                      </Typography>
+                                    );
+                                  }
+                                  if (status === 'warning' && missing.length > 0) {
+                                    return (
+                                      <Box sx={{ mt: 0.75 }}>
+                                        <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', mb: 0.25 }}>No data loaded</Typography>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                          {missing.map(name => (
+                                            <Chip key={name} label={name} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#d97706', 0.1), color: '#b45309', borderRadius: 1 }} />
+                                          ))}
+                                        </Box>
+                                      </Box>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                                 {/* Warning label */}
                                 {status === 'warning' && (
                                   <Typography variant="caption" sx={{ color: '#d97706', fontSize: '0.72rem', fontWeight: 600, display: 'block', mt: 0.5 }}>
-                                    Has validation issues — review before proceeding
+                                    {item.missingKey ? 'Load data for the highlighted reference tables to continue' : 'Has validation issues — review before proceeding'}
                                   </Typography>
                                 )}
                               </Box>

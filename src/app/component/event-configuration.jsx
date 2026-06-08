@@ -117,6 +117,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [customOperationalTables, setCustomOperationalTables] = useState([]);
     const [customTableColumns, setCustomTableColumns] = useState([]);
     const [customTableMappings, setCustomTableMappings] = useState([]);
+    // Tracks whether the map-field fetch for the selected operational table has completed,
+    // so the "no data loaded" warning only appears once we know the result (not mid-fetch).
+    const [customMappingFetched, setCustomMappingFetched] = useState(false);
     const [referenceTables, setReferenceTables] = useState([]);
     const [operationalTables, setOperationalTables] = useState([]);
     const [triggerTypePickerAnchor, setTriggerTypePickerAnchor] = useState(null);
@@ -268,6 +271,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             uri = `${baseURL}/fyntrac/custom-table/get/values/operational_table/${reference}`;
         }
 
+        setCustomMappingFetched(false);
         dataloaderApi.get(uri)
             .then(response => {
                 const metadata = Array.isArray(response.data?.data)
@@ -284,7 +288,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
             .catch(error => {
                 console.error('Error fetching custom source mapping:', error);
                 setCustomTableMappings([]);
-            });
+            })
+            .finally(() => setCustomMappingFetched(true));
     }, [baseURL, tenant]);
 
     // Load edit data when component opens
@@ -352,13 +357,16 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 // Determine which table list to use based on selection
                 if (selectedSource === 'operational_table') {
                     determinedTable = operationalTables[0]; // Assign local variable
-                    // Assuming fetchCustomSourceMapping takes (TableName, SourceType)
-                    fetchCustomSourceMapping(determinedTable, 'operational_table');
-
-
-
+                    // On edit the saved operational table may not be operationalTables[0], so
+                    // fetch map fields for the event's actual source table when one exists.
+                    const tableForMappings = sourceMappings[0]?.sourceTable || operationalTables[0];
+                    if (tableForMappings) fetchCustomSourceMapping(tableForMappings, 'operational_table');
+                    // Source table options must be the operational tables (not the standard
+                    // sources) — important on edit, where the load defaults to ALL_SOURCES.
+                    setAvailableSources(operationalTables);
                 } else if (selectedSource === 'reference_table') {
                     setCustomTableMappings([]);
+                    setAvailableSources(referenceTables);
                 }
             }
 
@@ -368,7 +376,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             }
         }
 
-    }, [eventData.triggerSource, eventData.triggerType, referenceTables, operationalTables, newSource.sourceTable, fetchCustomSourceMapping]);
+    }, [eventData.triggerSource, eventData.triggerType, referenceTables, operationalTables, newSource.sourceTable, sourceMappings, fetchCustomSourceMapping]);
 
     const resetForm = () => {
         setEventData({
@@ -393,6 +401,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
         });
         setAlert({ open: false, message: '', severity: 'success' });
         setCustomTableMappings([]);
+        setCustomMappingFetched(false);
         setSubmitted(false);
     };
 
@@ -411,14 +420,19 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setEventData((prev) => ({ ...prev, [key]: value }));
         setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
 
-        if (key === 'triggerType' && value === 'ON_CUSTOM_DATA_TRIGGER') {
-            {
-                if (referenceTables.length > 0)
-                    setAvailableSources(referenceTables);
-                else
-                    setAvailableSources([]);
+        if (key === 'triggerType') {
+            // Changing the trigger type invalidates any previously selected source mappings.
+            setSourceMappings([]);
+            setEditingRow(null);
+            setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] });
+            setCustomTableMappings([]);
+            setCustomMappingFetched(false);
+        }
 
-            }
+        if (key === 'triggerType' && value === 'ON_CUSTOM_DATA_TRIGGER') {
+            // Don't populate the source-mapping tables yet — wait until the trigger source
+            // (Reference Table / Operational Table) is selected, which sets the correct sources.
+            setAvailableSources([]);
         }
 
 
@@ -465,6 +479,20 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const showTriggerSource = ['ON_ATTRIBUTE_CHANGE', 'ON_TRANSACTION_POST', 'ON_CUSTOM_DATA_TRIGGER', 'ON_REPLAY'].includes(eventData.triggerType);
+
+    // When the trigger is a Custom Data Trigger sourced from an Operational Table but the
+    // reference table behind it has no ingested data, there are no map fields to choose from.
+    // Surface a persistent warning that links to the Ingest page so the user can load data.
+    const showNoMapFieldsWarning =
+        eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' &&
+        eventData.triggerSource?.[0]?.value === 'operational_table' &&
+        customMappingFetched &&
+        (!Array.isArray(customTableMappings) || customTableMappings.length === 0);
+
+    const goToIngest = () => {
+        window.dispatchEvent(new CustomEvent('fyntrac:navigate', { detail: { segment: 'sync' } }));
+        if (onClose) onClose(false);
+    };
 
 
     const getColumnsByReferenceTableName = (tableName) => {
@@ -954,6 +982,11 @@ export default function EventConfiguration({ open, onClose, editData }) {
             setAvailableSources(['Attribute']);
 
         }
+        else if (eventData?.triggerType === 'ON_REPLAY') {
+            // Replay allows all standard sources (matches create-mode behaviour, which
+            // includes Transactions) so editing isn't missing it.
+            setAvailableSources([...ALL_SOURCES]);
+        }
         else {
             setAvailableSources([]);
             setAvailableSources(["Attribute", "Balances"]);
@@ -1069,6 +1102,29 @@ export default function EventConfiguration({ open, onClose, editData }) {
                       }}
                     >
                       {alert.message}
+                    </Alert>
+                  )}
+                  {showNoMapFieldsWarning && (
+                    <Alert
+                      severity="warning"
+                      variant="standard"
+                      sx={{
+                        borderRadius: 2.5, fontSize: '0.8rem', fontWeight: 600,
+                        bgcolor: 'rgba(245,158,11,0.10)',
+                        border: '1px solid rgba(245,158,11,0.3)',
+                        color: '#b45309',
+                        '& .MuiAlert-icon': { color: '#d97706' },
+                      }}
+                    >
+                      It looks like no data has been loaded yet for the reference table attached to this operational table, so there are no map fields to choose from. Please load the data first, then the map field selection will appear here.{' '}
+                      <Box
+                        component="span"
+                        onClick={goToIngest}
+                        sx={{ fontWeight: 700, color: '#b45309', textDecoration: 'underline', cursor: 'pointer', '&:hover': { color: '#92400e' } }}
+                      >
+                        Click here
+                      </Box>{' '}
+                      to go to Ingest.
                     </Alert>
                   )}
                     {/* Event Details Card */}
@@ -1512,7 +1568,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                             </TableCell>
                                             <TableCell>
                                                 {editingRow === row.id ? (() => {
-                                                    const dmOpts = dataMappingOptions[row.sourceTable] || [];
+                                                    const dmOpts = eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER'
+                                                        ? customTableMappings
+                                                        : (dataMappingOptions[row.sourceTable] || []);
                                                     const dmEnabled = isDataMappingEnabled(row.sourceTable);
                                                     const filtDM = dmOpts.filter(o => o.label.toLowerCase().includes(emPickerSearch.toLowerCase()));
                                                     const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.secondary.main, 0.12), color: theme.palette.secondary.dark, border: `1px solid ${alpha(theme.palette.secondary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.secondary.main, 0.5), '&:hover': { color: theme.palette.secondary.dark } } };
