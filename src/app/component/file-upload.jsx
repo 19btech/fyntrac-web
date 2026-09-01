@@ -122,8 +122,9 @@ export default function FileUploadComponent({
 
     const targetUrl = (() => {
       console.log("Mode:", loadMode, "Activity Type:", currentActivityType);
-
-      if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
+      if(!showLoadModeSelector){
+        return activity_appendURL;
+      }else if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
         return custom_overwriteURL;
       } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
         return custom_appendURL;
