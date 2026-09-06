@@ -32,7 +32,7 @@ function Transaction({ refreshData, onToast }) {
   const handleConfirmDelete = async () => {
     if (!rowToDelete) return;
     try {
-      await dataloaderApi.delete(`/transaction/delete/${rowToDelete.id}`);
+      await dataloaderApi.delete(`/transaction/delete/name/${encodeURIComponent(rowToDelete.name)}`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
       fetchTransactionData();

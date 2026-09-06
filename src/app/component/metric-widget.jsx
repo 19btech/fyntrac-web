@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
 
 const formatMetricName = (name) =>
   (name || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -34,15 +35,17 @@ const MetricWidget = ({ metric, currencyCode = 'USD' }) => {
   const activity = parseFloat(balance.activity || 0);
 
   const diff = ending - beginning;
-  const percentageChange = beginning !== 0 ? (diff / beginning) * 100 : 100;
+  // Zero placeholder (shown when no widgets are configured) — render neutrally, not as growth.
+  const isZero = beginning === 0 && ending === 0 && activity === 0;
+  const percentageChange = beginning !== 0 ? (diff / beginning) * 100 : (ending !== 0 ? 100 : 0);
 
   const isPositive = activity >= 0;
   const diffSign = isPositive ? '+' : '-';
   const diffValue = `${Math.abs(activity / 1000).toFixed(0)}K`;
-  const percentLabel = `${diffSign}${Math.abs(percentageChange).toFixed(0)}%`;
+  const percentLabel = `${isZero ? '' : diffSign}${Math.abs(percentageChange).toFixed(0)}%`;
 
-  const accentColor = isPositive ? '#10b981' : '#ef4444';
-  const accentBg   = isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+  const accentColor = isZero ? '#94a3b8' : (isPositive ? '#10b981' : '#ef4444');
+  const accentBg   = isZero ? 'rgba(148,163,184,0.12)' : (isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)');
 
   const animatedEnding = useAnimatedValue(ending);
 
@@ -73,7 +76,7 @@ const MetricWidget = ({ metric, currencyCode = 'USD' }) => {
         position: 'relative',
         overflow: 'hidden',
         // Left accent stripe — tint colour
-        borderLeft: `4px solid ${isPositive ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)'}`,
+        borderLeft: `4px solid ${isZero ? 'rgba(148,163,184,0.45)' : (isPositive ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)')}`,
         // Subtle diagonal gradient tint
         background: 'transparent',
         transition: 'box-shadow 0.22s ease',
@@ -136,9 +139,11 @@ const MetricWidget = ({ metric, currencyCode = 'USD' }) => {
               justifyContent: 'center',
             }}
           >
-            {isPositive
-              ? <TrendingUpIcon sx={{ fontSize: '0.85rem' }} />
-              : <TrendingDownIcon sx={{ fontSize: '0.85rem' }} />
+            {isZero
+              ? <TrendingFlatIcon sx={{ fontSize: '0.85rem' }} />
+              : isPositive
+                ? <TrendingUpIcon sx={{ fontSize: '0.85rem' }} />
+                : <TrendingDownIcon sx={{ fontSize: '0.85rem' }} />
             }
           </Box>
           <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: accentColor }}>
@@ -146,7 +151,7 @@ const MetricWidget = ({ metric, currencyCode = 'USD' }) => {
           </Typography>
         </Box>
         <Typography sx={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>
-          {diffSign} {diffValue} this month
+          {isZero ? 'No activity this month' : `${diffSign} ${diffValue} this month`}
         </Typography>
       </Box>
     </Box>

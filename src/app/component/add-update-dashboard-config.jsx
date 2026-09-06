@@ -11,7 +11,7 @@ import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CheckIcon from '@mui/icons-material/Check';
-import { List as FixedSizeList } from 'react-window';
+import { List as WindowList } from 'react-window';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
 
@@ -24,15 +24,13 @@ const VirtualizedListbox = React.forwardRef(function VirtualizedListbox({ childr
   const height = Math.max(1, Math.min(items.length, LISTBOX_MAX_VISIBLE)) * LISTBOX_ITEM_HEIGHT;
   return (
     <Box ref={ref} {...other}>
-      <FixedSizeList
-        height={height}
-        width="100%"
-        itemSize={LISTBOX_ITEM_HEIGHT}
-        itemCount={items.length}
+      <WindowList
+        rowCount={items.length}
+        rowHeight={LISTBOX_ITEM_HEIGHT}
+        rowComponent={({ index, style }) => <div style={style}>{items[index]}</div>}
+        style={{ height, width: "100%" }}
         overscanCount={6}
-      >
-        {({ index, style }) => <div style={style}>{items[index]}</div>}
-      </FixedSizeList>
+      />
     </Box>
   );
 });

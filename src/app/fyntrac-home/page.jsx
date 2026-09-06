@@ -317,6 +317,22 @@ export default function HomePage() {
 
   // --- RENDER ---
   // Added a slight background color to the container so white cards pop out
+  // When no widgets are configured (empty widget data), fall back to four zero-value
+  // placeholder widgets (no titles) so the metrics row stays populated instead of blank.
+  const ZERO_BALANCE = { beginningBalance: 0, endingBalance: 0, activity: 0 };
+  const displayWidgets = widgetDataList.length > 0
+    ? widgetDataList.slice(0, 4)
+    : Array.from({ length: 4 }, () => ({ metricName: '', balance: { ...ZERO_BALANCE } }));
+
+  // Shared empty-state copy + styling so the metrics table, trend graph and MoM graph all read
+  // identically (matching the trend graph's font) when the dashboard isn't configured.
+  const emptyStateMessage = isDataFetched ? 'Dashboard is not configured' : 'Loading data...';
+  const TopMetricsNoRowsOverlay = () => (
+    <Box sx={{ height: '100%', minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Typography color="text.secondary" fontWeight={500}>{emptyStateMessage}</Typography>
+    </Box>
+  );
+
   return (
     <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh' }}>
       <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -381,7 +397,7 @@ export default function HomePage() {
           </Grid>
 
           {/* B. Four Metric Widgets */}
-          {widgetDataList.slice(0, 4).map((metric, index) => (
+          {displayWidgets.map((metric, index) => (
             <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={index}>
               <DashboardCard noPadding>
                 <MetricWidget metric={metric} currencyCode={currencyCode} />
@@ -454,7 +470,7 @@ export default function HomePage() {
               ) : (
                 <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.grey[200], 0.3), borderRadius: 2 }}>
                   <Typography color="text.secondary" fontWeight={500}>
-                    {isDataFetched ? 'No trend data available' : 'Loading data...'}
+                    {emptyStateMessage}
                   </Typography>
                 </Box>
               )}
@@ -521,6 +537,7 @@ export default function HomePage() {
                 disableColumnMenu
                 disableRowSelectionOnClick
                 density="comfortable"
+                slots={{ noRowsOverlay: TopMetricsNoRowsOverlay }}
                 sx={{
                   border: 'none',
                   '& .MuiDataGrid-columnHeaders': {
@@ -601,7 +618,7 @@ export default function HomePage() {
               ) : (
                 <Box sx={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.grey[200], 0.3), borderRadius: 2 }}>
                   <Typography color="text.secondary" fontWeight={500}>
-                    {isDataFetched ? 'No activity data available' : 'Loading...'}
+                    {emptyStateMessage}
                   </Typography>
                 </Box>
               )}

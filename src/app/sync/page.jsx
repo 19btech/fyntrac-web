@@ -174,6 +174,7 @@ function Row({ row, isExpandedDefault = false }) {
                       <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 600 }}>Table Name</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>File Name</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Read</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Written</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Skipped</TableCell>
@@ -193,6 +194,9 @@ function Row({ row, isExpandedDefault = false }) {
                             <TableRow key={index}>
                               <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
                                 {detail.tableName}
+                              </TableCell>
+                              <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                                {detail.fileName}
                               </TableCell>
                               <TableCell align="center">{detail.recordsRead}</TableCell>
                               <TableCell align="center">{detail.recordsWritten}</TableCell>
@@ -384,7 +388,7 @@ export default function IngestPage() {
         setValidationLogs(res.data ?? []);
         if ((res.data ?? []).length === 0) setStripDismissed(false);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [tenant]);
 
   useEffect(() => { recheckValidationIssues(); }, [recheckValidationIssues]);
@@ -394,7 +398,7 @@ export default function IngestPage() {
     setResolvedIds(prev => {
       const next = new Set(prev);
       next.add(key);
-      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch {}
+      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch { }
       return next;
     });
   };
@@ -404,7 +408,7 @@ export default function IngestPage() {
     setResolvedIds(prev => {
       const next = new Set(prev);
       unresolvedLogs.forEach(r => next.add(String(r.id ?? `${r.rowNumber}-${r.fieldName}`)));
-      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch {}
+      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch { }
       return next;
     });
     showToast(`${count} issue${count !== 1 ? 's' : ''} marked as resolved.`, 'success');
@@ -660,11 +664,11 @@ export default function IngestPage() {
           transition: { direction: 'up' },
           paper: {
             sx: {
-            borderRadius: 4,
-            boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
-            overflow: 'hidden',
-            border: '1px solid',
-            borderColor: 'divider',
+              borderRadius: 4,
+              boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'divider',
             },
           },
         }}
@@ -860,83 +864,107 @@ export default function IngestPage() {
           </Box>
 
           <Box sx={{ flex: 1, overflow: 'hidden', px: 3 }}>
-          <DataGrid
-            rows={filteredLogs}
-            loading={validationLogsLoading}
-            getRowId={(row) => row.id ?? `${row.rowNumber}-${row.fieldName}`}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-            disableRowSelectionOnClick
-            slots={{ noRowsOverlay: ValidationNoRows }}
-            slotProps={{ noRowsOverlay: { severityFilter, context: 'ingest' } }}
-            columns={[
-              { field: 'validationType', headerName: 'Type', width: 140,
-                renderCell: (p) => <Box sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>{p.value}</Box> },
-              { field: 'fieldName', headerName: 'Field', width: 140,
-                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#475569' }}>{p.value ?? '—'}</Box> },
-              { field: 'rejectedValue', headerName: 'Rejected Value', width: 130,
-                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'rowNumber', headerName: 'Row #', width: 80, align: 'center', headerAlign: 'center',
-                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'errorCode', headerName: 'Error Code', width: 130,
-                renderCell: (p) => (
-                  <Chip label={p.value} size="small" sx={{
-                    height: 20, fontSize: '0.68rem', fontWeight: 700, fontFamily: 'monospace',
-                    bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626',
-                    border: '1px solid rgba(239,68,68,0.2)', borderRadius: 1,
-                  }} />
-                ) },
-              { field: 'errorMessage', headerName: 'Message', flex: 1, minWidth: 200,
-                renderCell: (p) => (
-                  <Tooltip title={p.value} placement="top-start">
-                    <Box sx={{ fontSize: '0.82rem', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                      {p.value}
+            <DataGrid
+              rows={filteredLogs}
+              loading={validationLogsLoading}
+              getRowId={(row) => row.id ?? `${row.rowNumber}-${row.fieldName}`}
+              pageSizeOptions={[10, 25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+              disableRowSelectionOnClick
+              slots={{ noRowsOverlay: ValidationNoRows }}
+              slotProps={{ noRowsOverlay: { severityFilter, context: 'ingest' } }}
+              columns={[
+                {
+                  field: 'validationType', headerName: 'Type', width: 140,
+                  renderCell: (p) => <Box sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>{p.value}</Box>
+                },
+                {
+                  field: 'fieldName', headerName: 'Field', width: 140,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#475569' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'rejectedValue', headerName: 'Rejected Value', width: 130,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'rowNumber', headerName: 'Row #', width: 80, align: 'center', headerAlign: 'center',
+                  renderCell: (p) => <Box sx={{ fontSize: '0.82rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'errorCode', headerName: 'Error Code', width: 130,
+                  renderCell: (p) => (
+                    <Chip label={p.value} size="small" sx={{
+                      height: 20, fontSize: '0.68rem', fontWeight: 700, fontFamily: 'monospace',
+                      bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626',
+                      border: '1px solid rgba(239,68,68,0.2)', borderRadius: 1,
+                    }} />
+                  )
+                },
+                {
+                  field: 'errorMessage', headerName: 'Message', flex: 1, minWidth: 200,
+                  renderCell: (p) => (
+                    <Tooltip title={p.value} placement="top-start">
+                      <Box sx={{ fontSize: '0.82rem', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                        {p.value}
+                      </Box>
+                    </Tooltip>
+                  )
+                },
+                {
+                  field: 'instrumentId', headerName: 'Instrument', width: 140,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'attributeId', headerName: 'Attribute', width: 120,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'postingDate', headerName: 'Posting', width: 90, align: 'center', headerAlign: 'center',
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'jobId', headerName: 'Job ID', width: 90, align: 'center', headerAlign: 'center',
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'createdAt', headerName: 'Timestamp', width: 160,
+                  renderCell: (p) => (
+                    <Box sx={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      {p.value ? new Date(p.value).toLocaleString() : '—'}
                     </Box>
-                  </Tooltip>
-                ) },
-              { field: 'instrumentId', headerName: 'Instrument', width: 140,
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'attributeId', headerName: 'Attribute', width: 120,
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'postingDate', headerName: 'Posting', width: 90, align: 'center', headerAlign: 'center',
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'jobId', headerName: 'Job ID', width: 90, align: 'center', headerAlign: 'center',
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>{p.value ?? '—'}</Box> },
-              { field: 'createdAt', headerName: 'Timestamp', width: 160,
-                renderCell: (p) => (
-                  <Box sx={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    {p.value ? new Date(p.value).toLocaleString() : '—'}
-                  </Box>
-                ) },
-              { field: '__resolve', headerName: '', width: 140, sortable: false, filterable: false,
-                renderCell: (p) => (
-                  <Button size="small" onClick={() => handleMarkResolved(p.row)} sx={{
-                    fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
-                    border: '1px solid', borderColor: alpha('#16a34a', 0.3),
-                    borderRadius: 1.5, px: 1.5, py: 0.25, minWidth: 'auto',
-                    '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
-                  }}>✓ Mark Resolved</Button>
-                ) },
-            ]}
-            sx={{
-              border: 0, flex: 1,
-              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-              fontSize: '0.85rem',
-              '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
-              '& .MuiDataGrid-columnHeaders': {
-                bgcolor: '#f8fafc', color: '#475569', fontSize: '0.7rem',
-                fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
-                borderBottom: '2px solid #e2e8f0',
-              },
-              '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
-              '& .MuiDataGrid-columnSeparator': { display: 'none' },
-              '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
-              '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
-              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#2563EB', 0.03) } },
-              '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
-              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
-            }}
-          />
+                  )
+                },
+                {
+                  field: '__resolve', headerName: '', width: 140, sortable: false, filterable: false,
+                  renderCell: (p) => (
+                    <Button size="small" onClick={() => handleMarkResolved(p.row)} sx={{
+                      fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
+                      border: '1px solid', borderColor: alpha('#16a34a', 0.3),
+                      borderRadius: 1.5, px: 1.5, py: 0.25, minWidth: 'auto',
+                      '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
+                    }}>✓ Mark Resolved</Button>
+                  )
+                },
+              ]}
+              sx={{
+                border: 0, flex: 1,
+                fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                fontSize: '0.85rem',
+                '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
+                '& .MuiDataGrid-columnHeaders': {
+                  bgcolor: '#f8fafc', color: '#475569', fontSize: '0.7rem',
+                  fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                  borderBottom: '2px solid #e2e8f0',
+                },
+                '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
+                '& .MuiDataGrid-columnSeparator': { display: 'none' },
+                '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#2563EB', 0.03) } },
+                '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
+                '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
+              }}
+            />
           </Box>
         </DialogContent>
       </Dialog>

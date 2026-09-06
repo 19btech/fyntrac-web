@@ -780,25 +780,29 @@ function Row({ row, onToggleStatus, onDownload, onExecute, executionStatus, exec
         <TableCell onClick={(e) => e.stopPropagation()} align="center">
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
             <Tooltip title={`Execute ${row.modelType || 'Model'}`}>
-              <IconButton
-                size="small"
-                onClick={handleExecute}
-                disabled={row.modelStatus !== 'ACTIVE'}
-                sx={{
-                  bgcolor: 'rgba(22,163,74,0.1)',
-                  border: '1px solid rgba(21,128,61,0.35)',
-                  color: '#16a34a',
-                  '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d' },
-                  '&.Mui-disabled': { bgcolor: 'rgba(0,0,0,0.04)', borderColor: 'transparent', color: 'action.disabled' },
-                }}
-              >
-                <PlayArrowIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleExecute}
+                  disabled={row.modelStatus !== 'ACTIVE'}
+                  sx={{
+                    bgcolor: 'rgba(22,163,74,0.1)',
+                    border: '1px solid rgba(21,128,61,0.35)',
+                    color: '#16a34a',
+                    '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d' },
+                    '&.Mui-disabled': { bgcolor: 'rgba(0,0,0,0.04)', borderColor: 'transparent', color: 'action.disabled' },
+                  }}
+                >
+                  <PlayArrowIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
             <Tooltip title="Download">
-              <IconButton size="small" onClick={handleDownload} disabled={!row.modelFileId}>
-                <FileDownloadOutlinedIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton size="small" onClick={handleDownload} disabled={!row.modelFileId}>
+                  <FileDownloadOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
             <Tooltip title={row.modelStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -825,9 +829,11 @@ function Row({ row, onToggleStatus, onDownload, onExecute, executionStatus, exec
               </Box>
             </Tooltip>
             <Tooltip title="Delete">
-              <IconButton size="small" color="error" disabled>
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton size="small" color="error" disabled>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </TableCell>

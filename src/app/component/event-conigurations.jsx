@@ -98,7 +98,11 @@ function EventConfigurationsList({ refreshData }) {
 
     async function updateEventConfigurationStatus(id, isActive) {
         try {
-            const response = await dataloaderApi.put(`/fyntrac/event-configurations/update/status/${id}/${isActive}`);
+            const response = await dataloaderApi.put(
+                `/fyntrac/event-configurations/update/status/${id}/${isActive}`,
+                null,
+                { headers: { 'X-User-Id': user?.id || '' } }
+            );
             return response.data;
         } catch (error) {
             console.error('Error updating status:', error.response?.data || error.message || error);
@@ -108,7 +112,10 @@ function EventConfigurationsList({ refreshData }) {
 
     async function deleteEventConfiguration(eventId) {
         try {
-            const response = await dataloaderApi.delete(`/fyntrac/event-configurations/delete/${eventId}`);
+            const response = await dataloaderApi.delete(
+                `/fyntrac/event-configurations/delete/${eventId}`,
+                { headers: { 'X-User-Id': user?.id || '' } }
+            );
             return response.data;
         } catch (error) {
             console.error('Error deleting:', error.response?.data || error.message || error);
