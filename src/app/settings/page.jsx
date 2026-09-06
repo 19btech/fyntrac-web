@@ -191,6 +191,7 @@ export default function SettingsPage() {
 
   // Delete entries
   const [latestPostingDate, setLatestPostingDate] = useState(null);
+  const [isDeletingEntries, setIsDeletingEntries] = useState(false);
 
   // Restatement
   const [restatementMode, setRestatementMode] = React.useState(false);
@@ -257,19 +258,35 @@ export default function SettingsPage() {
       .catch(() => {});
   };
 
-  React.useEffect(() => {
-    fetchSettings();
-    fetchCurrencies();
-    fetchClosedAccountingPeriods();
-    dataloaderApi.get('/activitylog/get/recent/loads')
+  const fetchRecentActivityLoads = () => {
+    return dataloaderApi.get('/activitylog/get/recent/loads')
       .then(res => {
         const logs = res.data ?? [];
         const completed = logs.filter(l => l.activityStatus === 'COMPLETED');
         setHasActivityData(completed.length > 0);
-        const dates = completed.map(l => l.postingDate).filter(Boolean);
-        if (dates.length > 0) setLatestPostingDate(String(dates.sort().at(-1)));
       })
       .catch(() => {});
+  };
+
+  // The recent-loads API only returns the last 11 upload records, so deriving "latest posting
+  // date" from it can miss the true latest once more uploads have happened since. ExecutionState
+  // is the authoritative running tally the backend itself updates on every load, so read it from
+  // there instead - same source the Delete Entries action uses to decide what to delete.
+  const fetchLatestPostingDate = () => {
+    return dataloaderApi.get('/execution/state/get/latest')
+      .then(res => {
+        const executionDate = res.data?.executionDate;
+        setLatestPostingDate(executionDate ? String(executionDate) : null);
+      })
+      .catch(() => {});
+  };
+
+  React.useEffect(() => {
+    fetchSettings();
+    fetchCurrencies();
+    fetchClosedAccountingPeriods();
+    fetchRecentActivityLoads();
+    fetchLatestPostingDate();
   }, []);
 
   const saveCurrency = async () => {
@@ -333,11 +350,21 @@ export default function SettingsPage() {
   };
 
   const handleDeleteEntries = async () => {
-    setShowDeleteConfirmDialog(false);
+    if (!latestPostingDate || isDeletingEntries) return;
+    setIsDeletingEntries(true);
     try {
+      // The backend derives the posting date to delete from ExecutionState itself (the same
+      // value shown here) rather than trusting a client-supplied one, so no body is sent.
+      await dataloaderApi.post('/setting/delete/activity-data', null, {
+        headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
+      });
+      setShowDeleteConfirmDialog(false);
       showToast('Entries deleted successfully.', 'success');
+      await Promise.all([fetchRecentActivityLoads(), fetchLatestPostingDate()]);
     } catch {
       showToast('Failed to delete entries.', 'error');
+    } finally {
+      setIsDeletingEntries(false);
     }
   };
 
@@ -462,7 +489,7 @@ export default function SettingsPage() {
       {/* ── Delete Entries confirm dialog ── */}
       <Dialog
         open={showDeleteConfirmDialog}
-        onClose={() => setShowDeleteConfirmDialog(false)}
+        onClose={() => !isDeletingEntries && setShowDeleteConfirmDialog(false)}
         maxWidth="xs" fullWidth
         slots={{ transition: Slide }}
         slotProps={{
@@ -498,12 +525,14 @@ export default function SettingsPage() {
               </Box>
             </Box>
             <Tooltip title="Close" placement="left">
-              <IconButton onClick={() => setShowDeleteConfirmDialog(false)} size="small" sx={{
-                color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
-                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
-              }}>
-                <HighlightOffOutlinedIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton onClick={() => setShowDeleteConfirmDialog(false)} disabled={isDeletingEntries} size="small" sx={{
+                  color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                  '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                }}>
+                  <HighlightOffOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </DialogTitle>
@@ -515,7 +544,7 @@ export default function SettingsPage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={handleDeleteEntries} variant="contained" sx={{
+          <Button onClick={handleDeleteEntries} disabled={isDeletingEntries} variant="contained" sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700,
             fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
             background: '#14213d', color: '#fff',
@@ -523,7 +552,7 @@ export default function SettingsPage() {
             transition: 'all 0.2s ease-in-out',
             '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
             '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
-          }}>Delete Entries</Button>
+          }}>{isDeletingEntries ? 'Deleting…' : 'Delete Entries'}</Button>
         </DialogActions>
       </Dialog>
 
