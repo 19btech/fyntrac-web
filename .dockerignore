@@ -6,3 +6,5 @@ docker-compose.yml
 *.md
 .git
 .gitignore
+.env.local
+.env*.local

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { gatewayUri } from "./runtime-config";
 
 /**
  * Centralized API client that routes all requests through the Spring Cloud Gateway.
@@ -9,15 +10,18 @@ import axios from "axios";
  * - 401 responses redirect to the login page
  */
 
-const GATEWAY_URI = process.env.NEXT_PUBLIC_GATEWAY_URI || "http://localhost:8585";
-
 const apiClient = axios.create({
-    baseURL: GATEWAY_URI,
     withCredentials: true,  // Send session cookies to gateway
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
+});
+
+// Resolve the gateway per request: the runtime config is only available once the page has loaded
+apiClient.interceptors.request.use((config) => {
+    config.baseURL = gatewayUri();
+    return config;
 });
 
 // Response interceptor: redirect to login on 401
@@ -58,7 +62,7 @@ export const authApi = {
      * The gateway handles the OAuth2 handshake and redirects back to the frontend.
      */
     getLoginUrl: () => {
-        return `${GATEWAY_URI}/oauth2/authorization/zitadel`;
+        return `${gatewayUri()}/oauth2/authorization/zitadel`;
     },
 
     /**
@@ -91,7 +95,7 @@ export const authApi = {
                 // Use fetch POST to trigger Spring Security logout.
                 // We don't use a form POST here to avoid the browser navigating
                 // to the gateway's redirect URL (which might be misconfigured as localhost on beta VMs).
-                await fetch(`${GATEWAY_URI}/auth/logout`, {
+                await fetch(`${gatewayUri()}/auth/logout`, {
                     method: "POST",
                     credentials: "include" // Must send session cookies
                 });

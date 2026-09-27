@@ -1,0 +1,62 @@
+diff -ru /home/uabbas/Downloads/fyntrac-web-final/src/app/component/file-upload.jsx /home/uabbas/Workspace/fyntrac-web/src/app/component/file-upload.jsx
+--- /home/uabbas/Downloads/fyntrac-web-final/src/app/component/file-upload.jsx	2026-06-03 16:09:58.000000000 +0500
++++ /home/uabbas/Workspace/fyntrac-web/src/app/component/file-upload.jsx	2026-06-03 20:38:21.127256260 +0500
+@@ -71,8 +71,10 @@
+     loadModeRef.current = loadMode;
+   }, [loadMode]);
+ 
+-  const standardURL = `/accounting/rule/upload`;
+-  const customURL = `/fyntrac/custom-table/data-upload`;
++  const activity_overwriteURL = `/accounting/rule/upload-overwrite`;
++  const activity_appendURL = `/accounting/rule/upload`;
++  const custom_overwriteURL = `/fyntrac/custom-table/data-upload-overwrite`;
++  const custom_appendURL = `/fyntrac/custom-table/data-upload`;
+ 
+   const handleDrop = async (acceptedFiles, fileRejections) => {
+     // 🔒 Prevent double upload
+@@ -92,10 +94,22 @@
+       ? activityTypeRef.current
+       : ACTIVITY_TYPES.STANDARD;
+ 
+-    const targetUrl =
+-      currentActivityType === ACTIVITY_TYPES.CUSTOM
+-        ? customURL
+-        : standardURL;
++    const targetUrl = (() => {
++      console.log("Mode:", loadMode, "Activity Type:", currentActivityType);
++
++      if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
++        return custom_overwriteURL;
++      } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
++        return custom_appendURL;
++      } else if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.STANDARD) { // ◄ Fixed here
++        return activity_overwriteURL;
++      } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.STANDARD) {  // ◄ Fixed here
++        return activity_appendURL;
++      }
++
++      return null;
++    })();
++
+ 
+     const newFiles = acceptedFiles.map((file) =>
+       Object.assign(file, { preview: URL.createObjectURL(file) })
+@@ -111,6 +125,8 @@
+     }
+ 
+     try {
++
++      console.log("Activity upload targetUrl", targetUrl);
+       const response = await dataloaderApi.post(targetUrl, formData, {
+         headers: {
+           "X-Tenant": tenant || "",
+@@ -133,7 +149,7 @@
+         setStatus("idle");
+         setFiles([]);
+         setUploadProgress({});
+-        uploadLock.current = false; 
++        uploadLock.current = false;
+         onDrop()// 🔓 Release lock
+       }, 5000);
+ 
+Only in /home/uabbas/Workspace/fyntrac-web/src/app/reports: custom-activity-data-report

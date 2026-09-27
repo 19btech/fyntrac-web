@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import apiClient from '../services/api-client';
+import { insightUrl } from '../services/runtime-config';
 import { useTenant } from '../tenant-context';
 import {
   Box,
@@ -136,7 +137,7 @@ export default function ReportDashboard() {
                   transition: 'transform 0.2s',
                   '&:hover': { transform: 'scale(1.02)' }
                 }}
-                onClick={() => handleCardClick({ url: process.env.NEXT_PUBLIC_INSIGHT_URL || "http://localhost:3001" })}
+                onClick={() => handleCardClick({ url: insightUrl() })}
               />
             )}
           </Box>

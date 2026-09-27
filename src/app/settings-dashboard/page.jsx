@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import apiClient from '../services/api-client';
+import { dslStudioUrl } from '../services/runtime-config';
 import { useTenant } from '../tenant-context';
 import {
   Box,
@@ -63,7 +64,7 @@ export default function ReportDashboard() {
       reports: [
         { name: "Setup Events", description: "Define business events that aggregate required data from multple input sources.", component: EventConfigurationMain },
         { name: "Setup Custom Tables", description: "Create and manage custom operational and reference data tables to support business specific needs.", component: CustomTablesMain },
-        { name: "Logic Studio", description: "Built,test and execute custom business logic for financial workflows.", url: process.env.NEXT_PUBLIC_DSL_STUDIO_URL || "http://localhost:3000" }
+        { name: "Logic Studio", description: "Built,test and execute custom business logic for financial workflows.", url: dslStudioUrl() }
       ]
     },
   ];
