@@ -90,11 +90,18 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
 
     try {
       const payload = { date };
+      // async=true: the service answers 202 with the run id as soon as the run has started, instead of
+      // holding this request open for the whole run (minutes, or hours for large tenants — longer
+      // than any proxy keeps a request open). The Model page's progress panel follows the run.
       const response = await dataloaderApi.post(serviceURL, payload, {
         headers: { 'X-Tenant': tenant, Accept: '*/*' },
+        params: { async: true },
       });
 
-      setSuccessMessage(response.data);
+      const started = response.data;
+      setSuccessMessage(typeof started === 'string'
+        ? started
+        : `Execution started for ${date}. Follow its progress on the Model page.`);
       setShowSuccessMessage(true);
       setShowWarningMessage(false);
       fetchLatestExecutionState();

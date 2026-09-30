@@ -104,6 +104,7 @@ const StatusChip = ({ status }) => {
   const isSuccess = status === 'ACTIVE' || status === 'COMPLETED' || status === 'SUCCESS';
   const isError = status === 'FAILED';
   const isWarning = status === 'IN_PROGRESS';
+  const isPartial = status === 'PARTIAL_SUCCESS';
   const isIdle = status === 'IDLE' || status === 'INACTIVE' || status === 'CONFIGURE' || status === 'NOT_EXECUTED';
 
   let bg = alpha('#22c55e', 0.1);
@@ -113,11 +114,16 @@ const StatusChip = ({ status }) => {
 
   if (status === 'NOT_EXECUTED') label = 'NOT EXECUTED';
   else if (status === 'IN_PROGRESS') label = 'IN PROGRESS';
+  else if (status === 'PARTIAL_SUCCESS') label = 'PARTIAL SUCCESS';
 
   if (isError) {
     bg = alpha('#ef4444', 0.1);
     color = '#991b1b';
     border = alpha('#ef4444', 0.2);
+  } else if (isPartial) {
+    bg = alpha('#f59e0b', 0.1);
+    color = '#92400e';
+    border = alpha('#f59e0b', 0.25);
   } else if (isWarning) {
     bg = alpha('#3b82f6', 0.1);
     color = '#1e40af';
@@ -158,233 +164,75 @@ const SUMMARY_STATUS_CONFIG = {
   FAILED: { color: '#dc2626', bg: 'rgba(220,38,38,0.08)', icon: ErrorOutlineIcon },
 };
 
-function StatCard({ icon: Icon, label, value, color, bg }) {
-  return (
-    <Box sx={{
-      flex: 1, minWidth: 130, p: 2, borderRadius: 2,
-      bgcolor: bg || 'rgba(99,102,241,0.06)',
-      display: 'flex', alignItems: 'center', gap: 1.5
-    }}>
-      <Box sx={{
-        width: 38, height: 38, borderRadius: '50%',
-        bgcolor: color ? `${color}18` : 'rgba(99,102,241,0.12)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-      }}>
-        <Icon sx={{ fontSize: 20, color: color || '#6366f1' }} />
-      </Box>
-      <Box>
-        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, lineHeight: 1 }}>{label}</Typography>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: color || 'text.primary', lineHeight: 1.3 }}>{value ?? '—'}</Typography>
-      </Box>
-    </Box>
-  );
-}
-
-function ExecutionSummaryPanel() {
-  const theme = useTheme();
-  const { tenant } = useTenant();
-  const [summary, setSummary] = useState(null);
-  const [loadingSummary, setLoadingSummary] = useState(true);
-
-  const fetchSummary = useCallback(async () => {
-    if (!tenant) return;
-    try {
-      const res = await dataloaderApi.get('/model/execution-summary', {
-        headers: { 'X-Tenant': tenant }
-      });
-      // Find the most recent EXECUTION_SUMMARY entry if response is an array,
-      // or use directly if it's the aggregated object.
-      const data = res.data;
-      setSummary(Array.isArray(data) ? data[0] : data);
-    } catch (e) {
-      setSummary(null);
-    } finally {
-      setLoadingSummary(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSummary();
-    const timer = setInterval(fetchSummary, 15000);
-    return () => clearInterval(timer);
-  }, [fetchSummary]);
-
-  const cfg = summary?.statusCounts
-    ? (Object.keys(summary.statusCounts).length === 1 && summary.statusCounts['SUCCESS']
-      ? SUMMARY_STATUS_CONFIG.SUCCESS
-      : summary.statusCounts['FAILED'] ? SUMMARY_STATUS_CONFIG.FAILED : SUMMARY_STATUS_CONFIG.PARTIAL_SUCCESS)
-    : SUMMARY_STATUS_CONFIG.SUCCESS;
-
-  const fmtMs = (ms) => {
-    if (!ms && ms !== 0) return '—';
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${(ms / 60000).toFixed(1)}m`;
-  };
-
-  const fmtDate = (d) => {
-    if (!d) return '—';
-    const s = String(d);
-    if (s.length === 8) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-    return s;
-  };
-
-  if (loadingSummary) return (
-    <Box sx={{ mb: 3, p: 2, borderRadius: 3, bgcolor: 'background.paper', boxShadow: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-      <CircularProgress size={18} />
-      <Typography variant="body2" color="text.secondary">Loading execution summary…</Typography>
-    </Box>
-  );
-
-  if (!summary || (!summary.totalBatches && !summary.totalInstruments)) return (
-    <Box sx={{ mb: 3, p: 2.5, borderRadius: 3, bgcolor: 'background.paper', boxShadow: 1, border: '1px dashed', borderColor: 'divider' }}>
-      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-        No execution summary available for the current execution date.
-      </Typography>
-    </Box>
-  );
-
-  const successBatches = summary.statusCounts?.SUCCESS ?? summary.totalSuccess ?? 0;
-  const failedBatches = summary.statusCounts?.FAILED ?? summary.totalFailed ?? 0;
-  const overallStatus = failedBatches === 0 ? 'SUCCESS' : successBatches === 0 ? 'FAILED' : 'PARTIAL_SUCCESS';
-  const statusCfg = SUMMARY_STATUS_CONFIG[overallStatus] || SUMMARY_STATUS_CONFIG.SUCCESS;
-  const StatusIcon = statusCfg.icon;
-
-  return (
-    <Box sx={{
-      mb: 3, p: 2.5, borderRadius: 3, bgcolor: 'background.paper',
-      boxShadow: `0 2px 8px ${alpha(theme.palette.grey[400], 0.18)}`,
-      border: `1.5px solid ${alpha(statusCfg.color, 0.2)}`,
-    }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <StatusIcon sx={{ color: statusCfg.color, fontSize: 22 }} />
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
-            Last Execution Summary
-          </Typography>
-          <Chip
-            label={overallStatus.replace('_', ' ')}
-            size="small"
-            sx={{
-              fontWeight: 700, fontSize: '0.68rem', borderRadius: 1, height: 22,
-              bgcolor: statusCfg.bg, color: statusCfg.color,
-              border: `1px solid ${alpha(statusCfg.color, 0.3)}`
-            }}
-          />
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Posting Date: <strong>{fmtDate(summary.postingDate)}</strong>
-          </Typography>
-          <Tooltip title="Refresh summary">
-            <IconButton size="small" onClick={fetchSummary}>
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Box>
-
-      {/* Stat Cards */}
-      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-        <StatCard
-          icon={LayersIcon}
-          label="Total Batches"
-          value={summary.totalBatches ?? 0}
-          color="#6366f1"
-        />
-        <StatCard
-          icon={FiberManualRecordIcon}
-          label="Instruments"
-          value={(summary.totalInstruments ?? 0).toLocaleString()}
-          color="#0ea5e9"
-        />
-        <StatCard
-          icon={CheckCircleOutlineIcon}
-          label="Successful Batches"
-          value={successBatches}
-          color="#16a34a"
-        />
-        <StatCard
-          icon={ErrorOutlineIcon}
-          label="Failed Batches"
-          value={failedBatches}
-          color={failedBatches > 0 ? '#dc2626' : '#94a3b8'}
-        />
-        <StatCard
-          icon={AccessTimeIcon}
-          label="Total Duration"
-          value={fmtMs(summary.totalDurationMs)}
-          color="#7c3aed"
-        />
-        <StatCard
-          icon={AccessTimeIcon}
-          label="Avg Batch Time"
-          value={fmtMs(summary.avgBatchMs)}
-          color="#0891b2"
-        />
-      </Box>
-
-      {/* Errors */}
-      {summary.errors?.length > 0 && (
-        <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)' }}>
-          <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626' }}>Errors:</Typography>
-          {summary.errors.map((e, i) => (
-            <Typography key={i} variant="caption" display="block" sx={{ color: '#991b1b', mt: 0.5, fontSize: '0.72rem' }}>
-              • {e}
-            </Typography>
-          ))}
-        </Box>
-      )}
-    </Box>
-  );
-}
-
 // Live Execution Progress Panel
+// Which run record (ExecutionInstance) a model row belongs to: DSL models run as "DSL", Excel as "EXCEL".
+const runTypeOf = (modelType) => (modelType === 'DSL' || modelType === 'PYTHON' ? 'DSL' : 'EXCEL');
+
+// Status shown for a model type, from its latest run record (GET /model/executions/latest).
+const executionStatusOf = (run) => {
+  if (!run) return 'NOT_EXECUTED';
+  if (run.active) return 'IN_PROGRESS';
+  return run.status || 'NOT_EXECUTED';   // COMPLETED | PARTIAL_SUCCESS | FAILED
+};
+
 function ExecutionProgressPanel() {
   const theme = useTheme();
   const { tenant } = useTenant();
-  const [progress, setProgress] = useState(null);  // /execution-progress data
-  const [batches, setBatches] = useState([]);     // /execution-summary batches[]
+  const [progress, setProgress] = useState(null);
+  const [batches, setBatches] = useState([]);
   const [isLive, setIsLive] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
-  const prevCompleted = useRef(0);
   const [isRunning, setIsRunning] = useState(false);
-  const stablePolls = useRef(0);
 
+  // The run shown is the one in progress, else the most recent one. Status, counts and chunk
+  // progress come from its run record; the per-batch timeline from the batch logs of its posting
+  // date (passed explicitly: the default date only advances when a run ends).
   const poll = useCallback(async () => {
     if (!tenant) return;
     try {
-      // Single call — /execution-progress now includes batches[] too.
-      // Count queries only; no full document loads during polling.
-      const res = await dataloaderApi.get('/model/execution-progress', {
-        headers: { 'X-Tenant': tenant }
+      const res = await dataloaderApi.get('/model/executions/latest', { headers: { 'X-Tenant': tenant } });
+      const runs = Object.values(res.data || {}).filter(Boolean);
+      if (runs.length === 0) { setProgress(null); setBatches([]); setIsRunning(false); return; }
+      const run = runs.find(r => r.active)
+        || runs.reduce((a, b) => (new Date(a.startTime) >= new Date(b.startTime) ? a : b));
+
+      let timeline = null;
+      try {
+        const t = await dataloaderApi.get('/model/execution-progress', {
+          headers: { 'X-Tenant': tenant }, params: { postingDate: run.postingDate }
+        });
+        timeline = t.data;
+      } catch { /* timeline is optional */ }
+
+      const completedBatches = run.completedBatches ?? 0;
+      const failedBatches = run.failedBatches ?? 0;
+      const totalInstruments = run.totalInstruments ?? timeline?.totalInstruments ?? 0;
+      const totalInstrumentsProcessed = timeline?.totalInstrumentsProcessed ?? 0;
+      const isComplete = !run.active;
+      let completionPct = 0;
+      if (isComplete) completionPct = 100;
+      else if (run.totalChunks > 0) completionPct = Math.round((run.completedChunks ?? 0) * 1000 / run.totalChunks) / 10;
+      else if (totalInstruments > 0) completionPct = Math.min(100, Math.round(totalInstrumentsProcessed * 1000 / totalInstruments) / 10);
+
+      setProgress({
+        runId: run._id, modelType: run.modelType, stage: run.status, errorMessage: run.errorMessage,
+        postingDate: run.postingDate, startTime: run.startTime, endTime: run.endTime,
+        completedBatches, failedBatches, successBatches: Math.max(0, completedBatches - failedBatches),
+        totalChunks: run.totalChunks ?? 0, completedChunks: run.completedChunks ?? 0,
+        totalInstruments, totalInstrumentsProcessed, totalExpectedBatches: 0,
+        pageSize: timeline?.pageSize ?? 0, isComplete, completionPct,
       });
-      const p = res.data;
-
-      const completed = p?.completedBatches ?? 0;
-      if (completed !== prevCompleted.current) {
-        stablePolls.current = 0;
-        setIsRunning(true);
-      } else if (!p?.isComplete) {
-        stablePolls.current += 1;
-        if (stablePolls.current >= 3) setIsRunning(false);
-      } else {
-        setIsRunning(false);
-      }
-      prevCompleted.current = completed;
-
-      setProgress(p);
-      setBatches(p?.batches ?? []);
+      setBatches(timeline?.batches ?? []);
+      setIsRunning(!!run.active);
       setLastUpdated(new Date());
     } catch { /* silent — never block the UI */ }
-  }, []);
+  }, [tenant]);
 
   useEffect(() => {
     poll();
     if (!isLive) return;
-    // Adaptive interval: poll faster while actively running, back off when idle
+    // Poll faster while a run is in progress, back off when idle
     const interval = isRunning ? 2000 : 10000;
     const t = setInterval(poll, interval);
     return () => clearInterval(t);
@@ -405,12 +253,16 @@ function ExecutionProgressPanel() {
 
   const { completionPct = 0, completedBatches = 0, totalExpectedBatches = 0,
     totalInstruments = 0, totalInstrumentsProcessed = 0,
-    successBatches = 0, failedBatches = 0, isComplete = false, pageSize = 0 } = progress;
+    successBatches = 0, failedBatches = 0, isComplete = false, pageSize = 0,
+    stage, modelType, totalChunks = 0, completedChunks = 0, errorMessage } = progress;
 
-  const statusColor = isRunning ? '#6366f1' : failedBatches > 0 ? '#dc2626' : '#16a34a';
-  const statusLabel = isRunning ? 'Running…'
-    : isComplete ? (failedBatches > 0 ? 'Completed with errors' : 'Completed')
-      : completedBatches === 0 ? 'Idle' : 'Partial';
+  const stageLabel = (stage || '').replace(/_/g, ' ').toLowerCase();
+  const statusColor = isRunning ? '#6366f1'
+    : stage === 'FAILED' ? '#dc2626'
+      : stage === 'PARTIAL_SUCCESS' || failedBatches > 0 ? '#d97706' : '#16a34a';
+  const statusLabel = isRunning ? `Running · ${stageLabel}`
+    : stage === 'FAILED' ? 'Failed'
+      : stage === 'PARTIAL_SUCCESS' || failedBatches > 0 ? 'Completed with errors' : 'Completed';
 
   const fmtDate = (d) => {
     if (!d) return '—';
@@ -445,6 +297,9 @@ function ExecutionProgressPanel() {
             bgcolor: alpha(statusColor, 0.1), color: statusColor,
             border: `1px solid ${alpha(statusColor, 0.3)}`
           }} />
+          {modelType && (
+            <Chip label={modelType} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }} />
+          )}
           {/* Posting date — always visible so you always know which date is running */}
           {progress?.postingDate && (
             <Box sx={{
@@ -492,7 +347,9 @@ function ExecutionProgressPanel() {
                   Batches Completed:
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                  {completedBatches} of {isComplete ? completedBatches : (totalExpectedBatches || (totalInstruments > 0 && pageSize > 0 ? Math.ceil(totalInstruments / pageSize) : '?'))}
+                  {/* Batch size is set by the worker callback and chunks round up independently, so
+                      totalInstruments / pageSize is not the batch count; only a reported total is shown. */}
+                  {completedBatches}{totalExpectedBatches > 0 && !isComplete ? ` of ${totalExpectedBatches}` : ''}
                 </Typography>
                 {successBatches > 0 && (
                   <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 600 }}>· {successBatches} succeeded</Typography>
@@ -521,8 +378,27 @@ function ExecutionProgressPanel() {
               </Box>
             )}
 
+            {totalChunks > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  Chunks Completed:
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {completedChunks} of {totalChunks}
+                </Typography>
+              </Box>
+            )}
+
+            {errorMessage && (
+              <Typography variant="caption" display="block" sx={{ color: '#991b1b', mb: 0.75 }}>
+                {errorMessage}
+              </Typography>
+            )}
+
             <Tooltip
-              title={`${completionPct}% = ${completedBatches} completed batches ÷ ${totalExpectedBatches} expected batches (${totalInstruments} instruments ÷ ${pageSize} batch size)`}
+              title={totalChunks > 0
+                ? `${completionPct}% = ${completedChunks} of ${totalChunks} chunks completed`
+                : `${completionPct}% = ${totalInstrumentsProcessed} of ${totalInstruments} instruments processed`}
               placement="top"
             >
               <LinearProgress
@@ -607,7 +483,7 @@ function ExecutionProgressPanel() {
 
           {batches.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
-              Waiting for batch data…
+              {isComplete ? 'No per-batch log for this run.' : 'Waiting for batch data…'}
             </Typography>
           )}
         </Box>
@@ -958,62 +834,19 @@ export default function ModelPage() {
   // Incremented after each execution so Row components reset their cached summaries
   const [execRefreshKey, setExecRefreshKey] = useState(0);
 
-  // Execution status map: modelType -> 'NOT_EXECUTED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED'
+  // Execution status map: 'DSL' | 'EXCEL' -> 'NOT_EXECUTED' | 'IN_PROGRESS' | 'COMPLETED' | 'PARTIAL_SUCCESS' | 'FAILED'
   const [executionStatusMap, setExecutionStatusMap] = useState({});
-  const rowsRef = useRef([]);
 
-  // Fetch last execution status for all unique model types in the loaded rows
-  const refreshExecutionStatuses = useCallback(async (modelRows) => {
-    if (!modelRows?.length) return;
-    const types = [...new Set(modelRows.map(r => r.modelType === 'DSL' ? 'PYTHON' : r.modelType).filter(Boolean))];
-    if (!types.length) return;
-
-    // Check which model types currently have a run in progress
-    let inProgressTypes = new Set();
+  // Execution status per run type ('DSL' | 'EXCEL'), from the latest run record of each.
+  const refreshExecutionStatuses = useCallback(async () => {
     try {
-      const progRes = await dataloaderApi.get('/model/execution-progress');
-      const prog = progRes.data;
-      const completed = prog?.completedBatches ?? 0;
-      const expected = prog?.totalExpectedBatches ?? 0;
-      const isActuallyRunning = prog && !prog.isComplete && expected > 0 && completed < expected;
-      if (isActuallyRunning) {
-        const batches = prog.batches || [];
-        batches.forEach(b => { if (b.modelType) inProgressTypes.add(b.modelType); });
-        // If no per-batch type info but batches are genuinely incomplete, treat all types as in progress
-        if (inProgressTypes.size === 0) {
-          types.forEach(t => inProgressTypes.add(t));
-        }
-      }
-    } catch { /* silent */ }
-
-    const results = await Promise.allSettled(
-      types.map(type =>
-        dataloaderApi.get(`/model/execution-summary?modelType=${type}`)
-          .then(res => ({ type, data: res.data }))
-      )
-    );
-
-    const map = {};
-    results.forEach(r => {
-      if (r.status === 'fulfilled') {
-        const { type, data: summaryData } = r.value;
-        const summary = Array.isArray(summaryData) ? summaryData[0] : summaryData;
-        if (inProgressTypes.has(type)) {
-          map[type] = 'IN_PROGRESS';
-        } else if (!summary || (!summary.totalBatches && !summary.totalInstruments)) {
-          map[type] = 'NOT_EXECUTED';
-        } else {
-          const success = summary.statusCounts?.SUCCESS ?? summary.totalSuccess ?? 0;
-          const failed = summary.statusCounts?.FAILED ?? summary.totalFailed ?? 0;
-          map[type] = failed === 0 ? 'SUCCESS' : 'FAILED';
-        }
-      }
-    });
-    // Fallback for any type whose summary fetch errored
-    types.forEach(type => {
-      if (!(type in map)) map[type] = inProgressTypes.has(type) ? 'IN_PROGRESS' : 'NOT_EXECUTED';
-    });
-    setExecutionStatusMap(map);
+      const res = await dataloaderApi.get('/model/executions/latest');
+      const runs = res.data || {};
+      setExecutionStatusMap({
+        DSL: executionStatusOf(runs.DSL),
+        EXCEL: executionStatusOf(runs.EXCEL),
+      });
+    } catch { /* silent — keep the last known statuses */ }
   }, []);
 
   // --- Data fetching ---
@@ -1024,8 +857,7 @@ export default function ModelPage() {
       const response = await dataloaderApi.get('/model/get/all');
       const data = response.data || [];
       setRows(data);
-      rowsRef.current = data;
-      refreshExecutionStatuses(data);
+      refreshExecutionStatuses();
     } catch (err) {
       console.error('Failed to fetch models:', err);
       setError('Failed to load models. Please try again.');
@@ -1039,18 +871,25 @@ export default function ModelPage() {
     fetchModels();
   }, [fetchModels]);
 
-  // Keep rowsRef in sync with state so the polling interval always reads latest rows
-  useEffect(() => { rowsRef.current = rows; }, [rows]);
-
   // Real-time polling: 3s while IN_PROGRESS, 8s otherwise
   useEffect(() => {
-    const poll = () => refreshExecutionStatuses(rowsRef.current);
+    const poll = () => refreshExecutionStatuses();
     const getInterval = () =>
       Object.values(executionStatusMap).includes('IN_PROGRESS') ? 3000 : 8000;
     let timer = setInterval(poll, getInterval());
     // Restart interval whenever the interval duration should change
     return () => clearInterval(timer);
   }, [refreshExecutionStatuses, executionStatusMap]);
+
+  // When a run leaves IN_PROGRESS its summary has just been written, so open rows re-fetch it.
+  const prevStatusRef = useRef({});
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const finished = Object.keys(executionStatusMap).some(
+      k => prev[k] === 'IN_PROGRESS' && executionStatusMap[k] !== 'IN_PROGRESS');
+    prevStatusRef.current = executionStatusMap;
+    if (finished) setExecRefreshKey(k => k + 1);
+  }, [executionStatusMap]);
 
   // --- Action handlers ---
 
@@ -1237,7 +1076,7 @@ export default function ModelPage() {
                             onToggleStatus={handleToggleStatus}
                             onDownload={handleDownload}
                             onExecute={handleExecuteOpen}
-                            executionStatus={executionStatusMap[row.modelType === 'DSL' ? 'PYTHON' : row.modelType]}
+                            executionStatus={executionStatusMap[runTypeOf(row.modelType)]}
                             execRefreshKey={execRefreshKey}
                           />
                         ))
