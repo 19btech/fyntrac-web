@@ -514,7 +514,7 @@ export default function DashboardLayoutModern() {
     if (customOnClick) {
       customOnClick();
     } else if (segment === "getstarted") {
-      window.open("https://fyntrac.gitbook.io/fyntrac-docs", "_blank");
+      window.open("https://docs.fyntrac.com", "_blank");
     } else if (segment) {
       if (segment === 'settings-dashboard') setSettingsKey(k => k + 1);
       setPathname(`/${segment}`);
