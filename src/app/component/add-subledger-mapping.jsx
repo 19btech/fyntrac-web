@@ -15,6 +15,8 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import CheckIcon from '@mui/icons-material/Check';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage } from './rules-shared';
+import { flipEntryType, flipSign, oppositeEntryOf } from './subledger-pairs';
 
 const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
@@ -27,6 +29,8 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showErrorMessage, setShowErrorMessage] = useState(false);
+  // Saved, but a follow-up (the opposite entry) failed: closing still refreshes the list.
+  const [savedWithProblem, setSavedWithProblem] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [accountSubtypes, setAccountSubtypes] = useState([]);
   const [transactionNames, setTransactionNames] = useState([]);
@@ -36,6 +40,9 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   const [txPickerSearch, setTxPickerSearch] = useState('');
   const [subtypePickerAnchor, setSubtypePickerAnchor] = useState(null);
   const [subtypePickerSearch, setSubtypePickerSearch] = useState('');
+  const [subtypesError, setSubtypesError] = useState('');
+  const [transactionsError, setTransactionsError] = useState('');
+  const [saving, setSaving] = useState(false);
   const filteredTransactionNames = transactionNames.filter(tx =>
     tx.toLowerCase().includes(txPickerSearch.toLowerCase())
   );
@@ -48,11 +55,9 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
   const serviceGetTransactionNamesURL = '/transaction/get/transactions'
 
   React.useEffect(() => {
-    if (accountSubtypes.length === 0) {
+    // Re-read the lists on every open: transactions and subtypes may have been added since.
+    if (open) {
       fetchAccountSubtypes();
-    }
-
-    if (transactionNames.length === 0) {
       fetchTransactionNames();
     }
 
@@ -73,41 +78,51 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
     }
     setShowErrorMessage(false);
     setShowSuccessMessage(false);
+    setSavedWithProblem(false);
   }, [editData, open]);
 
   const fetchAccountSubtypes = () => {
-    console.log('Tenant...', tenant);
     dataloaderApi.get(sericeGetSubTypeURL)
       .then(response => {
-        setAccountSubtypes(response.data);
-        // Handle success response if needed
+        setAccountSubtypes(Array.isArray(response.data) ? response.data : []);
+        setSubtypesError('');
       })
-      .catch(error => {
-        // Handle error if needed
-      });
+      .catch(error => setSubtypesError(apiErrorMessage(error, 'Account subtypes could not be loaded.')));
   };
 
   const fetchTransactionNames = () => {
 
     dataloaderApi.get(serviceGetTransactionNamesURL)
       .then(response => {
-        setTransactionNames(response.data);
+        setTransactionNames(Array.isArray(response.data) ? response.data : []);
+        setTransactionsError('');
       })
-      .catch(error => {
-        // Handle error if needed
-      });
+      .catch(error => setTransactionsError(apiErrorMessage(error, 'Transactions could not be loaded.')));
   };
 
   const handleAddSubledgerMapping = async () => {
+    if (saving) return;
     setShowErrorMessage(false);
+    setSaving(true);
+    try {
+      await saveMapping();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveMapping = async () => {
 
     const backendSign = sign === 'AMOUNT > 0' ? 'POSITIVE' : (sign === 'AMOUNT < 0' ? 'NEGATIVE' : sign);
 
     // ── Pre-save validation ───────────────────────────────────────────────
+    // When editing, the mapping's opposite entry (as it was) follows the edit.
+    let partner = null;
     try {
       const allRes = await dataloaderApi.get('/subledgermapping/get/all');
-      // Exclude the row being edited so self-comparison doesn't false-positive
-      const existing = (allRes.data || []).filter(r => !id || r.id !== id);
+      partner = id && editData ? oppositeEntryOf(editData, allRes.data || []) : null;
+      // Exclude the row being edited (and its partner, which moves with it) from the checks
+      const existing = (allRes.data || []).filter(r => (!id || r.id !== id) && (!partner || r.id !== partner.id));
 
       const txnLower = transactionName.toLowerCase();
       const signLower = backendSign.toLowerCase();
@@ -161,57 +176,49 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
         id: id
       });
 
-      // Auto-create opposite entry (flip sign and entry type) for new mappings only
-      if (!id) {
-        const oppositeSign = backendSign === 'POSITIVE' ? 'NEGATIVE' : 'POSITIVE';
-        const oppositeEntryType = entryType === 'DEBIT' ? 'CREDIT' : 'DEBIT';
+      // The opposite entry (sign and entry type flipped, same subtype): created with a new mapping,
+      // and kept in step when a mapping is edited.
+      const opposite = {
+        transactionName: transactionName,
+        sign: flipSign(backendSign),
+        entryType: flipEntryType(entryType),
+        accountSubType: accountSubType,
+      };
+      let pairProblem = null;
+      if (!id || partner) {
         try {
-          await dataloaderApi.post(serviceURL, {
-            transactionName: transactionName,
-            sign: oppositeSign,
-            entryType: oppositeEntryType,
-            accountSubType: accountSubType,
-          });
+          await dataloaderApi.post(serviceURL, partner ? { ...opposite, id: partner.id } : opposite);
         } catch (oppositeErr) {
-          console.warn('Opposite entry could not be created (may already exist):', oppositeErr);
+          console.warn('Opposite entry could not be saved:', oppositeErr);
+          pairProblem = apiErrorMessage(oppositeErr, 'the service refused it');
         }
       }
 
-      setSuccessMessage('Mapping saved successfully.');
-      setShowSuccessMessage(true);
-
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        setShowErrorMessage(false);
-        onClose(true);
-      }, 2000);
+      if (pairProblem) {
+        // The mapping itself is saved; say so, and leave the dialog open so this is seen.
+        setErrorMessage(`Mapping saved, but its opposite entry could not be ${partner ? 'updated' : 'created'} (${pairProblem}). Please add or fix it manually.`);
+        setShowErrorMessage(true);
+        setSavedWithProblem(true);
+        return;
+      }
+      onClose(true);
     } catch (error) {
       console.error('Submission failed:', error);
-
-      if (error.response && error.response.status === 400) {
-        const errorList = error.response.data;
-
-        const formattedMessage = Array.isArray(errorList)
-          ? errorList.map(err => err.message).join(' | ')
-          : "Invalid input. Please check your data.";
-
-        setErrorMessage(formattedMessage);
-      } else {
-        setErrorMessage("Server error. Please try again later.");
-      }
+      setErrorMessage(apiErrorMessage(error, error.response?.status === 400 ? 'Invalid input. Please check your data.' : 'Server error. Please try again later.'));
       setShowErrorMessage(true);
     }
   };
 
 
   const handleClose = () => {
+    if (saving) return;
     setShowErrorMessage(false);
     setShowSuccessMessage(false);
-    onClose(false);
+    onClose(savedWithProblem);
   };
 
   const isEditMode = !!editData;
-  const canSave = transactionName && sign && entryType && accountSubType;
+  const canSave = transactionName && sign && entryType && accountSubType && !saving;
 
   return (
     <Dialog
@@ -337,7 +344,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
             <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
               {filteredTransactionNames.length === 0 ? (
                 <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
-                  <Typography variant="caption" color="text.disabled">No transactions found.</Typography>
+                  <Typography variant="caption" color={transactionsError ? 'error' : 'text.disabled'}>{transactionsError || 'No transactions found.'}</Typography>
                 </ListItemButton>
               ) : filteredTransactionNames.map((tx) => (
                 <ListItemButton key={tx} selected={tx === transactionName}
@@ -492,7 +499,7 @@ const AddSubledgerMappingDialog = ({ open, onClose, editData }) => {
             <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
               {filteredAccountSubtypes.length === 0 ? (
                 <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
-                  <Typography variant="caption" color="text.disabled">No subtypes found.</Typography>
+                  <Typography variant="caption" color={subtypesError ? 'error' : 'text.disabled'}>{subtypesError || 'No subtypes found.'}</Typography>
                 </ListItemButton>
               ) : filteredAccountSubtypes.map((st) => (
                 <ListItemButton key={st} selected={st === accountSubType}

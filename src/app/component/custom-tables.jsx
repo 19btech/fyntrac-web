@@ -14,13 +14,14 @@ import {
     DialogContent,
     DialogContentText,
     DialogActions,
-    Chip
+    Chip,
+    Alert
 } from '@mui/material';
 import SuccessAlert from '../component/success-alert';
 import ErrorAlert from '../component/error-alert';
 import { styled, alpha } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
-import { DeleteOutlineOutlined, EditOutlined, Add, DataArray } from '@mui/icons-material';
+import { DeleteOutlineOutlined, EditOutlined } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
 
 // Dynamically import the CustomTableModal component
@@ -28,15 +29,58 @@ const CreateTableDialog = dynamic(() => import('./custom-table'), {
     ssr: false
 });
 
+const Android12Switch = styled(Switch)(({ theme }) => ({
+    padding: 8,
+    '& .MuiSwitch-track': {
+        borderRadius: 22 / 2,
+        '&::before, &::after': {
+            content: '""',
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 16,
+            height: 16,
+        },
+        '&::before': {
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+                theme.palette.getContrastText(theme.palette.primary.main),
+            )}" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>')`,
+            left: 12,
+        },
+        '&::after': {
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+                theme.palette.getContrastText(theme.palette.primary.main),
+            )}" d="M19,13H5V11H19V13Z" /></svg>')`,
+            right: 12,
+        },
+    },
+    '& .MuiSwitch-thumb': {
+        boxShadow: 'none',
+        width: 16,
+        height: 16,
+        margin: 2,
+    },
+    '& .MuiSwitch-switchBase.Mui-checked': { color: '#1e88e5' },
+    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#1e88e5' },
+    '& .MuiSwitch-switchBase:not(.Mui-checked)': { color: '#6d6d6d' },
+    '& .MuiSwitch-switchBase:not(.Mui-checked) + .MuiSwitch-track': { backgroundColor: '#6d6d6d' },
+}));
+
+// Soft-deleted definitions are never listed.
+const liveTables = (data) => (Array.isArray(data) ? data.filter(t => t && !t.isDeleted) : []);
+
 function CustomTablesList({ refreshData, tableType, referenceTables }) {
     const { tenant, user } = useTenant();
 
     const initialRows = [];
 
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [currentPage, setCurrentPage] = useState(0);
+    const [rowsPerPage] = useState(10);
     const [isDataFetched, setIsDataFetched] = useState(false);
     const [rows, setRows] = useState(initialRows);
+    const [loadingRows, setLoadingRows] = useState(true);
+    const [loadError, setLoadError] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [statusBusyId, setStatusBusyId] = useState(null);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -48,45 +92,15 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     // Delete confirmation dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [tableToDelete, setTableToDelete] = useState(null);
-
-    const Android12Switch = styled(Switch)(({ theme }) => ({
-        padding: 8,
-        '& .MuiSwitch-track': {
-            borderRadius: 22 / 2,
-            '&::before, &::after': {
-                content: '""',
-                position: 'absolute',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 16,
-                height: 16,
-            },
-            '&::before': {
-                backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
-                    theme.palette.getContrastText(theme.palette.primary.main),
-                )}" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>')`,
-                left: 12,
-            },
-            '&::after': {
-                backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
-                    theme.palette.getContrastText(theme.palette.primary.main),
-                )}" d="M19,13H5V11H19V13Z" /></svg>')`,
-                right: 12,
-            },
-        },
-        '& .MuiSwitch-thumb': {
-            boxShadow: 'none',
-            width: 16,
-            height: 16,
-            margin: 2,
-        },
-    }));
+    // Operational tables that will also be soft-deleted if tableToDelete is a REFERENCE table
+    // they depend on. Informational only - the backend cascades the delete regardless; this is
+    // just so the confirmation dialog can tell the user upfront.
+    const [dependentTables, setDependentTables] = useState([]);
 
     const fetchCustomTable = (tableId, fallbackRow) => {
         dataloaderApi.get(`/fyntrac/custom-table/get/${tableId}`)
             .then(response => {
                 const metadata = response.data;
-                console.log('Custom table [TableId]:', tableId, metadata.data);
                 setEditData(metadata);
                 setOpen(true);
             })
@@ -112,8 +126,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
 
     async function deleteCustomTable(tableId) {
         try {
+            // Soft delete: the backend flags isDeleted on the definition (and cascades across
+            // a REFERENCE/OPERATIONAL pair - see CustomTableDefinitionService.softDeleteById).
+            // It never drops the physical collection or its data.
             const response = await dataloaderApi.delete(`/fyntrac/custom-table/delete/${tableId}`);
-            return response.data;
+            // ApiResponseRecord shape: { success, message, data, error }. `data` here is the
+            // list of table-definition ids that were soft-deleted (the requested one, plus any
+            // cascaded REFERENCE/OPERATIONAL counterpart).
+            return response.data?.data ?? [];
         } catch (error) {
             console.error('Error deleting table:', error.response?.data || error.message || error);
             throw error;
@@ -121,97 +141,98 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     }
 
     const handleCustomTableAction = async (row, isActive) => {
+        if (statusBusyId) return;
+        setStatusBusyId(row.id);
         try {
             const response = await updateCustomTableStatus(row.id, isActive);
-            row.isActive = response.isActive;
+            // The service's answer wins (it may refuse the change).
+            const saved = typeof response?.isActive === 'boolean' ? response.isActive
+                : typeof response?.data?.isActive === 'boolean' ? response.data.isActive : isActive;
             setRows(prevRows =>
                 prevRows.map(r =>
-                    r.id === row.id ? { ...r, isActive: isActive } : r
+                    r.id === row.id ? { ...r, isActive: saved } : r
                 )
             );
 
-            setSuccessMessage('Status updated successfully!');
+            setSuccessMessage(`${row.tableName} is now ${saved ? 'active' : 'inactive'}.`);
             setShowSuccessMessage(true);
         } catch (error) {
             console.error('Error in handleCustomTableAction:', error);
             setErrorMessage(error.response?.data?.message || error.message || 'An error occurred');
             setShowErrorMessage(true);
+        } finally {
+            setStatusBusyId(null);
         }
     };
 
-    // Open delete confirmation dialog
-    const handleDeleteClick = (row) => {
+    // Open delete confirmation dialog. For a REFERENCE table, look up which OPERATIONAL tables
+    // still depend on it so the dialog can tell the user they'll be soft-deleted too - the
+    // backend cascades this automatically, this is purely informational.
+    const handleDeleteClick = async (row) => {
         setTableToDelete(row);
+        setDependentTables([]);
         setDeleteDialogOpen(true);
-    };
 
-    // Handle confirmed delete
-    const handleConfirmDelete = async () => {
-        if (!tableToDelete) return;
-
-        // Guard: a REFERENCE table cannot be deleted while any OPERATIONAL table
-        // is still pointing at it via `referenceTable`. Fetch the current operational
-        // tables and block the delete if a dependency exists.
         if (tableType === 'REFERENCE') {
             try {
                 const opResponse = await dataloaderApi.get('/fyntrac/custom-table/operational-tables');
                 const opTables = Array.isArray(opResponse.data?.data) ? opResponse.data.data : [];
-                const refName = tableToDelete.tableName;
-                const dependents = opTables.filter(
-                    t => t && !t.isDeleted && t.referenceTable && t.referenceTable === refName
-                );
-
-                if (dependents.length > 0) {
-                    const names = dependents.map(t => t.tableName).filter(Boolean).join(', ');
-                    setErrorMessage(
-                        `Cannot delete "${refName}" because its reference column is used by ` +
-                        `operational table${dependents.length > 1 ? 's' : ''}: ${names}.`
-                    );
-                    setShowErrorMessage(true);
-                    setDeleteDialogOpen(false);
-                    setTableToDelete(null);
-                    return;
-                }
+                const dependents = opTables
+                    .filter(t => t && !t.isDeleted && t.referenceTable === row.tableName)
+                    .map(t => t.tableName)
+                    .filter(Boolean);
+                setDependentTables(dependents);
             } catch (depErr) {
-                console.error('Failed to check operational dependencies before delete:', depErr);
-                setErrorMessage('Unable to verify dependencies. Please try again.');
-                setShowErrorMessage(true);
-                setDeleteDialogOpen(false);
-                setTableToDelete(null);
-                return;
+                console.error('Failed to look up operational dependencies before delete:', depErr);
             }
         }
+    };
+
+    // Handle confirmed delete. Soft delete cascades server-side across a REFERENCE/OPERATIONAL
+    // pair (see CustomTableDefinitionService.softDeleteById) - nothing to block here, the physical
+    // data is never touched.
+    const handleConfirmDelete = async () => {
+        if (!tableToDelete || deleting) return;
+        setDeleting(true);
 
         try {
-            const response = await deleteCustomTable(tableToDelete.id);
-            tableToDelete.isDeleted = response.isDeleted;
-            setRows(prevRows =>
-                prevRows.map(r =>
-                    r.id === tableToDelete.id ? { ...r, isDeleted: true } : r
-                )
-            );
+            const deletedIds = await deleteCustomTable(tableToDelete.id);
+            // Gone from the list straight away (the requested table and any cascaded ones).
+            const gone = new Set([tableToDelete.id, ...(Array.isArray(deletedIds) ? deletedIds : [])]);
+            setRows(prevRows => prevRows.filter(r => !gone.has(r.id)));
 
-            setSuccessMessage('Custom table deleted successfully!');
+            setSuccessMessage(
+                dependentTables.length > 0
+                    ? `Custom table deleted successfully, along with linked operational table` +
+                      `${dependentTables.length > 1 ? 's' : ''}: ${dependentTables.join(', ')}.`
+                    : 'Custom table deleted successfully!'
+            );
             setShowSuccessMessage(true);
             refreshGridData();
 
             // Close the confirmation dialog
             setDeleteDialogOpen(false);
             setTableToDelete(null);
+            setDependentTables([]);
+            setDeleting(false);
         } catch (error) {
             console.error('Error in handleConfirmDelete:', error);
-            setErrorMessage(error.response?.data?.message || error.message || 'An error occurred while deleting');
+            setErrorMessage(error.response?.data?.error || error.response?.data?.message || error.message || 'An error occurred while deleting');
             setShowErrorMessage(true);
             // Close the confirmation dialog even on error
             setDeleteDialogOpen(false);
             setTableToDelete(null);
+            setDependentTables([]);
+            setDeleting(false);
         }
     };
 
     // Handle cancel delete
     const handleCancelDelete = () => {
+        if (deleting) return;
         setDeleteDialogOpen(false);
         setTableToDelete(null);
+        setDependentTables([]);
     };
 
     // Function to refresh the grid data
@@ -225,19 +246,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
         }
     };
 
-    const handleViewData = (tableId) => {
-        console.log('View data for table:', tableId);
-        // Navigate to data view page
-    };
-
     const handleEdit = (rowData) => {
-        // Sample rows have string IDs (e.g. 's-ref-1') — open modal directly
-        if (typeof rowData.id === 'string' && rowData.id.startsWith('s-')) {
-            setEditData({ data: rowData });
-            setOpen(true);
-        } else {
-            fetchCustomTable(rowData.id, rowData);
-        }
+        fetchCustomTable(rowData.id, rowData);
     };
 
     const columns = [
@@ -304,7 +314,9 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             headerName: 'Reference Field',
             width: 150,
             editable: false,
-            renderCell: (params) => (
+            renderCell: (params) => (!params.value ? (
+                <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+            ) : (
                 <Chip
                     label={params.value}
                     size="small"
@@ -316,7 +328,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         borderRadius: 1,
                     }}
                 />
-            ),
+            )),
         },
         {
             field: 'columns',
@@ -325,7 +337,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             editable: false,
             renderCell: (params) => (
                 <Chip
-                    label={`${params.value.length} columns`}
+                    label={`${Array.isArray(params.value) ? params.value.length : 0} columns`}
                     size="small"
                     sx={{
                         bgcolor: 'rgba(99,102,241,0.10)',
@@ -342,7 +354,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             headerName: 'Primary Keys',
             width: 200,
             editable: false,
-            renderCell: (params) => (
+            // Primary keys are optional, so a table may have none (empty list or null).
+            renderCell: (params) => {
+                const keys = Array.isArray(params.value) ? params.value : [];
+                return (
                 <Box
                     sx={{
                         display: 'flex',
@@ -353,7 +368,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         flexWrap: 'wrap',
                     }}
                 >
-                    {params.value.slice(0, 2).map((pk, idx) => (
+                    {keys.length === 0 && (
+                        <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+                    )}
+                    {keys.slice(0, 2).map((pk, idx) => (
                         <Chip
                             key={idx}
                             label={pk}
@@ -369,9 +387,9 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         />
                     ))}
 
-                    {params.value.length > 2 && (
+                    {keys.length > 2 && (
                         <Chip
-                            label={`+${params.value.length - 2}`}
+                            label={`+${keys.length - 2}`}
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(148,163,184,0.15)',
@@ -384,9 +402,29 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         />
                     )}
                 </Box>
-            ),
+                );
+            },
         }
         ,
+        {
+            field: 'isActive',
+            headerName: 'Active',
+            width: 100,
+            sortable: false,
+            filterable: false,
+            renderCell: (params) => (
+                <Tooltip title={params.row.isActive === false ? 'Inactive — click to activate' : 'Active — click to deactivate'}>
+                    <span>
+                        <Android12Switch
+                            checked={params.row.isActive !== false}
+                            disabled={statusBusyId === params.row.id}
+                            onChange={(e) => handleCustomTableAction(params.row, e.target.checked)}
+                            inputProps={{ 'aria-label': `${params.row.tableName} active` }}
+                        />
+                    </span>
+                </Tooltip>
+            ),
+        },
         {
             field: 'action',
             headerName: 'Action',
@@ -418,37 +456,46 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             ? '/fyntrac/custom-table/operational-tables'
             : '/fyntrac/custom-table/reference-tables';
 
+        setLoadingRows(true);
         dataloaderApi.get(endpoint)
             .then(response => {
-                console.log('Custom Tables', response.data.data);
-                const data = response.data.data;
-                if (Array.isArray(data) && data.length > 0) {
-                    setRows(data);
-                }
-                // else keep sample rows
+                setRows(liveTables(response.data?.data));
+                setLoadError('');
             })
             .catch(error => {
-                // keep sample rows on error
-            });
+                console.error('Error fetching custom tables:', error);
+                setLoadError(error.response?.data?.message || 'Custom tables could not be loaded.');
+            })
+            .finally(() => setLoadingRows(false));
     };
 
     // Fetch data when the component mounts or when refreshTrigger changes.
-    // For REFERENCE tab we seed from the `referenceTables` prop on first load, but on
-    // any subsequent refresh (refreshTrigger bump) we must fetch fresh data — otherwise
-    // newly created tables won't appear because we'd be overwriting with the stale prop.
+    //
+    // This always hits the backend rather than ever seeding from the `referenceTables` prop.
+    // That prop reflects the parent's own `rows` state, and every mutation here (delete, create,
+    // the page's Refresh button) remounts this component via a `key` bump on the parent - which
+    // resets refreshTrigger back to 0, making "first load of this instance" indistinguishable
+    // from "true first load of the page". The parent kicks off its own re-fetch in the same click
+    // handler that bumps the key, so at remount time its `rows` is one round-trip behind: seeding
+    // from it here previously left a just-deleted (or just-created) row showing until a second
+    // refresh caught up. Always fetching fresh avoids that race entirely.
     useEffect(() => {
-        const isFirstLoad = refreshTrigger === 0;
-        if (tableType === 'REFERENCE' && isFirstLoad && referenceTables.length > 0) {
-            setRows(referenceTables);
-        } else {
-            console.log('tableType', tableType, 'refreshTrigger', refreshTrigger);
-            fetchCustomTables();
-        }
+        fetchCustomTables();
         setIsDataFetched(true);
     }, [isDataFetched, refreshData, refreshTrigger]);
 
     return (
         <div>
+            {loadError && (
+                <Alert
+                    severity="error"
+                    variant="outlined"
+                    sx={{ mb: 1.5, borderRadius: 2 }}
+                    action={<Button color="inherit" size="small" onClick={fetchCustomTables} sx={{ fontWeight: 700 }}>Retry</Button>}
+                >
+                    {loadError}
+                </Alert>
+            )}
             <Box
                 sx={{
                     width: '100%',
@@ -474,7 +521,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                     paginationMode='client'
                     disableRowSelectionOnClick
                     autoHeight
-                    key={refreshTrigger}
+                    loading={loadingRows}
+                    localeText={{ noRowsLabel: loadError ? 'Custom tables could not be loaded.' : `No ${tableType === 'OPERATIONAL' ? 'operational' : 'reference'} tables yet.` }}
                     sx={{
                         border: 0,
                         fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
@@ -523,12 +571,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             {tableType === 'REFERENCE' && (<CreateTableDialog
                 open={open}
                 onClose={(result) => {
-                    console.log('Parent: Modal onClose called with result:', result);
                     setOpen(false);
                     setEditData(null);
 
                     if (result === true) {
-                        console.log('Parent: Refreshing grid data...');
                         refreshGridData();
                     }
                 }}
@@ -540,12 +586,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             {tableType === 'OPERATIONAL' && (<CreateTableDialog
                 open={open}
                 onClose={(result) => {
-                    console.log('Parent: Modal onClose called with result:', result);
                     setOpen(false);
                     setEditData(null);
 
                     if (result === true) {
-                        console.log('Parent: Refreshing grid data...');
                         refreshGridData();
                     }
                 }}
@@ -566,22 +610,31 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                     Confirm Delete
                 </DialogTitle>
                 <DialogContent>
-                    <DialogContentText id="delete-dialog-description">
+                    <DialogContentText id="delete-dialog-description" component="div">
                         Are you sure you want to delete the custom table "{tableToDelete?.tableName}"?
-                        This action cannot be undone and will also delete all associated data.
+                        It will be hidden from the list; its underlying data is not removed.
+                        {dependentTables.length > 0 && (
+                            <Box sx={{ mt: 1.5 }}>
+                                <strong>Note:</strong> operational table{dependentTables.length > 1 ? 's' : ''}{' '}
+                                <strong>{dependentTables.join(', ')}</strong>{' '}
+                                {dependentTables.length > 1 ? 'reference' : 'references'} this table and will be
+                                deleted as well.
+                            </Box>
+                        )}
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCancelDelete} color="primary">
+                    <Button onClick={handleCancelDelete} color="primary" disabled={deleting}>
                         Cancel
                     </Button>
                     <Button
                         onClick={handleConfirmDelete}
                         color="error"
                         variant="contained"
+                        disabled={deleting}
                         autoFocus
                     >
-                        Delete
+                        {deleting ? 'Deleting…' : 'Delete'}
                     </Button>
                 </DialogActions>
             </Dialog>

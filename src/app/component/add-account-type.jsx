@@ -31,8 +31,8 @@ const AddAccountTypeDialog = ({ open, onClose, editData }) => {
 
   React.useEffect(() => {
     if (editData) {
-      setAccountSubType(editData.accountSubType);
-      setAccountType(editData.accountType);
+      setAccountSubType(editData.accountSubType ?? '');
+      setAccountType(editData.accountType || 'BALANCESHEET');
       setId(editData.id);
     } else {
       setAccountSubType('');

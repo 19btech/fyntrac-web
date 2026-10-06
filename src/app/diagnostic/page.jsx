@@ -1,18 +1,14 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
+  Button,
   Container,
-  MenuItem,
   TextField,
   IconButton,
-  Divider,
   Tooltip,
   Tabs,
   Tab,
-  FormControl,
-  InputLabel,
-  Select,
   Snackbar,
   Alert,
   Slide,
@@ -22,251 +18,272 @@ import {
   ListItemButton,
   ListItemText,
   InputAdornment,
+  Chip,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
-import Grid from "@mui/material/Grid"; 
 import { dataloaderApi, reportingApi } from '../services/api-client';
 import CustomTabPanel from '../component/custom-tab-panel';
 import CircularProgress from '@mui/material/CircularProgress';
 import { green } from '@mui/material/colors';
-import Fab from '@mui/material/Fab';
-import CheckIcon from '@mui/icons-material/Check';
-import UpdateIcon from '@mui/icons-material/Update';
 import { useTenant } from "../tenant-context";
 import EnhancedDataGridTabs from "../component/map-tabs";
+
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+// The server's own message, including from a blob (download) error response.
+const serverMessage = async (error, fallback) => {
+  const data = error?.response?.data;
+  try {
+    if (data instanceof Blob) {
+      const text = await data.text();
+      try { return JSON.parse(text).message || text.slice(0, 200) || fallback; } catch { return text.slice(0, 200) || fallback; }
+    }
+  } catch { /* fall through */ }
+  if (typeof data === 'string' && data.trim()) return data.replace(/<[^>]*>/g, '').trim().slice(0, 200);
+  return data?.message || data?.error || error?.message || fallback;
+};
+
+// File name from Content-Disposition: filename*=UTF-8''… wins over filename="…".
+const fileNameFrom = (disposition, fallback) => {
+  if (!disposition) return fallback;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)?''([^;]+)/i.exec(disposition);
+  if (star) {
+    try { return decodeURIComponent(star[1].trim().replace(/^"|"$/g, '')); } catch { /* use plain filename */ }
+  }
+  const plain = /filename\s*=\s*("([^"]*)"|[^;]+)/i.exec(disposition);
+  const name = plain ? (plain[2] ?? plain[1]).trim() : '';
+  return name || fallback;
+};
+
+const PAPER_SX = {
+  mt: 0.75,
+  width: 350,
+  borderRadius: 3,
+  boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
+  border: '1px solid', borderColor: 'divider',
+  overflow: 'hidden',
+};
 
 const InstrumentDiagnosticPage = () => {
   const theme = useTheme();
   const { tenant } = useTenant();
-  // State to manage the list of criteria
-  const [criteriaList, setCriteriaList] = useState([
-    {
-      attributeName: "",
-      operator: "",
-      values: "",
-      filters: [], // Use filters directly in criteria
-      logicalOperator: "AND",
-    },
-  ]);
 
-  const [showErrorMessage, setShowErrorMessage] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
   const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
   const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
 
-  // Attribute options
-  const [attributeOptions, setAttributeOptions] = useState([]);
-  const [reportData, setReportData] = useState([]);
   const [instrumentId, setInstrumentId] = useState('');
   const [models, setModels] = useState([]);
-  const [model, setModel] = useState(models.length > 0 ? models[0]._id : "");
-  const [loading, setLoading] = React.useState(false);
-  const [success, setSuccess] = React.useState(false);
-  const timer = React.useRef(undefined);
-  const [postingDates, setPostingDates] = React.useState([]);
-  const [postingDate, setPostingDate] = React.useState('');
-  const [diagnosticData, setDiagnosticData] = React.useState({});
-  const [datepickerAnchor, setDatepickerAnchor] = React.useState(null);
-  const [datepickerSearch, setDatepickerSearch] = React.useState('');
-  const [modelpickerAnchor, setModelpickerAnchor] = React.useState(null);
-  const [modelpickerSearch, setModelpickerSearch] = React.useState('');
+  const [modelsError, setModelsError] = useState('');
+  const [model, setModel] = useState('');
+  const [postingDates, setPostingDates] = useState([]);
+  const [postingDatesError, setPostingDatesError] = useState('');
+  const [postingDate, setPostingDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  // Results and the inputs they were run for (shown above them).
+  const [diagnosticData, setDiagnosticData] = useState({});
+  const [ranFor, setRanFor] = useState(null);
+  const runSeq = useRef(0);
+
+  const [datepickerAnchor, setDatepickerAnchor] = useState(null);
+  const [datepickerSearch, setDatepickerSearch] = useState('');
+  const [modelpickerAnchor, setModelpickerAnchor] = useState(null);
+  const [modelpickerSearch, setModelpickerSearch] = useState('');
 
   const filteredPostingDates = postingDates.filter(d =>
-    d.label.toLowerCase().includes(datepickerSearch.toLowerCase())
+    String(d.label ?? d.value ?? '').toLowerCase().includes(datepickerSearch.toLowerCase())
   );
   const filteredModels = models.filter(m =>
-    m.modelName.toLowerCase().includes(modelpickerSearch.toLowerCase())
+    String(m.modelName ?? '').toLowerCase().includes(modelpickerSearch.toLowerCase())
   );
 
+  const modelName = (id) => models.find(m => m.id === id)?.modelName || id;
+  const dateLabel = (value) => postingDates.find(d => d.value === value)?.label || value;
 
-
-  const buttonSx = {
-    ...(success && {
-      bgcolor: green[500],
-      '&:hover': {
-        bgcolor: green[700],
-      },
-    }),
-  };
-
-
-  const handleButtonClick = () => {
-    if (!loading) {
-      setSuccess(false);
-      setLoading(true);
-      timer.current = setTimeout(() => {
-        setSuccess(true);
-        setLoading(false);
-      }, 2000);
-    }
-  };
-
-  function a11yProps(index) {
-    return {
-      id: `simple-tab-${index}`,
-      'aria-controls': `simple-tabpanel-${index}`,
-    };
-  }
-
-  const fetchAllModels = () => {
-    const fetchModels = `/model/get/all`;
-    dataloaderApi.get(fetchModels)
+  const fetchAllModels = useCallback(() => {
+    dataloaderApi.get('/model/get/all')
       .then(response => {
-        setModels(response.data);
+        setModels(Array.isArray(response.data) ? response.data : []);
+        setModelsError('');
       })
-      .catch(error => {
-        console.error('Error fetching attributes:', error);
+      .catch(async error => {
+        console.error('Error fetching models:', error);
+        setModelsError(await serverMessage(error, 'Models could not be loaded.'));
       });
-  };
+  }, []);
 
-
-  const fetchAllPostingDates = () => {
-    const fetchPostingDates = `/diagnostic/get/event-postingdates`;
-    reportingApi.get(fetchPostingDates)
+  const fetchAllPostingDates = useCallback(() => {
+    reportingApi.get('/diagnostic/get/event-postingdates')
       .then(response => {
-        setPostingDates(response.data);
-        console.info('Posting Dates:', response.data);
+        setPostingDates(Array.isArray(response.data) ? response.data : []);
+        setPostingDatesError('');
       })
-      .catch(error => {
+      .catch(async error => {
         console.error('Error fetching posting dates from EventHistory:', error);
+        setPostingDatesError(await serverMessage(error, 'Posting dates could not be loaded.'));
       });
+  }, []);
+
+  // Lists load for the tenant, and again each time a picker opens (new models / executions).
+  useEffect(() => {
+    if (!tenant) return;
+    fetchAllModels();
+    fetchAllPostingDates();
+  }, [tenant, fetchAllModels, fetchAllPostingDates]);
+
+  // Everything the diagnostic needs; names the missing inputs.
+  const missingInputs = () => [
+    !instrumentId.trim() && 'an instrument',
+    !model && 'a model',
+    !postingDate && 'a posting date',
+  ].filter(Boolean);
+
+  const checkInputs = () => {
+    setSubmitted(true);
+    const missing = missingInputs();
+    if (!missing.length) return true;
+    const list = missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}` : missing[0];
+    showToast(`Select ${list} first.`, 'error');
+    return false;
   };
+
+  const request = () => ({
+    tenant: tenant,
+    instrumentId: instrumentId.trim(),
+    modelId: model,
+    postingDate: postingDate,
+  });
 
   const downloadDiagnostic = () => {
-    const downloadFile = `/diagnostic/download`;
-    console.info('postingDate:', postingDate);
-    const diagnosticRequest = {
-      tenant: tenant,
-      instrumentId: instrumentId,
-      modelId: model,
-      postingDate: postingDate,
-    };
-
-    console.log('Download Request:', diagnosticRequest);
-
-    reportingApi.post(downloadFile, diagnosticRequest, {
+    if (downloading || !checkInputs()) return;
+    setDownloading(true);
+    reportingApi.post('/diagnostic/download', request(), {
       headers: {
         'X-Tenant': tenant,
-        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        Accept: XLSX_TYPE,
       },
       responseType: 'blob' // ✅ required
     })
       .then(response => {
-        const url = window.URL.createObjectURL(
-          new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        );
-
-        // Use backend-provided filename, fallback to default
-        const disposition = response.headers['content-disposition'];
-        let fileName = "report.xlsx";
-        if (disposition && disposition.includes("filename=")) {
-          fileName = disposition.split("filename=")[1].replace(/"/g, '');
-        }
-
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: XLSX_TYPE }));
+        const fileName = fileNameFrom(response.headers['content-disposition'], `diagnostic-${instrumentId.trim()}.xlsx`);
         const link = document.createElement('a');
         link.href = url;
         link.setAttribute('download', fileName);
         document.body.appendChild(link);
         link.click();
-
-        // cleanup
         link.remove();
-        window.URL.revokeObjectURL(url);
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
         showToast('Diagnostic file downloaded successfully.');
       })
-      .catch(error => {
+      .catch(async error => {
         console.error('Error downloading Excel file:', error);
-        showToast('Failed to download diagnostic file.', 'error');
-      });
+        showToast(await serverMessage(error, 'Failed to download diagnostic file.'), 'error');
+      })
+      .finally(() => setDownloading(false));
   };
-
-
-  useEffect(() => {
-    fetchAllModels();
-    fetchAllPostingDates();
-  }, []); // Empty dependency array means this runs once when the component mounts
-
-  useEffect(() => {
-    console.log('reporting attributes:', attributeOptions);
-    const header = generateGridColumns(attributeOptions);
-    console.log('Header:', header);
-  }, [attributeOptions]); // This will log the updated attributeOptions whenever it changes
 
   const executeReport = () => {
-    // Simulate a click anywhere on the page
-    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    console.log('criteriaList:', criteriaList);
-
-    setSuccess(false);
+    if (loading || !checkInputs()) return;
+    const seq = ++runSeq.current;
+    const inputs = request();
     setLoading(true);
 
-    console.info('postingDate:', postingDate);
-    const diagnosticRequest = {
-      tenant: tenant,
-      instrumentId: instrumentId,
-      modelId: model,
-      postingDate: postingDate,
-    };
-
-    console.log('request:', diagnosticRequest);
-
-    const executeReportAPI = `/diagnostic/generate`;
-
-    reportingApi.post(executeReportAPI, diagnosticRequest)
+    reportingApi.post('/diagnostic/generate', inputs)
       .then(response => {
-        const data = response.data;
-
-        setDiagnosticData(data.valueMapList);
-        setSuccess(true);
-        setLoading(false);
-        console.log('Full Response:', data);
+        if (seq !== runSeq.current) return; // a newer run was started
+        const data = response.data?.valueMapList;
+        setDiagnosticData(data && typeof data === 'object' ? data : {});
+        setRanFor(inputs);
         showToast('Diagnostic report loaded successfully.');
       })
-      .catch(error => {
+      .catch(async error => {
+        if (seq !== runSeq.current) return;
         console.error('Error fetching data:', error);
-        setErrorMessage(error.message);
-        setShowErrorMessage(true);
-        setLoading(false);
-        showToast('Failed to run diagnostic. Please check your filters.', 'error');
+        // Never leave another run's results on screen under these inputs.
+        setDiagnosticData({});
+        setRanFor(null);
+        showToast(await serverMessage(error, 'Failed to run diagnostic.'), 'error');
+      })
+      .finally(() => {
+        if (seq === runSeq.current) setLoading(false);
       });
   };
 
-  useEffect(() => {
-    console.log('reporting data:', reportData);
-  }, [reportData]); // This will log the updated reportData whenever it changes
+  // Results that don't match the inputs any more are labelled as such.
+  const resultsStale = Boolean(ranFor) && (
+    ranFor.instrumentId !== instrumentId.trim() || ranFor.modelId !== model || ranFor.postingDate !== postingDate
+  );
 
-  // Execute Filter
-  const executeFiler = () => {
-    executeReport();
-  }
+  const iconButtonSx = { bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } };
+  const fieldSx = { flex: '1 1 260px', minWidth: 0 };
 
-  const handleChange = (index, field, value) => {
-    setCriteriaList((prevCriteria) => {
-      const newCriteria = [...prevCriteria];
-      newCriteria[index][field] = value;
-      return newCriteria;
-    });
-  };
+  const pickerList = ({ items, error, onRetry, empty, isSelected, onPick, label }) => (
+    <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+      {error && !items.length ? (
+        <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1 }}>{error}</Typography>
+          <Button size="small" onClick={onRetry}>Retry</Button>
+        </Box>
+      ) : items.length === 0 ? (
+        <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
+          <Typography variant="caption" color="text.disabled">{empty}</Typography>
+        </ListItemButton>
+      ) : items.map((item) => (
+        <ListItemButton
+          key={item.key}
+          selected={isSelected(item)}
+          onClick={() => onPick(item)}
+          sx={{
+            py: 1, px: 2,
+            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+            '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+          }}
+        >
+          <ListItemText primary={label(item)} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }} />
+        </ListItemButton>
+      ))}
+    </List>
+  );
 
-  const handleTabChange = (event, newValue) => {
-    setTabOrder(newValue);
-  };
+  const searchBox = (value, onChange, placeholder) => (
+    <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
+      <TextField
+        autoFocus
+        fullWidth
+        size="small"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+      />
+    </Box>
+  );
 
-  const generateGridColumns = (columnDefs) => {
-    return columnDefs
-      .filter((col) => !col.attributeName?.startsWith('_'))
-      .map((col) => ({
-        field: col.attributeName,
-        headerName: col.attributeAlias,
-        width: 200,
-        editable: false,
-      }));
-  };
+  const clearAdornment = (show, onClear) => (show ? (
+    <InputAdornment position="end">
+      <IconButton
+        size="small"
+        onClick={(e) => { e.stopPropagation(); onClear(); }}
+        sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+      >
+        <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
+      </IconButton>
+    </InputAdornment>
+  ) : null);
 
   return (
     <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
@@ -289,305 +306,164 @@ const InstrumentDiagnosticPage = () => {
               Diagnostic Report
             </Typography>
           </Box>
-          <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Execute filter" arrow>
-              <IconButton
-                aria-label="execute"
-                onClick={executeFiler}
-                sx={{ bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
-              >
-                <PlayCircleOutlineOutlinedIcon />
-                {loading && (
-                  <CircularProgress
-                    size={24}
-                    sx={{
-                      color: green[500],
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      marginTop: '-12px',
-                      marginLeft: '-12px',
-                    }}
-                  />
-                )}
-              </IconButton>
+            <Tooltip title={loading ? 'Running…' : 'Run diagnostic'} arrow>
+              <span>
+                <IconButton
+                  aria-label="Run diagnostic"
+                  onClick={executeReport}
+                  disabled={loading}
+                  sx={{ position: 'relative', bgcolor: 'rgba(22,163,74,0.1)', border: '1px solid rgba(21,128,61,0.35)', color: '#16a34a', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'rgba(22,163,74,0.2)', borderColor: '#15803d', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' }, '&.Mui-disabled': { color: alpha('#16a34a', 0.5), bgcolor: 'rgba(22,163,74,0.06)' } }}
+                >
+                  <PlayCircleOutlineOutlinedIcon />
+                  {loading && (
+                    <CircularProgress
+                      size={24}
+                      sx={{
+                        color: green[500],
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        marginTop: '-12px',
+                        marginLeft: '-12px',
+                      }}
+                    />
+                  )}
+                </IconButton>
+              </span>
             </Tooltip>
-            <Tooltip title="Download Diagnostic" arrow>
-              <IconButton
-                onClick={downloadDiagnostic}
-                aria-label="Download file"
-                sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
-              >
-                <FileDownloadOutlinedIcon color="action" />
-              </IconButton>
+            <Tooltip title={downloading ? 'Downloading…' : 'Download Diagnostic'} arrow>
+              <span>
+                <IconButton
+                  onClick={downloadDiagnostic}
+                  disabled={downloading}
+                  aria-label="Download diagnostic"
+                  sx={{ ...iconButtonSx, position: 'relative' }}
+                >
+                  <FileDownloadOutlinedIcon color="action" />
+                  {downloading && (
+                    <CircularProgress size={24} sx={{ position: 'absolute', top: '50%', left: '50%', marginTop: '-12px', marginLeft: '-12px' }} />
+                  )}
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </Box>
       <Box sx={{ width: '100%', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
-        <Tabs sx={{ width: '90rem' }} value={0} aria-label="Filter">
+        <Tabs value={0} aria-label="Filter">
           <Tab label="Filter" sx={{ textTransform: 'none' }} />
         </Tabs>
       </Box>
 
       <CustomTabPanel value={0} index={0}>
 
-        <Box
-          display="flex"
-          flexDirection="column"
-          height="78vh" // Full viewport height
-        >
-          <Box
-            flex="0 0 11%" // First row occupies 30%
-            overflow="fit-content"
-          >
-            <Box key={1} justifyContent="center" sx={{
-              mb: 1, border: 0, p: 1, borderRadius: 1, flexDirection: 'column',
-            }} >
-              <Grid container spacing={1} alignItems="center" justifyContent="center">
-                <Grid xs={12} sm={4} alignItems="center">
-                  <TextField
-                    fullWidth
-                    label="Instrument"
-                    value={instrumentId}
-                    onChange={(e) => setInstrumentId(e.target.value)}
-                    size="small"
-                    sx={{ minWidth: 350, '& .MuiInputLabel-root:not(.MuiInputLabel-shrink)': { fontSize: '0.875rem' } }}
-                  />
-                </Grid>
+        <Box display="flex" flexDirection="column" sx={{ minHeight: '78vh' }}>
+          <Box sx={{ mb: 1, p: 1, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-start' }}>
+            <TextField
+              label="Instrument"
+              value={instrumentId}
+              onChange={(e) => setInstrumentId(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') executeReport(); }}
+              size="small"
+              error={submitted && !instrumentId.trim()}
+              helperText={submitted && !instrumentId.trim() ? 'Enter an instrument' : ' '}
+              sx={{ ...fieldSx, '& .MuiInputLabel-root:not(.MuiInputLabel-shrink)': { fontSize: '0.875rem' } }}
+            />
 
-                <Grid xs={12} sm={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Select Model"
-                    value={model ? (models.find(m => m.id === model)?.modelName || model) : ''}
-                    onClick={(e) => { setModelpickerAnchor(e.currentTarget); setModelpickerSearch(''); }}
-                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
-                    sx={{ m: 1, minWidth: 350 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: model ? (
-                        <InputAdornment position="end">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); setModel(''); }}
-                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-                          >
-                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
-                          </IconButton>
-                        </InputAdornment>
-                      ) : null,
-                    }}
-                  />
-                </Grid>
+            <TextField
+              size="small"
+              label="Select Model"
+              value={model ? modelName(model) : ''}
+              onClick={(e) => { setModelpickerAnchor(e.currentTarget); setModelpickerSearch(''); fetchAllModels(); }}
+              inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+              error={submitted && !model}
+              helperText={submitted && !model ? 'Select a model' : ' '}
+              sx={fieldSx}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: clearAdornment(Boolean(model), () => setModel('')),
+              }}
+            />
 
-                <Popover
-                  open={Boolean(modelpickerAnchor)}
-                  anchorEl={modelpickerAnchor}
-                  onClose={() => setModelpickerAnchor(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                  slotProps={{
-                    paper: {
-                      sx: {
-                        mt: 0.75,
-                        width: 350,
-                        borderRadius: 3,
-                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
-                        border: '1px solid', borderColor: 'divider',
-                        overflow: 'hidden',
-                      },
-                    },
-                  }}
-                >
-                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
-                    <TextField
-                      autoFocus
-                      fullWidth
-                      size="small"
-                      placeholder="Search models..."
-                      value={modelpickerSearch}
-                      onChange={(e) => setModelpickerSearch(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                    />
-                  </Box>
-                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
-                    {filteredModels.length === 0 ? (
-                      <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
-                        <Typography variant="caption" color="text.disabled">No models found.</Typography>
-                      </ListItemButton>
-                    ) : filteredModels.map((m) => (
-                      <ListItemButton
-                        key={m.id}
-                        selected={m.id === model}
-                        onClick={() => { setModel(m.id); setModelpickerAnchor(null); }}
-                        sx={{
-                          py: 1, px: 2,
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                          '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
-                        }}
-                      >
-                        <ListItemText
-                          primary={m.modelName}
-                          primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
-                        />
-                      </ListItemButton>
-                    ))}
-                  </List>
-                </Popover>
+            <Popover
+              open={Boolean(modelpickerAnchor)}
+              anchorEl={modelpickerAnchor}
+              onClose={() => setModelpickerAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              slotProps={{ paper: { sx: { ...PAPER_SX, width: modelpickerAnchor ? Math.max(modelpickerAnchor.offsetWidth, 280) : 350 } } }}
+            >
+              {searchBox(modelpickerSearch, setModelpickerSearch, 'Search models...')}
+              {pickerList({
+                items: filteredModels.map((m) => ({ ...m, key: m.id })),
+                error: modelsError,
+                onRetry: fetchAllModels,
+                empty: 'No models found.',
+                isSelected: (m) => m.id === model,
+                onPick: (m) => { setModel(m.id); setModelpickerAnchor(null); },
+                label: (m) => m.modelName,
+              })}
+            </Popover>
 
-                <Grid xs={12} sm={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Select Posting Date"
-                    value={postingDate ? (postingDates.find(d => d.value === postingDate)?.label || postingDate) : ''}
-                    onClick={(e) => { setDatepickerAnchor(e.currentTarget); setDatepickerSearch(''); }}
-                    inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
-                    sx={{ m: 1, minWidth: 350 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: postingDate ? (
-                        <InputAdornment position="end">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); setPostingDate(''); }}
-                            sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-                          >
-                            <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
-                          </IconButton>
-                        </InputAdornment>
-                      ) : null,
-                    }}
-                  />
-                </Grid>
+            <TextField
+              size="small"
+              label="Select Posting Date"
+              value={postingDate ? dateLabel(postingDate) : ''}
+              onClick={(e) => { setDatepickerAnchor(e.currentTarget); setDatepickerSearch(''); fetchAllPostingDates(); }}
+              inputProps={{ readOnly: true, style: { cursor: 'pointer' } }}
+              error={submitted && !postingDate}
+              helperText={submitted && !postingDate ? 'Select a posting date' : ' '}
+              sx={fieldSx}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: clearAdornment(Boolean(postingDate), () => setPostingDate('')),
+              }}
+            />
 
-                <Popover
-                  open={Boolean(datepickerAnchor)}
-                  anchorEl={datepickerAnchor}
-                  onClose={() => setDatepickerAnchor(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                  slotProps={{
-                    paper: {
-                      sx: {
-                        mt: 0.75,
-                        width: 350,
-                        borderRadius: 3,
-                        boxShadow: '0 8px 32px rgba(15,23,42,0.16)',
-                        border: '1px solid', borderColor: 'divider',
-                        overflow: 'hidden',
-                      },
-                    },
-                  }}
-                >
-                  <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) }}>
-                    <TextField
-                      autoFocus
-                      fullWidth
-                      size="small"
-                      placeholder="Search dates..."
-                      value={datepickerSearch}
-                      onChange={(e) => setDatepickerSearch(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Box>
-                  <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
-                    {filteredPostingDates.length === 0 ? (
-                      <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
-                        <Typography variant="caption" color="text.disabled">No dates found.</Typography>
-                      </ListItemButton>
-                    ) : filteredPostingDates.map((pdate) => (
-                      <ListItemButton
-                        key={pdate.value}
-                        selected={pdate.value === postingDate}
-                        onClick={() => { setPostingDate(pdate.value); setDatepickerAnchor(null); }}
-                        sx={{
-                          py: 1, px: 2,
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                          '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
-                        }}
-                      >
-                        <ListItemText
-                          primary={pdate.label}
-                          primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
-                        />
-                      </ListItemButton>
-                    ))}
-                  </List>
-                </Popover>
-
-                <Grid xs={12} sm={3}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ m: 1, position: 'relative' }}>
-                      <Fab
-                        size='small'
-                        aria-label="progress"
-                        color="primary"
-                        sx={buttonSx}
-                        onClick={handleButtonClick}
-                      >
-                        {success ? <CheckIcon size="small" /> : <UpdateIcon size="small" />}
-                      </Fab>
-                      {loading && (
-                        <CircularProgress
-
-                          size={10}
-                          sx={{
-                            color: green[500],
-                            position: 'absolute',
-                            top: -6,
-                            left: -6,
-                            zIndex: 1,
-                          }}
-                        />
-                      )}
-                    </Box>
-
-                  </Box>
-                </Grid>
-              </Grid>
-              <Grid container justifyContent="center" sx={{ mt: 1 }}>
-              </Grid>
-            </Box>
-
+            <Popover
+              open={Boolean(datepickerAnchor)}
+              anchorEl={datepickerAnchor}
+              onClose={() => setDatepickerAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              slotProps={{ paper: { sx: { ...PAPER_SX, width: datepickerAnchor ? Math.max(datepickerAnchor.offsetWidth, 280) : 350 } } }}
+            >
+              {searchBox(datepickerSearch, setDatepickerSearch, 'Search dates...')}
+              {pickerList({
+                items: filteredPostingDates.map((d) => ({ ...d, key: d.value })),
+                error: postingDatesError,
+                onRetry: fetchAllPostingDates,
+                empty: 'No dates found.',
+                isSelected: (d) => d.value === postingDate,
+                onPick: (d) => { setPostingDate(d.value); setDatepickerAnchor(null); },
+                label: (d) => d.label,
+              })}
+            </Popover>
           </Box>
 
-          <Box
-            flex="1" // Third row takes the remaining space
-            overflow="auto" // Enable scrolling if content overflows
-          >
-
-            <div style={{ padding: '20px' }}>
-              <EnhancedDataGridTabs
-                data={diagnosticData}
-                title="Enterprise Data Manager"
-              // onExport={handleExport}
-              />
-            </div>
-
+          <Box flex="1" sx={{ overflow: 'auto', px: { xs: 0, sm: 2.5 }, pb: 2.5 }}>
+            {ranFor && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>Results for</Typography>
+                <Chip size="small" label={`Instrument ${ranFor.instrumentId}`} />
+                <Chip size="small" label={modelName(ranFor.modelId)} />
+                <Chip size="small" label={dateLabel(ranFor.postingDate)} />
+                {resultsStale && (
+                  <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 600 }}>
+                    — the selection has changed; run the diagnostic again to update.
+                  </Typography>
+                )}
+              </Box>
+            )}
+            <EnhancedDataGridTabs data={diagnosticData} ran={Boolean(ranFor)} />
           </Box>
         </Box>
       </CustomTabPanel>

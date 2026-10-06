@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Tab,
@@ -8,66 +8,94 @@ import {
   Card,
   CardContent,
   Chip,
-  Stack
+  Stack,
+  Tooltip,
 } from '@mui/material';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
+import SearchOffOutlinedIcon from '@mui/icons-material/SearchOffOutlined';
+import { DataGrid } from '@mui/x-data-grid';
 
 // Helper function moved to top level
 const formatHeaderName = (key) => {
   if (!key || typeof key !== 'string') return 'Unknown';
-  
+
   // Split by underscore and capitalize each word
   return key.split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 };
 
-function MapAsRowsDataGridTabs({ data }) {
-  const [selectedTab, setSelectedTab] = useState(0);
+// Generated row id (a row's own "id" may be missing, null or repeated).
+const ROW_ID = '__rowId';
+const getRowId = (row) => row[ROW_ID];
 
-  const handleTabChange = (event, newValue) => {
-    setSelectedTab(newValue);
-  };
+// A calendar date sent as midnight UTC (or date-only) is shown as that date in every time zone.
+const MIDNIGHT_UTC = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.0+)?Z)?$/;
+
+function EmptyCard({ icon: Icon, title, text }) {
+  return (
+    <Card variant="outlined">
+      <CardContent
+        sx={{
+          padding: 6,
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 1.5,
+        }}
+      >
+        <Icon sx={{ fontSize: 40, color: 'text.disabled' }} />
+        <Typography variant="subtitle1" fontWeight={600} color="text.secondary">
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.disabled" sx={{ maxWidth: 360 }}>
+          {text}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Diagnostic results: one tab per result table, each a grid of its rows.
+ *   data: { [tabName]: rows[] }   ran: whether a diagnostic has completed (for the empty state)
+ */
+function MapAsRowsDataGridTabs({ data, ran = false }) {
+  const [selectedTab, setSelectedTab] = useState(0);
 
   // Transform your data structure: object with tab names as keys and arrays as values
   const tabData = useMemo(() => {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       return [];
     }
 
     return Object.entries(data).map(([tabName, rows]) => ({
       tabName,
       rows: Array.isArray(rows) ? rows.map((row, index) => ({
-        id: `${tabName}_${index + 1}`, // Unique ID for each row
-        ...row
+        ...(row && typeof row === 'object' ? row : { value: row }),
+        [ROW_ID]: `${tabName}_${index + 1}`,
       })) : []
     }));
   }, [data]);
 
-  // Show empty state if no data
+  // New results start on their first tab (the previous tab may not exist any more).
+  useEffect(() => { setSelectedTab(0); }, [data]);
+  const currentTab = selectedTab < tabData.length ? selectedTab : 0;
+
   if (tabData.length === 0) {
-    return (
-      <Card variant="outlined">
-        <CardContent
-          sx={{
-            padding: 6,
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 1.5,
-          }}
-        >
-          <FilterAltOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
-          <Typography variant="subtitle1" fontWeight={600} color="text.secondary">
-            No results to display
-          </Typography>
-          <Typography variant="body2" color="text.disabled" sx={{ maxWidth: 340 }}>
-            Select an instrument, model, and posting date above, then run the diagnostic to see results.
-          </Typography>
-        </CardContent>
-      </Card>
+    return ran ? (
+      <EmptyCard
+        icon={SearchOffOutlinedIcon}
+        title="No diagnostic data found"
+        text="The diagnostic ran, but there is no data for this instrument, model and posting date."
+      />
+    ) : (
+      <EmptyCard
+        icon={FilterAltOutlinedIcon}
+        title="No results to display"
+        text="Select an instrument, model, and posting date above, then run the diagnostic to see results."
+      />
     );
   }
 
@@ -75,27 +103,28 @@ function MapAsRowsDataGridTabs({ data }) {
     <Card variant="outlined">
       <CardContent sx={{ padding: 2 }}>
         <Paper sx={{ borderBottom: 0, borderColor: 'divider', mb: 1 }}>
-          <Tabs 
-            value={selectedTab} 
-            onChange={handleTabChange} 
+          <Tabs
+            value={currentTab}
+            onChange={(_, value) => setSelectedTab(value)}
             variant="scrollable"
             scrollButtons="auto"
           >
-            {tabData.map(({ tabName, rows }, index) => (
-              <Tab 
-                key={tabName} 
+            {tabData.map(({ tabName, rows }) => (
+              <Tab
+                key={tabName}
                 label={
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <Typography variant="body2">{tabName}</Typography>
+                    <Chip label={rows.length} size="small" sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700 }} />
                   </Stack>
-                } 
+                }
               />
             ))}
           </Tabs>
         </Paper>
 
         {tabData.map(({ tabName, rows }, index) => (
-          <TabPanel key={tabName} value={selectedTab} index={index}>
+          <TabPanel key={tabName} value={currentTab} index={index}>
             <DataGridTable rows={rows} tabName={tabName} />
           </TabPanel>
         ))}
@@ -120,16 +149,17 @@ function DataGridTable({ rows, tabName }) {
 
     // Get all unique keys from all rows for columns
     const allKeys = Array.from(
-      new Set(rows.flatMap(row => 
+      new Set(rows.flatMap(row =>
         row && typeof row === 'object' ? Object.keys(row) : []
       ))
     )
+      .filter(key => key !== ROW_ID)
       .filter(key => key.replace(/^_+/, '').toLowerCase() !== 'id') // Hide 'id'/'_id' column for all events
       .filter(key => !isReferenceEvent || !referenceHiddenCols.has(key.toLowerCase())); // Hide extra cols for reference events
 
     // Define the priority columns that should come first
     const priorityColumns = ['InstrumentId', 'AttributeId', 'PostingDate', 'EffectiveDate'];
-    
+
     // Separate priority columns from other columns (case-insensitive, use actual key from data)
     const priorityCols = priorityColumns
       .map(p => allKeys.find(k => k.toLowerCase() === p.toLowerCase()))
@@ -174,7 +204,7 @@ function DataGridTable({ rows, tabName }) {
   return (
     <Box
       sx={{
-        height: 400,
+        height: 460,
         width: '100%',
         '& .super-app-theme--header': {
           backgroundColor: 'rgba(25, 118, 210, 0.08)',
@@ -198,23 +228,17 @@ function DataGridTable({ rows, tabName }) {
           alignItems: 'center',
           justifyContent: 'center',
         },
-        '& .MuiDataGrid-virtualScroller': {
-          overflowX: 'auto',
-        },
-        '& .MuiDataGrid-root': {
-          overflow: 'auto',
-        },
       }}
     >
       <DataGrid
         rows={rows}
         columns={columns}
-        pageSize={10}
-        rowsPerPageOptions={[10, 25, 50]}
-        disableSelectionOnClick
-        components={{
-          Toolbar: GridToolbar,
-        }}
+        getRowId={getRowId}
+        initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+        pageSizeOptions={[10, 25, 50, 100]}
+        disableRowSelectionOnClick
+        showToolbar
+        slotProps={{ toolbar: { csvOptions: { fileName: `diagnostic-${tabName}` } } }}
         sx={{
           border: 1,
           borderColor: 'divider',
@@ -226,134 +250,110 @@ function DataGridTable({ rows, tabName }) {
             borderBottom: '2px solid',
             borderBottomColor: 'divider',
           },
-          '& .MuiDataGrid-virtualScrollerContent': {
-            width: 'auto',
-            minWidth: '100%',
-          },
         }}
-        autoHeight={false}
       />
     </Box>
   );
 }
 
+const centered = (content) => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', minWidth: 0 }}>{content}</Box>
+);
+
+// Full precision: up to 10 decimals, so small rates and amounts are never rounded away.
+export const formatDiagnosticNumber = (value) =>
+  (Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 10 }));
+
+export const formatDiagnosticDate = (value) => {
+  if (typeof value !== 'string' || !MIDNIGHT_UTC.test(value)) return null;
+  const date = new Date(value.length === 10 ? `${value}T00:00:00Z` : value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { timeZone: 'UTC' });
+};
+
 // Center-aligned value renderer
 function CenterAlignedValueRenderer({ value }) {
   // Handle undefined or null values first
   if (value === null || value === undefined || value === '') {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-        <Chip label="-" size="small" color="default" variant="outlined" />
-      </Box>
-    );
+    return centered(<Chip label="-" size="small" color="default" variant="outlined" />);
   }
 
   if (typeof value === 'boolean') {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-        <Chip 
-          label={value ? 'true' : 'false'} 
-          size="small" 
-          color={value ? 'success' : 'error'} 
-          variant="outlined" 
-        />
-      </Box>
+    return centered(
+      <Chip
+        label={value ? 'true' : 'false'}
+        size="small"
+        color={value ? 'success' : 'error'}
+        variant="outlined"
+      />
     );
   }
 
   if (typeof value === 'number') {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-          {value.toLocaleString()}
-        </Typography>
-      </Box>
+    return centered(
+      <Typography variant="body2" sx={{ fontFamily: 'monospace' }} title={String(value)}>
+        {formatDiagnosticNumber(value)}
+      </Typography>
     );
   }
 
   if (typeof value === 'string') {
-    // Check if it's a date string
-    if (value.includes('T00:00:00.000Z')) {
-      try {
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-              <Typography variant="body2">
-                {date.toLocaleDateString()}
-              </Typography>
-            </Box>
-          );
-        }
-      } catch (error) {
-        // Fall through to regular string display
-      }
-    }
-    
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-        <Typography variant="body2">{value}</Typography>
-      </Box>
-    );
+    const date = formatDiagnosticDate(value);
+    return centered(<Typography variant="body2">{date ?? value}</Typography>);
   }
 
   if (Array.isArray(value)) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+    return centered(
+      <Tooltip title={<Box component="span" sx={{ whiteSpace: 'pre-wrap' }}>{value.map(String).join('\n')}</Box>}>
         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
           {value.slice(0, 3).map((item, index) => (
-            <Chip 
+            <Chip
               key={index}
-              label={String(item)} 
-              size="small" 
-              variant="outlined" 
+              label={String(item)}
+              size="small"
+              variant="outlined"
             />
           ))}
           {value.length > 3 && (
-            <Chip 
-              label={`+${value.length - 3}`} 
-              size="small" 
-              variant="filled" 
+            <Chip
+              label={`+${value.length - 3}`}
+              size="small"
+              variant="filled"
             />
           )}
         </Stack>
-      </Box>
+      </Tooltip>
     );
   }
 
   if (typeof value === 'object') {
+    let text;
     try {
-      return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <Box 
-            sx={{ 
-              p: 0.5, 
-              backgroundColor: 'grey.50',
-              borderRadius: 1,
-              maxWidth: 250,
-              overflow: 'hidden'
-            }}
-          >
-            <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-              {JSON.stringify(value)}
-            </Typography>
-          </Box>
-        </Box>
-      );
-    } catch (error) {
-      return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <Chip label="[Object]" size="small" color="warning" variant="outlined" />
-        </Box>
-      );
+      text = JSON.stringify(value);
+    } catch {
+      return centered(<Chip label="[Object]" size="small" color="warning" variant="outlined" />);
     }
+    return centered(
+      <Tooltip title={<Box component="pre" sx={{ m: 0, whiteSpace: 'pre-wrap', fontSize: '0.75rem' }}>{JSON.stringify(value, null, 2)}</Box>}>
+        <Box
+          sx={{
+            p: 0.5,
+            backgroundColor: 'grey.50',
+            borderRadius: 1,
+            maxWidth: 250,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+            {text}
+          </Typography>
+        </Box>
+      </Tooltip>
+    );
   }
 
-  return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-      <Typography variant="body2">{String(value)}</Typography>
-    </Box>
-  );
+  return centered(<Typography variant="body2">{String(value)}</Typography>);
 }
 
 function TabPanel({ children, value, index, ...other }) {

@@ -7,7 +7,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 
-const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
+const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect, disabled = false, error }) => {
   const theme = useTheme();
   const [selectedValue, setSelectedValue] = useState(null);
   const [pickerAnchor, setPickerAnchor] = useState(null);
@@ -51,14 +51,16 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
     if (onSelect) onSelect(null, null);
   };
 
-  const filteredTables = tables.filter(t =>
+  // Deleted reference tables can't be linked.
+  const filteredTables = tables.filter(t => !t.isDeleted).filter(t =>
     t.tableName?.toLowerCase().includes(pickerSearch.toLowerCase()) ||
     t.referenceColumn?.toLowerCase().includes(pickerSearch.toLowerCase())
   );
 
+  // A linked table that isn't in the list (e.g. not loaded yet) still shows its name.
   const displayValue = selectedValue
     ? `${selectedValue.tableName} • ${selectedValue.referenceColumn}`
-    : '';
+    : (typeof value === 'string' ? value : '');
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -66,13 +68,16 @@ const ReferenceColumnAutocomplete = ({ tables = [], value, onSelect }) => {
         fullWidth size="small"
         label="Select Reference Table"
         value={displayValue}
-        onClick={(e) => { setPickerAnchor(e.currentTarget); setPickerSearch(''); }}
-        inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+        required
+        disabled={disabled}
+        error={Boolean(error)}
+        onClick={(e) => { if (!disabled) { setPickerAnchor(e.currentTarget); setPickerSearch(''); } }}
+        inputProps={{ readOnly: true, style: { cursor: disabled ? 'default' : 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
         InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
         sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
         InputProps={{
           startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
-          endAdornment: selectedValue ? (
+          endAdornment: selectedValue && !disabled ? (
             <InputAdornment position="end">
               <IconButton size="small" onClick={handleClear} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
                 <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />

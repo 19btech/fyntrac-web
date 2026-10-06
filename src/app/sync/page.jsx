@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -41,6 +41,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import { DataGrid } from '@mui/x-data-grid';
 
 import { useTenant } from "../tenant-context";
@@ -50,9 +51,40 @@ import FileUploadComponent from '../component/file-upload';
 // --- HELPERS ---
 
 // 1. Date Only (YYYY-MM-DD)
-const formatDate = (isoString) => {
-  if (!isoString) return '-';
-  return new Date(isoString).toLocaleDateString('en-CA');
+const formatDate = (value) => {
+  if (value === null || value === undefined || value === '') return '-';
+  const text = String(value);
+  const dateOnly = /^(\d{4})-?(\d{2})-?(\d{2})$/.exec(text);
+  if (dateOnly) return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}`;
+  const d = new Date(text);
+  return Number.isNaN(d.getTime()) ? text : d.toLocaleDateString('en-CA');
+};
+
+// Load statuses that are still running (the page re-checks them until they finish).
+const RUNNING_STATUSES = new Set(['STARTING', 'STARTED', 'RUNNING', 'IN_PROGRESS', 'PROCESSING', 'STOPPING']);
+const isRunningLoad = (row) => RUNNING_STATUSES.has(String(row?.activityStatus || '').toUpperCase());
+
+// Validation issues: a stable key per issue. Without an id, the job, row, field, code and time
+// identify it (so resolving one never hides an issue from another upload); exact repeats get #n.
+const withKeys = (logs) => {
+  const seen = new Map();
+  return (Array.isArray(logs) ? logs : []).map((r) => {
+    const base = r.id != null
+      ? String(r.id)
+      : [r.jobId, r.rowNumber, r.fieldName, r.errorCode, r.createdAt].map((v) => v ?? '').join('|');
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return { ...r, __key: n ? `${base}#${n}` : base };
+  });
+};
+
+const isErrorLog = (r) => r.validationType === 'ERROR' || (r.validationType !== 'WARNING' && r.errorCode?.startsWith('ERR'));
+
+// CSV cell: quoted, and text a spreadsheet would run as a formula is kept as text.
+const csvCell = (value) => {
+  let s = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
 };
 
 // 2. Date & Time (YYYY-MM-DD, HH:MM)
@@ -174,6 +206,7 @@ function Row({ row, isExpandedDefault = false }) {
                       <TableHead sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 600 }}>Table Name</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>File Name</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Read</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Written</TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>Skipped</TableCell>
@@ -193,6 +226,9 @@ function Row({ row, isExpandedDefault = false }) {
                             <TableRow key={index}>
                               <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
                                 {detail.tableName}
+                              </TableCell>
+                              <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                                {detail.fileName}
                               </TableCell>
                               <TableCell align="center">{detail.recordsRead}</TableCell>
                               <TableCell align="center">{detail.recordsWritten}</TableCell>
@@ -278,7 +314,17 @@ const FyntracCard = ({ title, children, action, sx }) => {
   );
 };
 
-function ValidationNoRows({ severityFilter, context }) {
+function ValidationNoRows({ severityFilter, context, error, onRetry }) {
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', py: 6, gap: 1.5 }}>
+        <WarningAmberOutlinedIcon sx={{ color: '#dc2626', fontSize: 32 }} />
+        <Box sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b' }}>Validation issues could not be loaded.</Box>
+        <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{error}</Box>
+        {onRetry && <Button size="small" variant="outlined" onClick={onRetry}>Retry</Button>}
+      </Box>
+    );
+  }
   const msgs = {
     rules: {
       all: 'All accounting rules are valid — no issues detected.',
@@ -313,35 +359,52 @@ export default function IngestPage() {
   const [historicalUpload, setHistoricalUpload] = useState([]);
   const [openFileUpload, setOpenFileUpload] = React.useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { tenant, user } = useTenant();
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
   const showToast = (message, severity = 'success') => setToast({ open: true, message, severity });
   const handleToastClose = (_, reason) => { if (reason === 'clickaway') return; setToast(p => ({ ...p, open: false })); };
-  const { tenant, user } = useTenant();
 
   // ── Validation Log ──────────────────────────────────────────────────────────
   const [openValidationLog, setOpenValidationLog] = React.useState(false);
+  // #6: every issue (badge, warning strip) vs. the issues shown in the dialog (with its filters).
+  const [allLogs, setAllLogs] = React.useState([]);
   const [validationLogs, setValidationLogs] = React.useState([]);
   const [validationLogsLoading, setValidationLogsLoading] = React.useState(false);
+  const [validationError, setValidationError] = React.useState('');
+  const [issuesCheckFailed, setIssuesCheckFailed] = React.useState(false);
+  const [uploadBusy, setUploadBusy] = React.useState(false);
 
   const [filterInstrumentId, setFilterInstrumentId] = React.useState('');
   const [filterAttributeId, setFilterAttributeId] = React.useState('');
   const [filterPostingDate, setFilterPostingDate] = React.useState('');
 
+  const filtersActive = Boolean(filterInstrumentId.trim() || filterAttributeId.trim() || filterPostingDate.trim());
   const fetchValidationLogs = React.useCallback(() => {
     setValidationLogsLoading(true);
+    setValidationError('');
     let url = '/validation-logs/activity';
     const params = new URLSearchParams();
-    if (filterInstrumentId) params.append('instrumentId', filterInstrumentId);
-    if (filterAttributeId) params.append('attributeId', filterAttributeId);
-    if (filterPostingDate) params.append('postingDate', filterPostingDate.replace(/-/g, ''));
+    if (filterInstrumentId.trim()) params.append('instrumentId', filterInstrumentId.trim());
+    if (filterAttributeId.trim()) params.append('attributeId', filterAttributeId.trim());
+    if (filterPostingDate.trim()) params.append('postingDate', filterPostingDate.trim().replace(/-/g, ''));
+    const filtered = Boolean(params.toString());
 
-    if (params.toString()) {
+    if (filtered) {
       url += `?${params.toString()}`;
     }
 
     dataloaderApi.get(url)
-      .then(res => setValidationLogs(res.data ?? []))
-      .catch(err => console.error('Failed to fetch validation logs:', err))
+      .then(res => {
+        const logs = withKeys(res.data ?? []);
+        setValidationLogs(logs);
+        // Unfiltered results are also the page-wide list.
+        if (!filtered) { setAllLogs(logs); setIssuesCheckFailed(false); }
+      })
+      .catch(err => {
+        console.error('Failed to fetch validation logs:', err);
+        setValidationLogs([]);
+        setValidationError(err?.response?.data?.message || err?.message || 'Please try again.');
+      })
       .finally(() => setValidationLogsLoading(false));
   }, [filterInstrumentId, filterAttributeId, filterPostingDate]);
 
@@ -353,58 +416,71 @@ export default function IngestPage() {
 
   const [stripDismissed, setStripDismissed] = React.useState(false);
 
-  const [resolvedIds, setResolvedIds] = React.useState(() => {
-    try { return new Set(JSON.parse(sessionStorage.getItem('resolved_INGEST') ?? '[]')); }
-    catch { return new Set(); }
-  });
+  const resolvedKey = `resolved_INGEST.${tenant || 'default'}.${user?.id || user?.email || 'anon'}`;
+  const [resolvedIds, setResolvedIds] = React.useState(() => new Set());
+  useEffect(() => {
+    try { setResolvedIds(new Set(JSON.parse(localStorage.getItem(resolvedKey) ?? '[]'))); }
+    catch { setResolvedIds(new Set()); }
+  }, [resolvedKey]);
+  const saveResolved = (next) => {
+    try { localStorage.setItem(resolvedKey, JSON.stringify([...next])); } catch { }
+  };
 
+  // Shown in the dialog (filters apply) and page-wide (badge / strip).
   const unresolvedLogs = React.useMemo(() =>
-    validationLogs.filter(r => !resolvedIds.has(String(r.id ?? `${r.rowNumber}-${r.fieldName}`))),
+    validationLogs.filter(r => !resolvedIds.has(r.__key)),
     [validationLogs, resolvedIds]
+  );
+  const allUnresolved = React.useMemo(() =>
+    allLogs.filter(r => !resolvedIds.has(r.__key)),
+    [allLogs, resolvedIds]
   );
 
   const [severityFilter, setSeverityFilter] = React.useState('all');
 
   const filteredLogs = React.useMemo(() => {
     if (severityFilter === 'all') return unresolvedLogs;
-    return unresolvedLogs.filter(r =>
-      severityFilter === 'error'
-        ? (r.validationType === 'ERROR' || r.errorCode?.startsWith('ERR'))
-        : r.validationType === 'WARNING'
-    );
+    return unresolvedLogs.filter(r => (severityFilter === 'error' ? isErrorLog(r) : r.validationType === 'WARNING'));
   }, [unresolvedLogs, severityFilter]);
 
-  const validationIssueCount = unresolvedLogs.length;
+  const validationIssueCount = allUnresolved.length;
   const hasValidationIssues = validationIssueCount > 0;
+
+  // #11: the warning strip comes back when new issues appear.
+  const lastIssueCount = useRef(0);
+  useEffect(() => {
+    if (validationIssueCount > lastIssueCount.current) setStripDismissed(false);
+    lastIssueCount.current = validationIssueCount;
+  }, [validationIssueCount]);
 
   const recheckValidationIssues = React.useCallback(() => {
     if (!tenant) return;
     dataloaderApi.get('/validation-logs/activity')
       .then(res => {
-        setValidationLogs(res.data ?? []);
-        if ((res.data ?? []).length === 0) setStripDismissed(false);
+        setAllLogs(withKeys(res.data ?? []));
+        setIssuesCheckFailed(false);
       })
-      .catch(() => {});
+      .catch(() => setIssuesCheckFailed(true)); // the badge says the check failed instead of "no issues"
   }, [tenant]);
 
   useEffect(() => { recheckValidationIssues(); }, [recheckValidationIssues]);
 
   const handleMarkResolved = (row) => {
-    const key = String(row.id ?? `${row.rowNumber}-${row.fieldName}`);
     setResolvedIds(prev => {
       const next = new Set(prev);
-      next.add(key);
-      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch {}
+      next.add(row.__key);
+      saveResolved(next);
       return next;
     });
   };
 
+  // Marks the issues listed in the dialog (only the filtered ones when filters are applied).
   const handleMarkAllResolved = () => {
     const count = unresolvedLogs.length;
     setResolvedIds(prev => {
       const next = new Set(prev);
-      unresolvedLogs.forEach(r => next.add(String(r.id ?? `${r.rowNumber}-${r.fieldName}`)));
-      try { sessionStorage.setItem('resolved_INGEST', JSON.stringify([...next])); } catch {}
+      unresolvedLogs.forEach(r => next.add(r.__key));
+      saveResolved(next);
       return next;
     });
     showToast(`${count} issue${count !== 1 ? 's' : ''} marked as resolved.`, 'success');
@@ -412,27 +488,29 @@ export default function IngestPage() {
 
   const downloadErrorReport = () => {
     const headers = ['Row #', 'Type', 'Field', 'Rejected Value', 'Instrument ID', 'Attribute ID', 'Posting Date', 'Error Code', 'Message', 'Job ID', 'Timestamp'];
-    const rows = validationLogs.map(r => [
-      r.rowNumber ?? '',
-      r.validationType ?? '',
-      r.fieldName ?? '',
-      `"${(r.rejectedValue ?? '').toString().replace(/"/g, '""')}"`,
-      r.instrumentId ?? '',
-      r.attributeId ?? '',
-      r.postingDate ?? '',
-      r.errorCode ?? '',
-      `"${(r.errorMessage ?? '').replace(/"/g, '""')}"`,
-      r.jobId ?? '',
+    const rows = filteredLogs.map(r => [
+      r.rowNumber,
+      r.validationType,
+      r.fieldName,
+      r.rejectedValue,
+      r.instrumentId,
+      r.attributeId,
+      r.postingDate,
+      r.errorCode,
+      r.errorMessage,
+      r.jobId,
       r.createdAt ? new Date(r.createdAt).toLocaleString() : '',
     ]);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `validation-errors-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `validation-issues-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const baseURL = "";
@@ -444,8 +522,8 @@ export default function IngestPage() {
     Accept: '*/*',
   };
 
-  const fetchUploadActivitiyLogs = () => {
-    setIsRefreshing(true);
+  const fetchUploadActivitiyLogs = ({ quiet = false } = {}) => {
+    if (!quiet) setIsRefreshing(true);
     dataloaderApi.get(fetchUploadActivityCall, { headers: headers })
       .then(response => {
         const logs = response.data || [];
@@ -462,7 +540,7 @@ export default function IngestPage() {
       .catch(error => {
         console.error('Error fetching logs:', error);
         setIsRefreshing(false);
-        showToast('Failed to refresh data. Please try again.', 'error');
+        if (!quiet) showToast('Failed to refresh data. Please try again.', 'error');
       });
   };
 
@@ -472,11 +550,29 @@ export default function IngestPage() {
     }
   }, [tenant]);
 
+  const anyRunning = isRunningLoad(recentUpload) || historicalUpload.some(isRunningLoad);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    // A load just finished: its validation issues are new.
+    if (wasRunning.current && !anyRunning) recheckValidationIssues();
+    wasRunning.current = anyRunning;
+    if (!anyRunning || !tenant) return undefined;
+    const id = setInterval(() => fetchUploadActivitiyLogs({ quiet: true }), 10000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyRunning, tenant]);
+
+  const refreshAll = () => {
+    fetchUploadActivitiyLogs();
+    recheckValidationIssues();
+  };
+
   const handleOpenFileUpload = () => {
     setOpenFileUpload(true);
   };
 
   const handleCloseFileUpload = () => {
+    if (uploadBusy) return; // closing mid-upload would hide its result
     setOpenFileUpload(false);
   };
 
@@ -503,7 +599,7 @@ export default function IngestPage() {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Validation Log">
+            <Tooltip title={issuesCheckFailed ? 'Validation Log — issues could not be checked' : 'Validation Log'}>
               <IconButton
                 aria-label="validation-log"
                 onClick={handleOpenValidationLog}
@@ -514,7 +610,7 @@ export default function IngestPage() {
                   '&:active': { transform: 'scale(0.94)' },
                 }}
               >
-                <Badge badgeContent={validationIssueCount} color="error" max={99}
+                <Badge badgeContent={issuesCheckFailed ? '!' : validationIssueCount} color="error" max={99}
                   sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
                   <WarningAmberOutlinedIcon sx={{ color: '#d97706' }} />
                 </Badge>
@@ -528,7 +624,7 @@ export default function IngestPage() {
             <Tooltip title="Refresh">
               <span>
                 <IconButton
-                  onClick={fetchUploadActivitiyLogs}
+                  onClick={refreshAll}
                   disabled={isRefreshing}
                   sx={{ bgcolor: 'white', boxShadow: 1, transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', '&:hover': { bgcolor: 'grey.50', boxShadow: 3, transform: 'scale(1.08)' }, '&:active': { transform: 'scale(0.94)' } }}
                 >
@@ -660,11 +756,11 @@ export default function IngestPage() {
           transition: { direction: 'up' },
           paper: {
             sx: {
-            borderRadius: 4,
-            boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
-            overflow: 'hidden',
-            border: '1px solid',
-            borderColor: 'divider',
+              borderRadius: 4,
+              boxShadow: '0 32px 64px rgba(0,0,0,0.14)',
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'divider',
             },
           },
         }}
@@ -710,9 +806,11 @@ export default function IngestPage() {
                 </Typography>
               </Box>
             </Box>
-            <Tooltip title="Close" placement="left">
+            <Tooltip title={uploadBusy ? 'Uploading — please wait' : 'Close'} placement="left">
+              <span>
               <IconButton
                 onClick={handleCloseFileUpload}
+                disabled={uploadBusy}
                 size="small"
                 sx={{
                   color: 'text.secondary',
@@ -723,12 +821,14 @@ export default function IngestPage() {
               >
                 <HighlightOffOutlinedIcon fontSize="small" />
               </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           <FileUploadComponent
             onDrop={handleFileUploadComplete}
+            onBusyChange={setUploadBusy}
             showActivitySelector={true}
             showLoadModeSelector={true}
             headerMessage={""}
@@ -803,7 +903,7 @@ export default function IngestPage() {
           <Box sx={{ display: 'flex', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc', alignItems: 'center', flexWrap: 'wrap' }}>
             {[
               { label: 'All', filterKey: 'all', value: unresolvedLogs.length, color: '#14213d' },
-              { label: 'Errors', filterKey: 'error', value: unresolvedLogs.filter(r => r.validationType === 'ERROR' || r.errorCode?.startsWith('ERR')).length, color: '#dc2626' },
+              { label: 'Errors', filterKey: 'error', value: unresolvedLogs.filter(isErrorLog).length, color: '#dc2626' },
               { label: 'Warnings', filterKey: 'warning', value: unresolvedLogs.filter(r => r.validationType === 'WARNING').length, color: '#d97706' },
             ].map(({ label, filterKey, value, color }) => {
               const active = severityFilter === filterKey;
@@ -815,11 +915,16 @@ export default function IngestPage() {
               );
             })}
             <Box sx={{ flex: 1 }} />
+            <Button size="small" startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: '16px !important' }} />} onClick={downloadErrorReport} disabled={filteredLogs.length === 0} sx={{
+              fontSize: '0.72rem', fontWeight: 700, color: '#14213d',
+              border: '1px solid', borderColor: alpha('#14213d', 0.25), borderRadius: 1.5, px: 1.5,
+              '&:hover': { bgcolor: alpha('#14213d', 0.05), borderColor: '#14213d' },
+            }}>Download CSV</Button>
             <Button size="small" onClick={handleMarkAllResolved} disabled={unresolvedLogs.length === 0} sx={{
               fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
               border: '1px solid', borderColor: alpha('#16a34a', 0.35), borderRadius: 1.5, px: 1.5,
               '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
-            }}>✓ Mark All Resolved</Button>
+            }}>{filtersActive ? '✓ Mark Shown Resolved' : '✓ Mark All Resolved'}</Button>
           </Box>
           {/* Filters */}
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc' }}>
@@ -846,6 +951,7 @@ export default function IngestPage() {
                 variant="outlined"
                 value={filterPostingDate}
                 onChange={(e) => setFilterPostingDate(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') fetchValidationLogs(); }}
                 sx={{ bgcolor: 'white', flex: 1 }}
               />
               <Button
@@ -860,83 +966,111 @@ export default function IngestPage() {
           </Box>
 
           <Box sx={{ flex: 1, overflow: 'hidden', px: 3 }}>
-          <DataGrid
-            rows={filteredLogs}
-            loading={validationLogsLoading}
-            getRowId={(row) => row.id ?? `${row.rowNumber}-${row.fieldName}`}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-            disableRowSelectionOnClick
-            slots={{ noRowsOverlay: ValidationNoRows }}
-            slotProps={{ noRowsOverlay: { severityFilter, context: 'ingest' } }}
-            columns={[
-              { field: 'validationType', headerName: 'Type', width: 140,
-                renderCell: (p) => <Box sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>{p.value}</Box> },
-              { field: 'fieldName', headerName: 'Field', width: 140,
-                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#475569' }}>{p.value ?? '—'}</Box> },
-              { field: 'rejectedValue', headerName: 'Rejected Value', width: 130,
-                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'rowNumber', headerName: 'Row #', width: 80, align: 'center', headerAlign: 'center',
-                renderCell: (p) => <Box sx={{ fontSize: '0.82rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'errorCode', headerName: 'Error Code', width: 130,
-                renderCell: (p) => (
-                  <Chip label={p.value} size="small" sx={{
-                    height: 20, fontSize: '0.68rem', fontWeight: 700, fontFamily: 'monospace',
-                    bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626',
-                    border: '1px solid rgba(239,68,68,0.2)', borderRadius: 1,
-                  }} />
-                ) },
-              { field: 'errorMessage', headerName: 'Message', flex: 1, minWidth: 200,
-                renderCell: (p) => (
-                  <Tooltip title={p.value} placement="top-start">
-                    <Box sx={{ fontSize: '0.82rem', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                      {p.value}
+            <DataGrid
+              rows={filteredLogs}
+              loading={validationLogsLoading}
+              getRowId={(row) => row.__key}
+              pageSizeOptions={[10, 25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+              disableRowSelectionOnClick
+              slots={{ noRowsOverlay: ValidationNoRows }}
+              slotProps={{ noRowsOverlay: { severityFilter, context: 'ingest', error: validationError, onRetry: fetchValidationLogs } }}
+              columns={[
+                {
+                  field: 'validationType', headerName: 'Type', width: 140,
+                  renderCell: (p) => <Box sx={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>{p.value}</Box>
+                },
+                {
+                  field: 'fieldName', headerName: 'Field', width: 140,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#475569' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'rejectedValue', headerName: 'Rejected Value', width: 130,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'rowNumber', headerName: 'Row #', width: 80, align: 'center', headerAlign: 'center',
+                  renderCell: (p) => <Box sx={{ fontSize: '0.82rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'errorCode', headerName: 'Error Code', width: 130,
+                  renderCell: (p) => {
+                    const warning = p.row.validationType === 'WARNING';
+                    const tone = warning ? '#d97706' : '#dc2626';
+                    return p.value ? (
+                      <Chip label={p.value} size="small" sx={{
+                        height: 20, fontSize: '0.68rem', fontWeight: 700, fontFamily: 'monospace',
+                        bgcolor: alpha(tone, 0.08), color: tone,
+                        border: `1px solid ${alpha(tone, 0.2)}`, borderRadius: 1,
+                      }} />
+                    ) : '—';
+                  }
+                },
+                {
+                  field: 'errorMessage', headerName: 'Message', flex: 1, minWidth: 200,
+                  renderCell: (p) => (
+                    <Tooltip title={p.value} placement="top-start">
+                      <Box sx={{ fontSize: '0.82rem', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                        {p.value}
+                      </Box>
+                    </Tooltip>
+                  )
+                },
+                {
+                  field: 'instrumentId', headerName: 'Instrument', width: 140,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'attributeId', headerName: 'Attribute', width: 120,
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'postingDate', headerName: 'Posting', width: 90, align: 'center', headerAlign: 'center',
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'jobId', headerName: 'Job ID', width: 90, align: 'center', headerAlign: 'center',
+                  renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>{p.value ?? '—'}</Box>
+                },
+                {
+                  field: 'createdAt', headerName: 'Timestamp', width: 160,
+                  renderCell: (p) => (
+                    <Box sx={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      {p.value ? new Date(p.value).toLocaleString() : '—'}
                     </Box>
-                  </Tooltip>
-                ) },
-              { field: 'instrumentId', headerName: 'Instrument', width: 140,
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'attributeId', headerName: 'Attribute', width: 120,
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'postingDate', headerName: 'Posting', width: 90, align: 'center', headerAlign: 'center',
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b' }}>{p.value ?? '—'}</Box> },
-              { field: 'jobId', headerName: 'Job ID', width: 90, align: 'center', headerAlign: 'center',
-                renderCell: (p) => <Box sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>{p.value ?? '—'}</Box> },
-              { field: 'createdAt', headerName: 'Timestamp', width: 160,
-                renderCell: (p) => (
-                  <Box sx={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    {p.value ? new Date(p.value).toLocaleString() : '—'}
-                  </Box>
-                ) },
-              { field: '__resolve', headerName: '', width: 140, sortable: false, filterable: false,
-                renderCell: (p) => (
-                  <Button size="small" onClick={() => handleMarkResolved(p.row)} sx={{
-                    fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
-                    border: '1px solid', borderColor: alpha('#16a34a', 0.3),
-                    borderRadius: 1.5, px: 1.5, py: 0.25, minWidth: 'auto',
-                    '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
-                  }}>✓ Mark Resolved</Button>
-                ) },
-            ]}
-            sx={{
-              border: 0, flex: 1,
-              fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-              fontSize: '0.85rem',
-              '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
-              '& .MuiDataGrid-columnHeaders': {
-                bgcolor: '#f8fafc', color: '#475569', fontSize: '0.7rem',
-                fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
-                borderBottom: '2px solid #e2e8f0',
-              },
-              '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
-              '& .MuiDataGrid-columnSeparator': { display: 'none' },
-              '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
-              '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
-              '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#2563EB', 0.03) } },
-              '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
-              '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
-            }}
-          />
+                  )
+                },
+                {
+                  field: '__resolve', headerName: '', width: 140, sortable: false, filterable: false,
+                  renderCell: (p) => (
+                    <Button size="small" onClick={() => handleMarkResolved(p.row)} sx={{
+                      fontSize: '0.72rem', fontWeight: 700, color: '#16a34a',
+                      border: '1px solid', borderColor: alpha('#16a34a', 0.3),
+                      borderRadius: 1.5, px: 1.5, py: 0.25, minWidth: 'auto',
+                      '&:hover': { bgcolor: alpha('#16a34a', 0.06), borderColor: '#16a34a' },
+                    }}>✓ Mark Resolved</Button>
+                  )
+                },
+              ]}
+              sx={{
+                border: 0, flex: 1,
+                fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                fontSize: '0.85rem',
+                '& *': { fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' },
+                '& .MuiDataGrid-columnHeaders': {
+                  bgcolor: '#f8fafc', color: '#475569', fontSize: '0.7rem',
+                  fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                  borderBottom: '2px solid #e2e8f0',
+                },
+                '& .MuiDataGrid-columnHeader': { bgcolor: '#f8fafc' },
+                '& .MuiDataGrid-columnSeparator': { display: 'none' },
+                '& .MuiDataGrid-scrollbarFiller': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                '& .MuiDataGrid-filler': { bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' },
+                '& .MuiDataGrid-row': { transition: 'background 0.15s', '&:hover': { bgcolor: alpha('#2563EB', 0.03) } },
+                '& .MuiDataGrid-cell': { borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center' },
+                '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider', bgcolor: alpha('#2563EB', 0.02) },
+              }}
+            />
           </Box>
         </DialogContent>
       </Dialog>

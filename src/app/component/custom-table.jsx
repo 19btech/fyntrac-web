@@ -142,7 +142,10 @@ const SectionCard = ({ theme, step, icon, title, description, action, children }
   </Box>
 );
 
-const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], editData = null }) => {
+// Shared default: a new [] on every render would re-run the reference-table sync endlessly.
+const NO_TABLES = [];
+
+const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = NO_TABLES, editData = null }) => {
   // Debug: Log received props
   const theme = useTheme();
 
@@ -161,7 +164,12 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   const baseURL = "";
   const [currentTableType, setCurrentTableType] = useState(tableType);
   const [referenceTables, setReferenceTables] = useState(tables);
+  useEffect(() => { setReferenceTables(Array.isArray(tables) ? tables : []); }, [tables]);
   const [existingTables, setExistingTables] = useState(['']);
+  const [refPickError, setRefPickError] = useState('');
+  // Editing: an existing link to a reference table is fixed; a table saved without one can still be linked.
+  const editLinkedTable = (editData?.data || editData)?.referenceTable || null;
+  const referenceLocked = isEditMode && Boolean(editLinkedTable);
 
   // Default operational columns configuration - ALL fields disabled except PK for accountingPeriod
   const defaultOperationalColumns = [
@@ -221,10 +229,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
 
   // Handle editData when component opens or editData changes
   useEffect(() => {
-    console.log('🔄 useEffect triggered:', { open, editData: !!editData, editData });
 
     if (editData && open) {
-      console.log('📝 Setting up EDIT mode with data:', editData);
 
       setIsEditMode(true);
       const data = editData.data || editData;
@@ -237,40 +243,27 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       setReferenceColumn(data.referenceColumn || '');
       setSelectedReferenceTable(data.referenceTable || null);
 
-      console.log('📝 Form data set:', {
-        tableName: data.tableName,
-        description: data.description,
-        referenceColumn: data.referenceColumn
-      });
 
-      // Convert columns from editData to match component's format
-      const convertedColumns = data.columns?.map((col, index) => {
-        // Check if this is a default operational column
-        const isDefaultOpColumn = tableType === 'OPERATIONAL' &&
-          (['instrumentId', 'attributeId', 'postingDate', 'effectiveDate', 'accountingPeriod']
-            .includes(col.columnName) || (col.columnName === data.referenceColumn));
-        console.log('📝 Form data set:', {
-          tableName: data.tableName,
-          description: data.description,
-          referenceColumn: data.referenceColumn,
-          isDefaultOpColumn: isDefaultOpColumn
-        });
+      // Existing columns hold data: once a table exists they can't be renamed, retyped, made
+      // required or removed, and its primary keys can't change. New columns can still be added.
+      const convertedColumns = (Array.isArray(data.columns) ? data.columns : []).map((col, index) => {
+        const isReferenceColumn = (data.tableType || tableType) === 'OPERATIONAL' && col.columnName === data.referenceColumn;
 
         return {
           id: `col_${Date.now()}_${index}`,
-          columnName: col.columnName,
+          columnName: col.columnName ?? '',
           dataType: col.dataType,
           nullable: col.nullable,
-          editable: !isDefaultOpColumn, // Default columns are not editable
-          typeEditable: !isDefaultOpColumn, // Default columns data type not editable
-          nullableEditable: !isDefaultOpColumn, // Default columns nullable not editable
-          deletable: !isDefaultOpColumn, // Default columns cannot be deleted
-          // Only accountingPeriod can be primary key for operational tables
-          canBePrimaryKey: col.columnName === 'accountingPeriod'
+          editable: false,
+          typeEditable: false,
+          nullableEditable: false,
+          deletable: false,
+          canBePrimaryKey: false,
+          existing: true,
+          isReferenceColumn,
         };
-      }) || [];
+      });
 
-      console.log('📋 Converted columns:', convertedColumns);
 
       setColumns(ensureColumnIds(convertedColumns));
       setPrimaryKeys(data.primaryKeys || []);
@@ -278,15 +271,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       setSelectedReferenceTable(data.referenceTable || null);
       setCurrentTableType(data.tableType || tableType);
 
-      console.log('✅ Edit mode state set:', {
-        columnsCount: convertedColumns.length,
-        primaryKeys: data.primaryKeys,
-        referenceColumn: data.referenceColumn,
-        tableType: data.tableType,
-        selectedReferenceTable: data.referenceTable
-      });
     } else if (open && !editData) {
-      console.log('🆕 Setting up CREATE mode');
       // Reset to create mode
       setIsEditMode(false);
       setFormData({ tableName: '', description: '' });
@@ -321,9 +306,11 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
         nullable: true,
         editable: true,      // User-added columns: editable
         typeEditable: true,  // User-added columns: data type editable
-        nullableEditable: true, // User-added columns: nullable editable
+        // A column added to an existing table has no value in the rows already there: it stays nullable.
+        nullableEditable: !isEditMode,
         deletable: true,     // User-added columns: deletable
-        canBePrimaryKey: true
+        // Primary keys are fixed once a table exists.
+        canBePrimaryKey: !isEditMode
       },
     ]);
   };
@@ -346,49 +333,45 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   const onReferenceColumnSelect = (referenceTable, columnObj) => {
+    setRefPickError('');
+    // The previous reference table's column goes (it was added by that choice, not by the user).
+    const withoutReferenceColumn = (cols) => cols.filter(c => !c.isReferenceColumn);
+
+    if (referenceTable && !columnObj) {
+      setRefPickError(`"${referenceTable.tableName}" has no reference column set up, so it can't be linked.`);
+      return;
+    }
+    if (!referenceTable) {
+      setSelectedReferenceTable(null);
+      setReferenceColumn('');
+      setColumns(withoutReferenceColumn);
+      setPrimaryKeys(prev => prev.filter(pk => columns.some(c => c.columnName === pk && !c.isReferenceColumn)));
+      return;
+    }
 
     if (referenceTable) {
       setSelectedReferenceTable(referenceTable.tableName);
       setReferenceColumn(columnObj.columnName);
-      // If we have the column object, you can use its properties
       if (columnObj) {
-        console.log('Column details:', {
-          name: columnObj.columnName,
-          type: columnObj.dataType,
-          nullable: columnObj.nullable,
-          displayOrder: columnObj.displayOrder
-        });
         setColumns(prevCols => {
           const ref = {
-            id: `op_${columnObj.columnName}`,
+            id: `ref_${columnObj.columnName}`,
             columnName: columnObj.columnName,
             dataType: columnObj.dataType,
-            nullable: columnObj.nullable,
+            // Added to an existing table: the rows already there have no value for it.
+            nullable: isEditMode ? true : columnObj.nullable,
             editable: false,
             typeEditable: false,
             nullableEditable: false,
             deletable: false,
-            canBePrimaryKey: true // Reference table columns cannot be primary keys
+            canBePrimaryKey: !isEditMode,
+            isReferenceColumn: true,
           };
-
-          const exists = prevCols.some(c => c.id === ref.id);
-
-          // If already exists → return as is
-          if (exists) return prevCols;
-
-          // Add at the top
-          return [ref, ...prevCols];
+          // Replace any earlier reference column; add this one at the top.
+          return [ref, ...withoutReferenceColumn(prevCols)];
         });
-
-        console.log('Columns after adding reference column:', columns);
-
-        // You can use the column object as needed
-        // For example, you might want to set some state based on it
-        // setReferenceColumn(columnObj.columnName);
+        setPrimaryKeys(prev => prev.filter(pk => columns.some(c => c.columnName === pk && !c.isReferenceColumn) || pk === columnObj.columnName));
       }
-    } else {
-      // Handle clear/removal
-      setSelectedReferenceTable(null);
     }
   };
 
@@ -398,9 +381,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     // Find the column
     const column = columns.find(col => col.columnName === columnName);
 
-    // Check if this column can be a primary key
-    if (column && column.canBePrimaryKey !== true) {
-      console.log('⛔ Column cannot be set as primary key:', columnName);
+    // Check if this column can be a primary key (never after the table exists)
+    if (isEditMode || (column && column.canBePrimaryKey !== true)) {
       return;
     }
 
@@ -437,12 +419,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   const validateForm = () => {
     let newErrors = {};
     let isValid = true;
-    console.log('🔍 Starting validation...');
-    console.log('Current form data:', formData);
-    console.log('Existing tables:', existingTables);
-    console.log('Columns:', columns);
-    console.log('Primary keys:', primaryKeys);
-    console.log('Reference column:', referenceColumn);
 
     /* ---------------------------------------------
        TABLE NAME VALIDATION
@@ -451,10 +427,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       const tableNameError = validateTableName(formData.tableName);
       if (tableNameError) {
         newErrors.tableName = tableNameError;
-        console.log('❌ Table name invalid:', tableNameError);
         isValid = false;
       } else {
-        console.log('✓ Table name format valid');
 
         if (existingTables) {
           // Check if existingTables is the full response object
@@ -463,7 +437,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
           if (existingTables && Array.isArray(existingTables)) {
             // It's an object with data array (your current structure)
             tablesArray = existingTables;
-            console.log('🔍 Tables array for duplicate check:', tablesArray);
 
             if (Array.isArray(tablesArray) && tablesArray.length > 0) {
               // Extract table names from the objects in the array
@@ -474,26 +447,22 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                 return '';
               }).filter(name => name && name.trim() !== '');
 
-              console.log('📋 Table names extracted:', tableNames);
 
-              const duplicateFound = tableNames
+              // In edit mode the table's own name is in the list: it is not a duplicate of itself.
+              const duplicateFound = !isEditMode && tableNames
                 .map(t => t.toLowerCase())
                 .includes(formData.tableName.toLowerCase());
 
               if (duplicateFound) {
                 newErrors.tableName = `Table "${formData.tableName}" already exists.`;
-                console.log('❌ Duplicate table found!');
                 isValid = false;
               } else {
-                console.log('✓ No duplicate table found');
               }
             } else {
-              console.log('⚠ No tables array found or array is empty');
             }
           }
         }
         else {
-          console.log('⚠ existingTables is null or undefined');
         }
       }
     }
@@ -503,18 +472,15 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     ---------------------------------------------- */
     if (columns.length === 0) {
       newErrors.columns = 'At least one column is required';
-      console.log('❌ No columns');
       isValid = false; // Stop validations
     } else {
-      console.log(`✓ ${columns.length} column(s)`);
 
       const hasInvalidColumns = columns.some(
-        col => !col.columnName.trim() || columnErrors[col.id]
+        col => !String(col.columnName ?? '').trim() || columnErrors[col.id]
       );
       if (hasInvalidColumns) {
         newErrors.columns =
           'Some columns have invalid names. Please fix all column errors before submitting.';
-        console.log('❌ Invalid columns found');
         isValid = false;
       }
 
@@ -524,22 +490,15 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       if (uniqueNames.size !== names.length) {
         newErrors.columns =
           'Column names must be unique. Please ensure all column names are distinct.';
-        console.log('❌ Duplicate column names');
         isValid = false;
       } else {
-        console.log('✓ Column names are unique');
       }
     }
 
     /* ---------------------------------------------
-       PRIMARY KEYS VALIDATION
+       PRIMARY KEYS VALIDATION (optional — only checks the ones selected)
     ---------------------------------------------- */
-    if (primaryKeys.length === 0) {
-      newErrors.primaryKeys = 'At least one primary key must be selected.';
-      console.log('❌ No primary keys');
-      isValid = false;
-    } else {
-      console.log(`✓ ${primaryKeys.length} primary key(s):`, primaryKeys);
+    if (primaryKeys.length > 0) {
 
       const existingColumnNames = columns.map(col => col.columnName);
       const missingPrimaryKeys = primaryKeys.filter(
@@ -548,7 +507,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
 
       if (missingPrimaryKeys.length > 0) {
         newErrors.primaryKeys = `Primary key(s) "${missingPrimaryKeys.join(', ')}" no longer exist in columns.`;
-        console.log('❌ Missing primary keys:', missingPrimaryKeys);
         isValid = false;
       }
 
@@ -561,28 +519,26 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       if (!referenceColumn) {
         newErrors.referenceColumn =
           'Reference column is required for Reference Tables.';
-        console.log('❌ No reference column');
         isValid = false;
       } else {
-        console.log('✓ Reference column:', referenceColumn);
 
         const existingColumnNames = columns.map(col => col.columnName);
         if (!existingColumnNames.includes(referenceColumn)) {
           newErrors.referenceColumn =
             'Reference column must exist in the table columns.';
-          console.log('❌ Reference column not in columns');
           isValid = false;
         }
       }
     }
 
+    if (currentTableType === 'OPERATIONAL' && (!selectedReferenceTable || !referenceColumn)) {
+      newErrors.referenceTable = 'Link a reference table — operational tables need one for their map fields.';
+      isValid = false;
+    }
+
     /* ---------------------------------------------
        FINAL RESULT
     ---------------------------------------------- */
-    console.log('📊 Validation result - newErrors:', newErrors);
-    console.log('📊 Validation result - error count:', Object.keys(newErrors).length);
-    console.log('📊 Validation result - isValid?', Object.keys(newErrors).length === 0);
-    console.log('📊 Validation result - isValid?', isValid);
 
     setErrors(newErrors);
     return isValid;
@@ -595,7 +551,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
     const isValid = validateForm();
 
     if (!isValid) {
-      console.log('❌ Validation failed, stopping submission');
       return;
     }
 
@@ -616,10 +571,14 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
         referenceTable: currentTableType === 'OPERATIONAL' ? selectedReferenceTable : ''
       };
 
-      console.log('✅ Validation passed, submitting:', tableData);
 
-      const tableId = editData?.id;
+      // The edit data is the API response ({ data: table }) or the grid row wrapped the same way.
+      const tableId = (editData?.data || editData)?.id ?? editData?.id;
 
+      if (isEditMode && !tableId) {
+        // Never fall back to creating a table while editing one.
+        throw new Error('This table has no id, so it can’t be updated. Refresh the list and try again.');
+      }
       if (isEditMode && tableId) {
         await dataloaderApi.put(
           `${baseURL}/fyntrac/custom-table/${tableId}`,
@@ -634,7 +593,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
         );
       }
 
-      await new Promise((res) => setTimeout(res, 1000));
       if (typeof onSuccess === 'function') {
         try { onSuccess(tableData); } catch (cbErr) { console.warn('onSuccess callback threw:', cbErr); }
       }
@@ -646,7 +604,9 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
       console.error('📡 Error response:', err.response?.data);
       setErrors(prev => ({
         ...prev,
-        submit: err.response?.data?.error ||
+        submit: err.response?.data?.message || err.response?.data?.error ||
+          (typeof err.response?.data === 'string' && err.response.data) ||
+          (!err.response && err.message) ||
           `Failed to ${isEditMode ? 'update' : 'create'} table. Please try again.`
       }));
     } finally {
@@ -655,45 +615,35 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   useEffect(() => {
-    console.log('🔄 useEffect for tables triggered');
-    console.log('Dialog open:', open);
 
     if (open) {
-      console.log('📞 Calling fetchExistingTables...');
       fetchExistingTables();
     }
   }, [open]); // Only fetch when dialog opens
 
   const fetchExistingTables = async () => {
-    console.log('🚀 fetchExistingTables called');
     try {
-      console.log('🌐 Making API call to:', `${baseURL}/fyntrac/custom-table/get/all-tables`);
       const response = await dataloaderApi.get(`${baseURL}/fyntrac/custom-table/get/all-tables`, {
         headers: headers
       });
-      console.log('📡 Raw API Response:', response);
-      console.log('📡 Response data:', response.data);
 
       // Handle different API response structures
       let tableNames = [];
 
       // Structure 1: { success: true, data: [...] }
       if (response.data?.success && Array.isArray(response.data?.data)) {
-        console.log('✅ Found structure 1: success=true with data array');
         tableNames = response.data.data.map(item =>
           item?.tableName || item?.name || String(item)
         );
       }
       // Structure 2: Direct array response
       else if (Array.isArray(response.data)) {
-        console.log('✅ Found structure 2: direct array response');
         tableNames = response.data.map(item =>
           item?.tableName || item?.name || String(item)
         );
       }
       // Structure 3: { data: [...] } without success field
       else if (Array.isArray(response.data?.data)) {
-        console.log('✅ Found structure 3: data array without success field');
         tableNames = response.data.data.map(item =>
           item?.tableName || item?.name || String(item)
         );
@@ -706,8 +656,6 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
         .filter(name => name && name.trim() !== '')
         .map(name => name.trim());
 
-      console.log('✅ Processed table names:', tableNames);
-      console.log('✅ Setting existingTables to:', tableNames);
       setExistingTables(tableNames);
 
     } catch (error) {
@@ -718,6 +666,8 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   const handleClose = (result) => {
+    if (loading && result !== true) return; // a save is running: its result must not be lost
+    setRefPickError('');
     setFormData({ tableName: '', description: '' });
     setColumns([]);
     setPrimaryKeys([]);
@@ -732,9 +682,10 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
   };
 
   const canSubmit = () => {
-    if (loading || columns.length === 0 || primaryKeys.length === 0) return false;
+    if (loading || columns.length === 0) return false;
     if (currentTableType === 'REFERENCE' && !referenceColumn) return false;
-    const hasInvalidColumns = columns.some(col => !col.columnName.trim() || columnErrors[col.id]);
+    if (currentTableType === 'OPERATIONAL' && (!selectedReferenceTable || !referenceColumn)) return false;
+    const hasInvalidColumns = columns.some(col => !String(col.columnName ?? '').trim() || columnErrors[col.id]);
     return !hasInvalidColumns;
   };
 
@@ -837,8 +788,10 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
           </Box>
 
           <Tooltip title="Close" placement="left">
+            <span>
             <IconButton
               onClick={handleClose}
+              disabled={loading}
               size="small"
               sx={{
                 color: 'text.secondary',
@@ -849,6 +802,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
             >
               <HighlightOffOutlinedIcon fontSize="small" />
             </IconButton>
+            </span>
           </Tooltip>
         </Box>
       </DialogTitle>
@@ -1148,11 +1102,11 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
 
                       {/* PK toggle */}
                       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                        <Tooltip title={!canBePrimaryKey ? 'Cannot be PK' : isPrimaryKey ? 'Remove PK' : 'Set as PK'}>
+                        <Tooltip title={isEditMode ? 'Primary keys can’t be changed after the table is created' : !canBePrimaryKey ? 'Cannot be PK' : isPrimaryKey ? 'Remove PK' : 'Set as PK'}>
                           <span>
                             <IconButton
                               size="small"
-                              disabled={!canBePrimaryKey}
+                              disabled={!canBePrimaryKey || isEditMode}
                               onClick={() => handleTogglePrimaryKey(col.columnName)}
                               sx={{
                                 width: 32,
@@ -1225,7 +1179,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                   variant="caption"
                   sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'text.secondary', display: 'block', mb: 1 }}
                 >
-                  Primary Keys
+                  Primary Keys <Box component="span" sx={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(optional)</Box>
                 </Typography>
                 {primaryKeys.length > 0 ? (
                   <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
@@ -1254,7 +1208,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                   </Box>
                 ) : (
                   <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', fontSize: '0.8rem' }}>
-                    No primary key selected — toggle the key icon on a column above.
+                    No primary key — optional. Toggle the key icon on a column above to add one.
                   </Typography>
                 )}
                 {errors.primaryKeys && (
@@ -1271,13 +1225,14 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                     fullWidth required size="small"
                     label="Reference Column"
                     value={referenceColumn}
-                    onClick={(e) => { setRefColPickerAnchor(e.currentTarget); setRefColPickerSearch(''); }}
+                    disabled={isEditMode}
+                    onClick={(e) => { if (!isEditMode) { setRefColPickerAnchor(e.currentTarget); setRefColPickerSearch(''); } }}
                     inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } }}
                     error={!!errors.referenceColumn}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper', fontSize: '0.9rem' }, '& .MuiInputLabel-root': { fontSize: '0.9rem' } }}
                     InputProps={{
                       startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
-                      endAdornment: referenceColumn ? (
+                      endAdornment: referenceColumn && !isEditMode ? (
                         <InputAdornment position="end">
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); setReferenceColumn(''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
                             <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
@@ -1287,7 +1242,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                     }}
                   />
                   <Typography variant="caption" sx={{ mt: 0.5, ml: 1.5, color: errors.referenceColumn ? 'error.main' : 'text.disabled' }}>
-                    {errors.referenceColumn || 'Used by other tables for lookups.'}
+                    {errors.referenceColumn || (isEditMode ? 'Fixed once the table exists — other tables link to it.' : 'Used by other tables for lookups.')}
                   </Typography>
                   <Popover
                     open={Boolean(refColPickerAnchor)} anchorEl={refColPickerAnchor}
@@ -1329,7 +1284,12 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
                     tables={referenceTables}
                     value={selectedReferenceTable}
                     onSelect={onReferenceColumnSelect}
+                    disabled={referenceLocked}
+                    error={refPickError || errors.referenceTable}
                   />
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5, ml: 1.5, color: (refPickError || errors.referenceTable) ? 'error.main' : 'text.disabled' }}>
+                    {refPickError || errors.referenceTable || (referenceLocked ? 'The linked reference table can’t be changed after creation.' : 'Required: map fields come from this reference table.')}
+                  </Typography>
                 </Box>
               )}
             </Stack>
@@ -1356,6 +1316,7 @@ const CreateTableDialog = ({ open, onClose, onSuccess, tableType, tables = [], e
         <Stack direction="row" spacing={1.25}>
           <Button
             onClick={handleClose}
+            disabled={loading}
             variant="text"
             sx={{
               borderRadius: 2,

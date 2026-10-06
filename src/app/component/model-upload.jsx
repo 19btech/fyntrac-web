@@ -58,85 +58,75 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
     return isValid;
   };
 
-  const handleFileUpload = (file) => {
-    const reader = new FileReader();
+  // One upload at a time: a second drop/click while uploading (or after success) is ignored.
+  const uploadLock = React.useRef(false);
 
-    reader.onprogress = (event) => {
-      const loaded = event.loaded;
-      const total = event.total;
-      const progress = Math.round((loaded / total) * 100);
+  const handleDrop = (acceptedFiles, fileRejections = []) => {
+    if (uploadLock.current) return;
 
-      setProgressMap((prevMap) => ({
-        ...prevMap,
-        [file.name]: progress,
-      }));
-    };
-
-    reader.onload = () => {
-      // Handle the file here if needed
-      // Example: console.log(`File "${file.name}" processed`);
-    };
-
-    reader.readAsBinaryString(file);
-  };
-
-  const handleDrop = (acceptedFiles) => {
+    if (!acceptedFiles || acceptedFiles.length === 0) {
+      // Wrong type (or several files) — say so instead of uploading nothing.
+      setErrorMessage(fileRejections.length > 1
+        ? 'Please drop a single model file.'
+        : 'Only Excel model files (.xls, .xlsx) can be uploaded.');
+      return;
+    }
 
     if (!validateFields()) {
       return;
     }
 
-    setUploading(true);
-    setProgressMap({});
-
-    acceptedFiles.forEach((file) => {
-      handleFileUpload(file);
-    });
-
-    // Simulate upload completion after 2 seconds
-    setTimeout(() => {
-      setUploading(false);
-      handleFileDrop(acceptedFiles, modelName, modelOrderId);
-    }, 5000);
+    setErrorMessage('');
+    uploadFile(acceptedFiles[0]);
   };
 
-  const handleFileDrop = (acceptedFiles, modelName, modelOrderId) => {
-    const serviceURL = '/model/upload';
+  const uploadFile = (file) => {
+    uploadLock.current = true;
+    setUploading(true);
+    setProgressMap({ [file.name]: 0 });
 
     const formData = new FormData();
     formData.append('modelName', modelName);
     formData.append('modelOrderId', modelOrderId);
-    formData.append('files', acceptedFiles[0]);   // backend expects ONE file
+    formData.append('files', file);   // backend expects ONE file
 
-    dataloaderApi.post(serviceURL, formData, {
+    dataloaderApi.post('/model/upload', formData, {
       headers: {
         'X-Tenant': tenant,
         'Content-Type': undefined
-      }
+      },
+      // Real upload progress (bytes sent to the server).
+      onUploadProgress: (e) => {
+        const percent = e.total ? Math.min(100, Math.round((e.loaded / e.total) * 100)) : 0;
+        setProgressMap({ [file.name]: percent });
+      },
     })
       .then(response => {
-        console.log('success response', response.data);
         setSuccessMessage(response.data);
         setOpenSuccess(true);
-        // Notify parent so it can close the dialog after the user sees the success state
+        // Notify parent so it can close the dialog after the user sees the success state.
+        // The lock stays on: this upload is done and the dialog is closing.
         setTimeout(() => {
-          onDrop(acceptedFiles, modelName, modelOrderId);
+          onDrop([file], modelName, modelOrderId);
         }, 1500);
       })
       .catch(error => {
         const errData = error.response?.data;
         let errMsg = "Upload failed";
         if (typeof errData === 'string') {
-           errMsg = errData;
+          errMsg = errData;
         } else if (errData && typeof errData === 'object') {
-           errMsg = errData.message || JSON.stringify(errData);
+          errMsg = errData.message || JSON.stringify(errData);
         }
         console.error('Upload data:', errMsg);
         setErrorMessage(errMsg);
+        uploadLock.current = false; // let the user fix and retry
         // Do NOT call onDrop — keep the modal open so the user can see the error and retry
+      })
+      .finally(() => {
+        setUploading(false);
       });
   };
-
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
@@ -146,6 +136,7 @@ function ModelUploadComponent({ onDrop, text, iconColor, borderColor, background
       'application/vnd.ms-excel': ['.xls', '.xlsx']
     },
     maxFiles: filesLimit || Infinity,
+    disabled: uploading || openSuccess,
   });
 
   return (

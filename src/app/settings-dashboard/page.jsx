@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import apiClient from '../services/api-client';
+import { dslStudioUrl } from '../services/runtime-config';
 import { useTenant } from '../tenant-context';
 import {
   Box,
@@ -12,12 +13,14 @@ import {
   Container,
   Chip,
   Fade,
-  Button // Use Button instead of IconButton
+  Button, // Use Button instead of IconButton
+  Tooltip
 } from '@mui/material';
 import {
   ArrowForward,
   AssessmentOutlined,
   ArrowBack, // Standard 'Back' icon
+  LockOutlined,
 } from '@mui/icons-material';
 
 // Import your actual report pages
@@ -27,10 +30,14 @@ import CustomTablesMain from '../custom-table/page';
 import RulePage from '../rules/page';
 import EventConfigurationMain from '../event-configuration/page';
 import AccountingPage from '../accounting/page';
+import UserManagement from '../user-management/user-management';
+import CronJobs from '../cron-jobs/cron-jobs';
+import { useAccess } from '../user-management/access';
 
 export default function ReportDashboard() {
   const [selectedReport, setSelectedReport] = useState(null);
   const { user, tenant } = useTenant();
+  const { can, failed: accessFailed } = useAccess();
 
   const ComingSoon = () => (
     <Box sx={{ textAlign: 'center', py: 10, color: 'text.secondary', bgcolor: '#f9fafb', borderRadius: 2 }}>
@@ -45,8 +52,8 @@ export default function ReportDashboard() {
       tag: "General",
       reports: [
         { name: "Tenant Management", description: "Manage tenant-level settings, system preferences and environment-wide configurations.", component: SettingsPage },
-        { name: "User Management", description: "Create and manages user accounts, roles, and permissions accross the paltform.", component: ComingSoon },
-        { name: "Cron Jobs", description: "Configure and monitor scheduled tasks for automated processes and data sync.", component: ComingSoon }
+        { name: "User Management", description: "Invite and manage users, user types and their permissions across the platform.", component: UserManagement, permission: 'users.view' },
+        { name: "Cron Jobs", description: "Configure and monitor scheduled tasks for automated model execution and accounting close.", component: CronJobs }
       ]
     },
     {
@@ -63,7 +70,7 @@ export default function ReportDashboard() {
       reports: [
         { name: "Setup Events", description: "Define business events that aggregate required data from multple input sources.", component: EventConfigurationMain },
         { name: "Setup Custom Tables", description: "Create and manage custom operational and reference data tables to support business specific needs.", component: CustomTablesMain },
-        { name: "Logic Studio", description: "Built,test and execute custom business logic for financial workflows.", url: process.env.NEXT_PUBLIC_DSL_STUDIO_URL || "http://localhost:3000" }
+        { name: "Logic Studio", description: "Built,test and execute custom business logic for financial workflows.", url: dslStudioUrl(), permission: 'logicStudio.access' }
       ]
     },
   ];
@@ -102,8 +109,12 @@ export default function ReportDashboard() {
           </Box>
 
           <Grid container spacing={3}>
-            {cat.reports.map((report, idx) => (
+            {cat.reports.map((report, idx) => {
+              // Role-gated cards stay visible but locked, so users know the feature exists.
+              const locked = Boolean(report.permission) && can(report.permission) === false;
+              return (
               <Grid size={{ xs: 12, md: 6, lg: 4 }} key={idx}>
+                <Tooltip title={!locked ? '' : accessFailed ? 'Your access could not be checked. Reload the page to try again.' : 'Your user type does not include this. Ask an Admin for access.'} placement="top">
                 <Fade in={true} timeout={(idx + 1) * 300}>
                   <Card
                     elevation={0}
@@ -112,9 +123,10 @@ export default function ReportDashboard() {
                       borderRadius: 4,
                       border: '1px solid',
                       borderColor: 'grey.200',
-                      bgcolor: 'white',
+                      bgcolor: locked ? 'grey.50' : 'white',
+                      opacity: locked ? 0.75 : 1,
                       transition: 'all 0.3s ease-in-out',
-                      '&:hover': {
+                      '&:hover': locked ? { transform: 'none', boxShadow: 'none' } : {
                         transform: 'translateY(-4px)',
                         boxShadow: '0 12px 24px -10px rgba(0, 0, 0, 0.1)',
                         borderColor: 'primary.main',
@@ -123,6 +135,8 @@ export default function ReportDashboard() {
                     }}
                   >
                     <CardActionArea
+                      disabled={locked}
+                      aria-disabled={locked}
                       onClick={async () => {
                         if (report.url) {
                           try {
@@ -160,6 +174,7 @@ export default function ReportDashboard() {
                       <Box sx={{ width: '100%' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                           <Chip label={cat.tag} size="small" sx={{ bgcolor: 'grey.100', fontWeight: 600, color: 'text.secondary' }} />
+                          {locked && <Chip icon={<LockOutlined sx={{ fontSize: 14 }} />} label="No access" size="small" sx={{ fontWeight: 600, color: 'text.secondary', bgcolor: 'grey.100' }} />}
                         </Box>
                         <Typography variant="h6" fontWeight="700" gutterBottom sx={{ lineHeight: 1.3 }}>
                           {report.name}
@@ -168,15 +183,17 @@ export default function ReportDashboard() {
                           {report.description}
                         </Typography>
                       </Box>
-                      <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', color: 'primary.main' }}>
-                        <Typography variant="button" fontSize="0.75rem" fontWeight="bold">Configure</Typography>
-                        <ArrowForward sx={{ fontSize: 16, ml: 1 }} />
+                      <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', color: locked ? 'text.disabled' : 'primary.main' }}>
+                        <Typography variant="button" fontSize="0.75rem" fontWeight="bold">{locked ? 'Locked' : 'Configure'}</Typography>
+                        {locked ? <LockOutlined sx={{ fontSize: 16, ml: 1 }} /> : <ArrowForward sx={{ fontSize: 16, ml: 1 }} />}
                       </Box>
                     </CardActionArea>
                   </Card>
                 </Fade>
+                </Tooltip>
               </Grid>
-            ))}
+              );
+            })}
           </Grid>
         </Box>
       ))}

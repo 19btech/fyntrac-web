@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { IconButton, Tooltip, Box, Chip, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
-import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
+import { EditOutlined, DeleteOutlineOutlined, SwapVertRounded } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddAggregationDialog from '../component/add-aggregation';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage } from './rules-shared';
 
-// Group flat { transactionName, metricName, id }[] → one row per metricName
+// Group flat { id, transactionName, metricName, signReversal }[] → one row per metricName.
+// `transactions` keeps each record's id and sign reversal flag (absent → false) for editing.
 const groupByMetric = (flatRows) => {
   const map = {};
   flatRows.forEach((row) => {
     if (!map[row.metricName]) {
-      map[row.metricName] = { id: row.metricName, metricName: row.metricName, transactionNames: [] };
+      map[row.metricName] = { id: row.metricName, metricName: row.metricName, transactionNames: [], transactions: [] };
     }
-    if (row.transactionName && !map[row.metricName].transactionNames.includes(row.transactionName)) {
-      map[row.metricName].transactionNames.push(row.transactionName);
+    const group = map[row.metricName];
+    if (row.transactionName && !group.transactionNames.includes(row.transactionName)) {
+      group.transactionNames.push(row.transactionName);
+      group.transactions.push({ id: row.id ?? null, name: row.transactionName, signReversal: row.signReversal === true });
     }
   });
   return Object.values(map);
@@ -30,8 +34,10 @@ function Aggregation({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // What still uses the item being deleted (shown in the confirmation), or null.
+  const [deleteRefs, setDeleteRefs] = useState(null);
   const [loading, setLoading] = useState(true);
-
 
   const handleEdit = (rowData) => {
     setEditData(rowData);
@@ -44,22 +50,30 @@ function Aggregation({ refreshData, onToast }) {
   };
 
   const handleConfirmDelete = async () => {
-    if (!rowToDelete) return;
+    if (!rowToDelete || deleting) return;
+    setDeleting(true);
     try {
-      await dataloaderApi.delete(`/aggregation/delete/${rowToDelete.metricName}`);
+      await dataloaderApi.delete(`/aggregation/delete/${encodeURIComponent(rowToDelete.metricName)}`);
+      
+      onToast?.(`${rowToDelete.metricName} deleted successfully.`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
+      setDeleteRefs(null);
       fetchAggregationData();
     } catch (error) {
-      console.error('Error deleting balance:', error);
-      setDeleteDialogOpen(false);
-      setRowToDelete(null);
+      console.error('Delete failed:', error);
+      // Keep the dialog open: the item still exists, and the reason is shown.
+      onToast?.(apiErrorMessage(error, `${rowToDelete.metricName} could not be deleted. Please try again.`), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancelDelete = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setRowToDelete(null);
+    setDeleteRefs(null);
   };
 
   const columns = [
@@ -89,18 +103,22 @@ function Aggregation({ refreshData, onToast }) {
       sortable: false,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, py: 0.75 }}>
-          {(params.value || []).map((tx) => (
-            <Chip
-              key={tx}
-              label={tx}
-              size="small"
-              sx={{
-                height: 22, fontSize: '0.72rem', fontWeight: 700,
-                bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d',
-                border: '1px solid rgba(22,163,74,0.28)', borderRadius: 1.5,
-                fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
-              }}
-            />
+          {(params.row.transactions || []).map((tx) => (
+            <Tooltip key={tx.name} title={tx.signReversal ? 'Sign reversed — amounts count with the opposite sign in this balance' : ''} placement="top">
+              <Chip
+                label={tx.name}
+                size="small"
+                icon={tx.signReversal ? <SwapVertRounded sx={{ fontSize: '14px !important' }} /> : undefined}
+                aria-label={tx.signReversal ? `${tx.name} (sign reversed)` : tx.name}
+                sx={{
+                  height: 22, fontSize: '0.72rem', fontWeight: 700, borderRadius: 1.5,
+                  fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                  ...(tx.signReversal
+                    ? { bgcolor: 'rgba(217,119,6,0.1)', color: '#b45309', border: '1px solid rgba(217,119,6,0.32)', '& .MuiChip-icon': { color: '#b45309', ml: 0.5 } }
+                    : { bgcolor: 'rgba(22,163,74,0.1)', color: '#15803d', border: '1px solid rgba(22,163,74,0.28)' }),
+                }}
+              />
+            </Tooltip>
           ))}
         </Box>
       ),
@@ -160,8 +178,8 @@ function Aggregation({ refreshData, onToast }) {
   const fetchAggregationData = () => {
     setLoading(true);
     dataloaderApi.get('/aggregation/get/all')
-      .then(response => setRows(groupByMetric(response.data)))
-      .catch(() => {})
+      .then(response => setRows(groupByMetric(Array.isArray(response.data) ? response.data : [])))
+      .catch(() => setRows([]))
       .finally(() => setLoading(false));
   };
 
@@ -260,8 +278,8 @@ function Aggregation({ refreshData, onToast }) {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+          <Button onClick={handleCancelDelete} disabled={deleting} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>{deleting ? 'Deleting…' : 'Delete'}</Button>
         </DialogActions>
       </Dialog>
 

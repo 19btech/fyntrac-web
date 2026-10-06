@@ -10,6 +10,7 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, flagOn } from './rules-shared';
 
 const AddTransactionDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
@@ -21,16 +22,17 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
   const [id, setId] = useState(null);
   const [errorSnackbar, setErrorSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     if (!open) return;
     if (editData) {
       // Populate form fields with editData if provided
       setTransactionName(editData.name || '');
-      setIsExclusive(editData.exclusive === 1 ? true : false);
-      setIsGL(editData.isGL === 1 ? true : false);
+      setIsExclusive(flagOn(editData.exclusive));
+      setIsGL(flagOn(editData.isGL));
       setId(editData.id);
-      setIsReplayable(editData.isReplayable === 1 ? true : false);
+      setIsReplayable(flagOn(editData.isReplayable));
     } else {
       // Clear form fields if no editData (e.g., for adding new transaction)
       setTransactionName('');
@@ -49,39 +51,25 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
     return () => clearTimeout(t);
   }, [errorSnackbar.open]);
 
-  // Clear any stale flag-warning when the user changes Reportable/Journal so the warn-then-confirm flow stays in sync
+  const WARN_BOTH = 'Both Reportable and Journal are off: this transaction will not appear in reports or journals. Save again to confirm.';
+
+  // Changing Reportable / Journal clears a pending "both off" confirmation.
   React.useEffect(() => {
-    if (!errorSnackbar.open || errorSnackbar.severity !== 'warning') return;
-    const msg = errorSnackbar.message;
-    if (msg === WARN_JOURNAL || msg === WARN_REPORTABLE || msg === WARN_BOTH) {
-      setErrorSnackbar(s => ({ ...s, open: false }));
+    if (errorSnackbar.open && errorSnackbar.message === WARN_BOTH) {
+      setErrorSnackbar(s => ({ ...s, open: false, message: '' }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExclusive, isGL]);
 
-  const WARN_JOURNAL = 'Journal flag is not set. Defaulting value to true.';
-  const WARN_REPORTABLE = 'Reportable flag is not set. Defaulting value to true.';
-  const WARN_BOTH = 'Both reportable and journal are false. Transaction will not appear in reports or journals.';
-
+  // A transaction can be reportable only, journal only, or both (saved as chosen). Neither means it
+  // shows up nowhere, so that is confirmed with a second click.
   const handleSaveClick = () => {
-    const reportableOff = !isExclusive;
-    const journalOff = !isGL;
-
-    let warningMsg = null;
-    if (reportableOff && journalOff) warningMsg = WARN_BOTH;
-    else if (journalOff) warningMsg = WARN_JOURNAL;
-    else if (reportableOff) warningMsg = WARN_REPORTABLE;
-
-    // First click with a warning condition: show the warning and wait for confirmation.
-    if (warningMsg && errorSnackbar.message !== warningMsg) {
-      setErrorSnackbar({ open: true, message: warningMsg, severity: 'warning' });
+    if (saving) return;
+    if (!isExclusive && !isGL && !(errorSnackbar.open && errorSnackbar.message === WARN_BOTH)) {
+      setErrorSnackbar({ open: true, message: WARN_BOTH, severity: 'warning' });
       return;
     }
-
-    // Second click (or no warning): proceed. Apply documented defaults.
-    const effectiveReportable = (warningMsg === WARN_REPORTABLE) ? 1 : (isExclusive ? 1 : 0);
-    const effectiveJournal = (warningMsg === WARN_JOURNAL) ? 1 : (isGL ? 1 : 0);
-    handleAddTransaction(effectiveReportable, effectiveJournal);
+    handleAddTransaction(isExclusive ? 1 : 0, isGL ? 1 : 0);
   };
 
   const handleAddTransaction = async (effectiveReportable, effectiveJournal) => {
@@ -89,6 +77,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
     const newName = transactionName.trim();
     const nameChanged = !!editData && oldName && oldName !== newName;
 
+    setSaving(true);
     try {
       await dataloaderApi.post('/transaction/add', {
         name: newName,
@@ -115,6 +104,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
               transactionName: newName,
               metricName: agg.metricName,
               id: agg.id,
+              signReversal: agg.signReversal === true,
             }));
 
           const smlUpdates = (smlRes.data || [])
@@ -142,7 +132,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         onClose(true);
       }
     } catch (error) {
-      console.log('Submission failed:', error);
+      console.error('Submission failed:', error);
       const status = error.response?.status;
       const responseText = JSON.stringify(error.response?.data ?? '').toLowerCase();
       const isDuplicate =
@@ -153,15 +143,11 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
 
       if (isDuplicate) {
         setErrorSnackbar({ open: true, message: 'Duplicate transaction name found. Transaction names must be unique.', severity: 'error' });
-      } else if (status === 400) {
-        const errorList = error.response.data;
-        const formattedMessage = Array.isArray(errorList)
-          ? errorList.map(err => err.message).join(' | ')
-          : 'Invalid input. Please check your data.';
-        setErrorSnackbar({ open: true, message: formattedMessage, severity: 'error' });
       } else {
-        setErrorSnackbar({ open: true, message: 'Server error. Please try again later.', severity: 'error' });
+        setErrorSnackbar({ open: true, message: apiErrorMessage(error, status === 400 ? 'Invalid input. Please check your data.' : 'Server error. Please try again later.'), severity: 'error' });
       }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -383,7 +369,7 @@ const AddTransactionDialog = ({ open, onClose, editData }) => {
         <Button
           onClick={handleSaveClick}
           variant="contained"
-          disabled={!canSave}
+          disabled={!canSave || saving}
           sx={{
             borderRadius: 2,
             textTransform: 'none',

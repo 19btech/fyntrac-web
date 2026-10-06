@@ -4,7 +4,7 @@ import {
   Box, Typography, TextField,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, IconButton, Switch, Tooltip, Chip,
-  Card, Snackbar, Alert, Slide, Link,
+  Card, Snackbar, Alert, Slide,
   Popover, List, ListItemButton, ListItemText, InputAdornment,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -17,7 +17,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
@@ -34,7 +33,13 @@ const ACTION_BLUE = '#1a6ab9';
 const ActionLink = ({ onClick, disabled = false, children }) => (
   <Typography
     component="span"
+    role="button"
+    tabIndex={disabled ? -1 : 0}
+    aria-disabled={disabled}
     onClick={disabled ? undefined : onClick}
+    onKeyDown={disabled ? undefined : (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(e); }
+    }}
     sx={{
       fontSize: '0.82rem', fontWeight: 700,
       fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
@@ -49,6 +54,7 @@ const ActionLink = ({ onClick, disabled = false, children }) => (
         letterSpacing: 0.3,
       },
       '&:active': { transform: 'translateY(0px)' },
+      '&:focus-visible': { outline: `2px solid ${ACTION_BLUE}`, outlineOffset: 2, borderRadius: '4px' },
     }}
   >
     {children}
@@ -113,6 +119,16 @@ const formatPostingDate = (p) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+// Server value (ISO / date-only / epoch) → the calendar day it names, as a local dayjs; null when unset.
+const toCalendarDay = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return dayjs(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+};
+// A picked calendar day → midnight UTC of that day (what the service stores).
+const toUtcDay = (day) => (day ? new Date(Date.UTC(day.year(), day.month(), day.date())) : null);
+
 const formatPeriod = (p) => {
   if (!p) return p;
   const str = String(p);
@@ -158,19 +174,24 @@ export default function SettingsPage() {
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [settings, setSettings] = React.useState({});
-  const [isDataFetched, setIsDataFetched] = React.useState(false);
+  const [loadError, setLoadError] = React.useState('');
   const [panelIndex, setPanelIndex] = React.useState(0);
 
   // Fiscal period
   const [fiscalPeriodStaringDate, setFiscalPeriodStaringDate] = React.useState(null);
   const [isFiscalPeriodButtonDisabled, setIsFiscalPeriodButtonDisabled] = React.useState(true);
-  const [hasActivityData, setHasActivityData] = React.useState(false);
+  const [isSavingFiscal, setIsSavingFiscal] = React.useState(false);
+  // #9: activity data exists if any load completed or the execution state has a posting date.
+  const [hasCompletedLoads, setHasCompletedLoads] = React.useState(false);
   const [fiscalCalendarAnchor, setFiscalCalendarAnchor] = useState(null);
 
   // Currency
   const [currency, setCurrency] = useState('USD');
+  const [savedCurrency, setSavedCurrency] = useState('USD');
   const [currencyList, setCurrencyList] = useState([]);
-  const [isCurrencyButtonDisabled, setIsCurrencyButtonDisabled] = useState(true);
+  const [currencyListError, setCurrencyListError] = useState('');
+  // #6: Save only for a chosen currency that differs from the saved one.
+  const isCurrencyButtonDisabled = !currency || currency === savedCurrency;
   const [currencyPickerAnchor, setCurrencyPickerAnchor] = useState(null);
   const [currencyPickerSearch, setCurrencyPickerSearch] = useState('');
   const filteredCurrencies = (currencyList || []).filter(code =>
@@ -181,6 +202,8 @@ export default function SettingsPage() {
   // Reporting period
   const [reportingPeriod, setReportingPeriod] = useState('12');
   const [isReportingPeriodButtonDisabled, setIsReportingPeriodButtonDisabled] = useState(true);
+  // #16: a whole number of periods from 1 to 60.
+  const reportingPeriodValid = /^\d+$/.test(String(reportingPeriod)) && Number(reportingPeriod) >= 1 && Number(reportingPeriod) <= 60;
 
   // Reopen period
   const [reopenPeriod, setReopenPeriod] = useState(null);
@@ -191,10 +214,12 @@ export default function SettingsPage() {
 
   // Delete entries
   const [latestPostingDate, setLatestPostingDate] = useState(null);
+  const [isDeletingEntries, setIsDeletingEntries] = useState(false);
 
   // Restatement
   const [restatementMode, setRestatementMode] = React.useState(false);
   const [showRestatementDaialog, setShowRestatementDaialog] = React.useState(false);
+  const [showRestatementOffDialog, setShowRestatementOffDialog] = React.useState(false);
   const [isConfirmingRestatement, setIsConfirmingRestatement] = React.useState(false);
 
   // Dialogs
@@ -211,6 +236,8 @@ export default function SettingsPage() {
     setToast(prev => ({ ...prev, open: false }));
   };
 
+  const hasActivityData = hasCompletedLoads || Boolean(latestPostingDate);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFiscalPeriodChange = (date) => {
     if (hasActivityData) {
@@ -222,21 +249,32 @@ export default function SettingsPage() {
   };
   const handleConfigurationTabChange = (_, newValue) => setPanelIndex(newValue);
   const handleAddDashboardConfigurationDialogOpen = () => setIsDashboardConfigurationDialogOpen(true);
-  const handleAddDashboardConfigurationDialogClose = (val) => setIsDashboardConfigurationDialogOpen(val);
+  const handleAddDashboardConfigurationDialogClose = (val) => {
+    setIsDashboardConfigurationDialogOpen(val);
+    if (val) return;
+    // Pick up a just-saved configuration (and its id) — only that part, so unsaved edits elsewhere
+    // on the page (fiscal date, currency) are kept.
+    dataloaderApi.get('/setting/get/settings')
+      .then(response => setSettings(prev => ({ ...prev, dashboardConfiguration: response.data?.dashboardConfiguration })))
+      .catch(() => {});
+  };
   const handleRestatementMode = (event) => {
-    setRestatementMode(event.target.checked);
     if (event.target.checked) setShowRestatementDaialog(true);
+    else setShowRestatementOffDialog(true);
   };
 
   // ── API calls ─────────────────────────────────────────────────────────────
   const fetchCurrencies = () => {
     dataloaderApi.get('/setting/get/currencies')
-      .then(response => setCurrencyList(response.data))
-      .catch(() => {});
+      .then(response => {
+        setCurrencyList(Array.isArray(response.data) ? response.data : []);
+        setCurrencyListError('');
+      })
+      .catch(() => setCurrencyListError('Currencies could not be loaded.'));
   };
 
   const fetchClosedAccountingPeriods = () => {
-    dataloaderApi.get('/setting/get/closed/accounting-periods')
+    return dataloaderApi.get('/setting/get/closed/accounting-periods')
       .then(response => {
         const all = Array.isArray(response.data) ? response.data : [];
         // take the 3 most recently closed (last 3 in ascending order, newest first)
@@ -247,29 +285,53 @@ export default function SettingsPage() {
   };
 
   const fetchSettings = () => {
-    dataloaderApi.get('/setting/get/settings')
+    return dataloaderApi.get('/setting/get/settings')
       .then(response => {
-        setSettings(response.data);
-        setFiscalPeriodStaringDate(dayjs(new Date(response.data.fiscalPeriodStartDate)));
-        setRestatementMode(response.data.restatementMode === 1);
-        setCurrency(response.data.currency || 'USD');
+        const data = response.data || {};
+        setSettings(data);
+        setFiscalPeriodStaringDate(toCalendarDay(data.fiscalPeriodStartDate));
+        setIsFiscalPeriodButtonDisabled(true);
+        setRestatementMode(data.restatementMode === 1);
+        setCurrency(data.currency || 'USD');
+        setSavedCurrency(data.currency || 'USD');
+        setLoadError('');
+      })
+      .catch(() => setLoadError('Tenant settings could not be loaded, so the values below may not be current.'));
+  };
+
+  const fetchRecentActivityLoads = () => {
+    return dataloaderApi.get('/activitylog/get/recent/loads')
+      .then(res => {
+        const logs = res.data ?? [];
+        setHasCompletedLoads(logs.some(l => l.activityStatus === 'COMPLETED'));
       })
       .catch(() => {});
   };
 
-  React.useEffect(() => {
-    fetchSettings();
-    fetchCurrencies();
-    fetchClosedAccountingPeriods();
-    dataloaderApi.get('/activitylog/get/recent/loads')
+  // The recent-loads API only returns the last 11 upload records, so deriving "latest posting
+  // date" from it can miss the true latest once more uploads have happened since. ExecutionState
+  // is the authoritative running tally the backend itself updates on every load, so read it from
+  // there instead - same source the Delete Entries action uses to decide what to delete.
+  const fetchLatestPostingDate = () => {
+    return dataloaderApi.get('/execution/state/get/latest')
       .then(res => {
-        const logs = res.data ?? [];
-        const completed = logs.filter(l => l.activityStatus === 'COMPLETED');
-        setHasActivityData(completed.length > 0);
-        const dates = completed.map(l => l.postingDate).filter(Boolean);
-        if (dates.length > 0) setLatestPostingDate(String(dates.sort().at(-1)));
+        const executionDate = res.data?.executionDate;
+        setLatestPostingDate(executionDate ? String(executionDate) : null);
       })
       .catch(() => {});
+  };
+
+  const loadAll = () => Promise.all([
+    fetchSettings(),
+    fetchCurrencies(),
+    fetchClosedAccountingPeriods(),
+    fetchRecentActivityLoads(),
+    fetchLatestPostingDate(),
+  ]);
+
+  React.useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveCurrency = async () => {
@@ -278,7 +340,7 @@ export default function SettingsPage() {
         headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
       });
       showToast('Home currency saved successfully.');
-      setIsCurrencyButtonDisabled(true);
+      setSavedCurrency(currency);
     } catch {
       showToast('Failed to save currency.', 'error');
     }
@@ -289,19 +351,22 @@ export default function SettingsPage() {
       showToast('Activity data is already loaded into the system and an accounting period is set. You cannot change the fiscal period.', 'error');
       return;
     }
+    if (!fiscalPeriodStaringDate || isSavingFiscal) return;
+    setIsSavingFiscal(true);
     try {
       const response = await dataloaderApi.post('/setting/fiscal-priod/save', {
         homeCurrency: '', glamFields: '',
-        fiscalPeriodStartDate: new Date(fiscalPeriodStaringDate.toISOString()),
-        reportingPeriod: null, restatementMode: 0, id: null,
+        fiscalPeriodStartDate: toUtcDay(fiscalPeriodStaringDate),
+        reportingPeriod: null, restatementMode: restatementMode ? 1 : 0, id: null,
       }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } });
       showToast('Fiscal period saved and accounting periods generated.');
-      setTimeout(() => {
-        setFiscalPeriodStaringDate(dayjs(new Date(response.data.fiscalPeriodStartDate)));
-        setIsFiscalPeriodButtonDisabled(true);
-      }, 1500);
+      setFiscalPeriodStaringDate(toCalendarDay(response.data?.fiscalPeriodStartDate) ?? fiscalPeriodStaringDate);
+      setSettings(prev => ({ ...prev, fiscalPeriodStartDate: response.data?.fiscalPeriodStartDate ?? toUtcDay(fiscalPeriodStaringDate) }));
+      setIsFiscalPeriodButtonDisabled(true);
     } catch {
       showToast('Failed to save fiscal period.', 'error');
+    } finally {
+      setIsSavingFiscal(false);
     }
   };
 
@@ -333,35 +398,53 @@ export default function SettingsPage() {
   };
 
   const handleDeleteEntries = async () => {
-    setShowDeleteConfirmDialog(false);
+    if (!latestPostingDate || isDeletingEntries) return;
+    setIsDeletingEntries(true);
     try {
+      // The backend derives the posting date to delete from ExecutionState itself (the same
+      // value shown here) rather than trusting a client-supplied one, so no body is sent.
+      await dataloaderApi.post('/setting/delete/activity-data', null, {
+        headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' },
+      });
+      setShowDeleteConfirmDialog(false);
       showToast('Entries deleted successfully.', 'success');
+      await Promise.all([fetchRecentActivityLoads(), fetchLatestPostingDate()]);
     } catch {
       showToast('Failed to delete entries.', 'error');
+    } finally {
+      setIsDeletingEntries(false);
     }
   };
 
-  const reopenAllClosedAccountingPeriods = async () => {
-    if (!restatementMode || isConfirmingRestatement) return;
+  // Saves restatement mode on (reopens every closed period) or off. The saved fiscal start date
+  // is sent (not one being edited, which may be cleared), and the switch follows the server's answer.
+  const saveRestatementMode = async (enable) => {
+    if (isConfirmingRestatement) return;
     setIsConfirmingRestatement(true);
     try {
       const response = await dataloaderApi.post('/setting/restatement-mode/save', {
         homeCurrency: '', glamFields: '',
-        fiscalPeriodStartDate: new Date(fiscalPeriodStaringDate.toISOString()),
-        reportingPeriod: null, restatementMode: 1, id: null,
+        fiscalPeriodStartDate: toUtcDay(toCalendarDay(settings.fiscalPeriodStartDate)),
+        reportingPeriod: null, restatementMode: enable ? 1 : 0, id: null,
       }, { headers: { 'X-Tenant': tenant, Accept: '*/*', 'Content-Type': 'application/json' } });
-      showToast('Restatement mode enabled — all accounting periods reopened.');
-      setTimeout(() => {
-        setFiscalPeriodStaringDate(dayjs(new Date(response.data.fiscalPeriodStartDate)));
-        setRestatementMode(response.data.restatementMode === 1);
-        setShowRestatementDaialog(false);
-      }, 1500);
+      const savedOn = response.data?.restatementMode !== undefined ? response.data.restatementMode === 1 : enable;
+      setRestatementMode(savedOn);
+      setSettings(prev => ({ ...prev, restatementMode: savedOn ? 1 : 0 }));
+      setShowRestatementDaialog(false);
+      setShowRestatementOffDialog(false);
+      if (savedOn !== enable) {
+        showToast(`The service kept restatement mode ${savedOn ? 'on' : 'off'}.`, 'error');
+      } else {
+        showToast(enable ? 'Restatement mode enabled — all accounting periods reopened.' : 'Restatement mode turned off.');
+      }
+      fetchClosedAccountingPeriods();
     } catch {
-      showToast('Failed to enable restatement mode.', 'error');
+      showToast(enable ? 'Failed to enable restatement mode.' : 'Failed to turn off restatement mode.', 'error');
     } finally {
       setIsConfirmingRestatement(false);
     }
   };
+  const reopenAllClosedAccountingPeriods = () => saveRestatementMode(true);
 
   const refreshEnvironment = async () => {
     if (isResetting) return;
@@ -378,8 +461,12 @@ export default function SettingsPage() {
         setClosedPeriodsList(closed.slice(0, 3));
       }
     } catch (err) {
-      console.warn('[reset] closed periods check failed, using cached state:', err);
-      // fall back to cached state value already set in hasClosedPeriods
+      console.warn('[reset] closed periods check failed:', err);
+      // Can't confirm there are no closed periods: don't wipe the environment.
+      setIsResetting(false);
+      setShowSchemaRefreshDialog(false);
+      showToast('Could not check for closed accounting periods, so the environment was not reset. Please try again.', 'error');
+      return;
     }
     if (hasClosedPeriods) {
       setIsResetting(false);
@@ -395,7 +482,7 @@ export default function SettingsPage() {
       // After reset: set default fiscal period 01/01/2020 and home currency USD,
       // and enable restatement mode so the freshly-reset tenant starts in restatement.
       const defaultFiscalDate = new Date('2020-01-01T00:00:00.000Z');
-      const fiscalRes = await dataloaderApi.post('/setting/fiscal-priod/save', {
+      await dataloaderApi.post('/setting/fiscal-priod/save', {
         homeCurrency: 'USD', glamFields: '',
         fiscalPeriodStartDate: defaultFiscalDate,
         reportingPeriod: null, restatementMode: 1, id: null,
@@ -415,12 +502,12 @@ export default function SettingsPage() {
         console.warn('[reset] failed to enable restatement mode after reset:', e);
       }
 
-      setFiscalPeriodStaringDate(dayjs(new Date(fiscalRes.data.fiscalPeriodStartDate)));
-      setCurrency('USD');
-      setRestatementMode(true);
-      setClosedPeriodsList([]);
       setShowSchemaRefreshDialog(false);
+      setReopenPeriod(null);
+      setIsReopenPeriodButtonDisabled(true);
       showToast(`Environment [${tenant}] has been reset successfully.`);
+      // Everything on the page (settings, periods, loads, latest posting date) comes from the server again.
+      await loadAll();
     } catch {
       showToast(`Failed to reset environment [${tenant}]. Please try again.`, 'error');
     } finally {
@@ -462,7 +549,7 @@ export default function SettingsPage() {
       {/* ── Delete Entries confirm dialog ── */}
       <Dialog
         open={showDeleteConfirmDialog}
-        onClose={() => setShowDeleteConfirmDialog(false)}
+        onClose={() => !isDeletingEntries && setShowDeleteConfirmDialog(false)}
         maxWidth="xs" fullWidth
         slots={{ transition: Slide }}
         slotProps={{
@@ -498,12 +585,14 @@ export default function SettingsPage() {
               </Box>
             </Box>
             <Tooltip title="Close" placement="left">
-              <IconButton onClick={() => setShowDeleteConfirmDialog(false)} size="small" sx={{
-                color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
-                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
-              }}>
-                <HighlightOffOutlinedIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton onClick={() => setShowDeleteConfirmDialog(false)} disabled={isDeletingEntries} size="small" sx={{
+                  color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                  '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                }}>
+                  <HighlightOffOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </DialogTitle>
@@ -515,7 +604,7 @@ export default function SettingsPage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={handleDeleteEntries} variant="contained" sx={{
+          <Button onClick={handleDeleteEntries} disabled={isDeletingEntries} variant="contained" sx={{
             borderRadius: 2, textTransform: 'none', fontWeight: 700,
             fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
             background: '#14213d', color: '#fff',
@@ -523,14 +612,14 @@ export default function SettingsPage() {
             transition: 'all 0.2s ease-in-out',
             '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
             '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
-          }}>Delete Entries</Button>
+          }}>{isDeletingEntries ? 'Deleting…' : 'Delete Entries'}</Button>
         </DialogActions>
       </Dialog>
 
       {/* ── Reset Environment confirm dialog ── */}
       <Dialog
         open={showSchemaRefreshDialog}
-        onClose={() => setShowSchemaRefreshDialog(false)}
+        onClose={() => !isResetting && setShowSchemaRefreshDialog(false)}
         maxWidth="xs" fullWidth
         slots={{ transition: Slide }}
         slotProps={{
@@ -571,12 +660,14 @@ export default function SettingsPage() {
               </Box>
             </Box>
             <Tooltip title="Close" placement="left">
-              <IconButton onClick={() => setShowSchemaRefreshDialog(false)} size="small" sx={{
-                color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
-                '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
-              }}>
-                <HighlightOffOutlinedIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton onClick={() => setShowSchemaRefreshDialog(false)} disabled={isResetting} size="small" sx={{
+                  color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                  '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                }}>
+                  <HighlightOffOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         </DialogTitle>
@@ -602,7 +693,7 @@ export default function SettingsPage() {
       {/* ── Restatement Mode confirm dialog ── */}
       <Dialog
         open={showRestatementDaialog}
-        onClose={() => { setShowRestatementDaialog(false); setRestatementMode(false); }}
+        onClose={() => !isConfirmingRestatement && setShowRestatementDaialog(false)}
         maxWidth="xs" fullWidth
         slots={{ transition: Slide }}
         slotProps={{
@@ -643,7 +734,7 @@ export default function SettingsPage() {
               </Box>
             </Box>
             <Tooltip title="Close" placement="left">
-              <IconButton onClick={() => { setShowRestatementDaialog(false); setRestatementMode(false); }} size="small" sx={{
+              <IconButton onClick={() => setShowRestatementDaialog(false)} disabled={isConfirmingRestatement} size="small" sx={{
                 color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
                 '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
               }}>
@@ -671,6 +762,75 @@ export default function SettingsPage() {
         </DialogActions>
       </Dialog>
 
+      {/* ── Restatement Mode off confirm dialog ── */}
+      <Dialog
+        open={showRestatementOffDialog}
+        onClose={() => !isConfirmingRestatement && setShowRestatementOffDialog(false)}
+        maxWidth="xs" fullWidth
+        slots={{ transition: Slide }}
+        slotProps={{
+          transition: { direction: 'up' },
+          paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } },
+        }}
+      >
+        <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+          <Box sx={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            px: 3, pt: 3, pb: 2.5,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            borderBottom: '1px solid', borderColor: 'divider',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <img src="fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Chip
+                    icon={<WarningAmberIcon sx={{ fontSize: '12px !important' }} />}
+                    label="Restatement"
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: '0.6rem', fontWeight: 700,
+                      letterSpacing: 0.8, textTransform: 'uppercase',
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                      color: theme.palette.warning.dark, borderRadius: 1,
+                    }}
+                  />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' }}>
+                  Turn Off Restatement Mode
+                </Typography>
+              </Box>
+            </Box>
+            <Tooltip title="Close" placement="left">
+              <span>
+                <IconButton onClick={() => setShowRestatementOffDialog(false)} disabled={isConfirmingRestatement} size="small" sx={{
+                  color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                  '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                }}>
+                  <HighlightOffOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 5, px: 3 }}>
+          <Typography sx={{ fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
+            Turn off restatement mode for <strong style={{ color: '#14213d' }}>[{tenant}]</strong>? Periods reopened by restatement stay open until they are closed again.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => saveRestatementMode(false)} variant="contained" disabled={isConfirmingRestatement} sx={{
+            borderRadius: 2, textTransform: 'none', fontWeight: 700,
+            fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', px: 2.5,
+            background: '#14213d', color: '#fff',
+            boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
+            '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
+          }}>{isConfirmingRestatement ? 'Saving…' : 'Turn Off'}</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ── Tabs ── */}
       <Box sx={{ width: '100%', borderBottom: 1, borderColor: 'divider' }}>
         <Tabs
@@ -685,6 +845,16 @@ export default function SettingsPage() {
 
       <CustomTabPanel value={panelIndex} index={0}>
         <Box sx={{ py: 1 }}>
+          {loadError && (
+            <Alert
+              severity="error"
+              variant="outlined"
+              sx={{ mb: 2, borderRadius: 2.5, fontSize: '0.82rem', bgcolor: 'rgba(220,38,38,0.06)' }}
+              action={<Button color="inherit" size="small" onClick={() => loadAll()} sx={{ fontWeight: 700 }}>Retry</Button>}
+            >
+              {loadError}
+            </Alert>
+          )}
 
           {/* ── Section: Environment ── */}
           <SectionLabel label="Environment" first />
@@ -739,17 +909,6 @@ export default function SettingsPage() {
                     <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} />
                   </InputAdornment>
                 ),
-                endAdornment: currency ? (
-                  <InputAdornment position="end">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => { e.stopPropagation(); setCurrency(null); setIsCurrencyButtonDisabled(false); }}
-                      sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-                    >
-                      <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
-                    </IconButton>
-                  </InputAdornment>
-                ) : null,
               }}
             />
             <Popover
@@ -790,7 +949,12 @@ export default function SettingsPage() {
                 />
               </Box>
               <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
-                {filteredCurrencies.length === 0 ? (
+                {currencyListError && !currencyList.length ? (
+                  <Box sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1 }}>{currencyListError}</Typography>
+                    <Button size="small" onClick={fetchCurrencies}>Retry</Button>
+                  </Box>
+                ) : filteredCurrencies.length === 0 ? (
                   <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
                     <Typography variant="caption" color="text.disabled">No currencies found.</Typography>
                   </ListItemButton>
@@ -801,7 +965,7 @@ export default function SettingsPage() {
                     <ListItemButton
                       key={code}
                       selected={code === currency}
-                      onClick={() => { setCurrency(code); setIsCurrencyButtonDisabled(false); setCurrencyPickerAnchor(null); }}
+                      onClick={() => { setCurrency(code); setCurrencyPickerAnchor(null); }}
                       sx={{
                         py: 0.75, px: 2,
                         '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
@@ -917,7 +1081,7 @@ export default function SettingsPage() {
                 )}
               </Box>
             </Tooltip>
-            <ActionLink onClick={handleSaveFiscalPeriod} disabled={isFiscalPeriodButtonDisabled || hasActivityData}>Save</ActionLink>
+            <ActionLink onClick={handleSaveFiscalPeriod} disabled={isFiscalPeriodButtonDisabled || hasActivityData || isSavingFiscal || !fiscalPeriodStaringDate}>{isSavingFiscal ? 'Saving…' : 'Save'}</ActionLink>
           </SettingRow>
 
           <SettingRow
@@ -930,10 +1094,12 @@ export default function SettingsPage() {
               label="# Periods"
               value={reportingPeriod}
               onChange={(e) => { setReportingPeriod(e.target.value); setIsReportingPeriodButtonDisabled(false); }}
-              slotProps={{ htmlInput: { min: 1, max: 60, step: 1 } }}
+              slotProps={{ htmlInput: { min: 1, max: 60, step: 1, inputMode: 'numeric' } }}
+              error={!reportingPeriodValid}
+              helperText={reportingPeriodValid ? '' : '1–60'}
               sx={{ width: 120, ...tfSx }}
             />
-            <ActionLink onClick={handleSaveReportingPeriod} disabled={isReportingPeriodButtonDisabled}>Save</ActionLink>
+            <ActionLink onClick={handleSaveReportingPeriod} disabled={isReportingPeriodButtonDisabled || !reportingPeriodValid}>Save</ActionLink>
           </SettingRow>
 
           {/* ── Section: Accounting Periods ── */}
@@ -946,6 +1112,8 @@ export default function SettingsPage() {
             <Switch
               checked={restatementMode}
               onChange={handleRestatementMode}
+              disabled={isConfirmingRestatement}
+              inputProps={{ 'aria-label': 'Restatement mode' }}
               sx={{
                 '& .MuiSwitch-switchBase.Mui-checked': { color: '#16a34a' },
                 '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#16a34a' },
@@ -1025,12 +1193,14 @@ export default function SettingsPage() {
                   </Box>
                 </Box>
                 <Tooltip title="Close" placement="left">
-                  <IconButton onClick={() => setShowReopenConfirm(false)} disabled={isReopening} size="small" sx={{
-                    color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
-                    '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
-                  }}>
-                    <HighlightOffOutlinedIcon fontSize="small" />
-                  </IconButton>
+                  <span>
+                    <IconButton onClick={() => setShowReopenConfirm(false)} disabled={isReopening} size="small" sx={{
+                      color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                      '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                    }}>
+                      <HighlightOffOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
                 </Tooltip>
               </Box>
             </DialogTitle>

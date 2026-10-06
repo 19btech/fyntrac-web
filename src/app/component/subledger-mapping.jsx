@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
-import { IconButton, Tooltip, Box, Chip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
+import { IconButton, Tooltip, Box, Chip, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Checkbox, FormControlLabel } from '@mui/material';
 import { EditOutlined, DeleteOutlineOutlined } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import AddSubledgerMappingDialog from '../component/add-subledger-mapping';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage } from './rules-shared';
+import { oppositeEntryOf, signLabel } from './subledger-pairs';
 
 function SubledgerMapping({ refreshData, onToast }) {
   const { tenant } = useTenant();
@@ -16,6 +18,11 @@ function SubledgerMapping({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // What still uses the item being deleted (shown in the confirmation), or null.
+  const [deleteRefs, setDeleteRefs] = useState(null);
+  // A new mapping is created with its opposite entry; deleting one offers to delete both.
+  const [deletePair, setDeletePair] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const handleEdit = (rowData) => {
@@ -25,27 +32,48 @@ function SubledgerMapping({ refreshData, onToast }) {
 
   const handleDeleteClick = (row) => {
     setRowToDelete(row);
+    setDeleteRefs(null);
+    setDeletePair(true);
     setDeleteDialogOpen(true);
   };
+  const partnerOf = (row) => (row ? oppositeEntryOf(row, rows) : null);
 
   const handleConfirmDelete = async () => {
-    if (!rowToDelete) return;
+    if (!rowToDelete || deleting) return;
+    setDeleting(true);
     try {
       await dataloaderApi.delete(`/subledgermapping/delete/${rowToDelete.id}`);
+      const partner = deletePair ? partnerOf(rowToDelete) : null;
+      if (partner) {
+        try {
+          await dataloaderApi.delete(`/subledgermapping/delete/${partner.id}`);
+        } catch (pairErr) {
+          onToast?.(`The mapping was deleted, but its opposite entry could not be: ${apiErrorMessage(pairErr, 'please delete it manually')}.`, 'error');
+          setDeleteDialogOpen(false);
+          setRowToDelete(null);
+          fetchData();
+          return;
+        }
+      }
+      onToast?.(`Mapping for ${rowToDelete.transactionName} deleted successfully.`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
+      setDeleteRefs(null);
       fetchData();
-      onToast?.('Subledger mapping deleted successfully.');
     } catch (error) {
-      console.error('Error deleting subledger mapping:', error);
-      setDeleteDialogOpen(false);
-      setRowToDelete(null);
+      console.error('Delete failed:', error);
+      // Keep the dialog open: the item still exists, and the reason is shown.
+      onToast?.(apiErrorMessage(error, `Mapping for ${rowToDelete.transactionName} could not be deleted. Please try again.`), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancelDelete = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setRowToDelete(null);
+    setDeleteRefs(null);
   };
 
   const columns = [
@@ -67,7 +95,7 @@ function SubledgerMapping({ refreshData, onToast }) {
         const isNegative = params.value?.toLowerCase() === 'negative';
         return (
           <Chip
-            label={params.value}
+            label={signLabel(params.value)}
             size="small"
             sx={{
               height: 24, fontSize: '0.75rem', fontWeight: 700,
@@ -172,7 +200,7 @@ function SubledgerMapping({ refreshData, onToast }) {
   const fetchData = () => {
     setLoading(true);
     dataloaderApi.get('/subledgermapping/get/all')
-      .then(response => setRows(response.data))
+      .then(response => setRows(Array.isArray(response.data) ? response.data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -267,11 +295,19 @@ function SubledgerMapping({ refreshData, onToast }) {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete the mapping for <strong>{rowToDelete?.transactionName}</strong>? This action cannot be undone.
+            {partnerOf(rowToDelete) && (
+              <Box component="span" sx={{ display: 'block', mt: 1 }}>
+                <FormControlLabel
+                  control={<Checkbox size="small" checked={deletePair} disabled={deleting} onChange={(e) => setDeletePair(e.target.checked)} />}
+                  label={`Also delete its opposite entry (${signLabel(partnerOf(rowToDelete).sign)}, ${partnerOf(rowToDelete).entryType})`}
+                />
+              </Box>
+            )}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+          <Button onClick={handleCancelDelete} disabled={deleting} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>{deleting ? 'Deleting…' : 'Delete'}</Button>
         </DialogActions>
       </Dialog>
     </>

@@ -1,10 +1,7 @@
 "use client"
 import React from 'react'
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid'
 import IconButton from '@mui/material/IconButton';
-import Stack from '@mui/material/Stack';
-import { styled } from '@mui/material/styles';
 import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import DatasetOutlinedIcon from '@mui/icons-material/DatasetOutlined';
@@ -23,25 +20,23 @@ import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { Container, Button, Badge, Dialog, Typography, DialogContent, DialogTitle, Divider, Tooltip, Slide, Chip, Card, Snackbar, Alert } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { dataloaderApi } from '../services/api-client';
-import GridHeader from '../component/gridHeader';
 import { useTenant } from "../tenant-context";
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import { DataGrid } from '@mui/x-data-grid';
 
-const VisuallyHiddenInput = styled('input')({
-  clip: 'rect(0 0 0 0)',
-  clipPath: 'inset(50%)',
-  height: 1,
-  overflow: 'hidden',
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  whiteSpace: 'nowrap',
-  width: 1,
-});
 
 
-function ValidationNoRows({ severityFilter, context }) {
+function ValidationNoRows({ severityFilter, context, error, onRetry }) {
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', py: 6, gap: 1.5 }}>
+        <WarningAmberOutlinedIcon sx={{ color: '#dc2626', fontSize: 32 }} />
+        <Box sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b' }}>The validation log could not be loaded.</Box>
+        <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>{error}</Box>
+        {onRetry && <Button size="small" variant="outlined" onClick={onRetry}>Retry</Button>}
+      </Box>
+    );
+  }
   const msgs = {
     rules: {
       all: 'All accounting rules are valid — no issues detected.',
@@ -86,12 +81,19 @@ export default function AccountingPage({ initialTab = 0 }) {
   const [openValidationLog, setOpenValidationLog] = React.useState(false);
   const [validationLogs, setValidationLogs] = React.useState([]);
   const [validationLogsLoading, setValidationLogsLoading] = React.useState(false);
+  const [validationError, setValidationError] = React.useState('');
+  const [issuesCheckFailed, setIssuesCheckFailed] = React.useState(false);
 
   const fetchValidationLogs = React.useCallback(() => {
     setValidationLogsLoading(true);
+    setValidationError('');
     dataloaderApi.get('/validation-logs/ref/by-type/JOURNAL_MAPPING')
-      .then(res => setValidationLogs(res.data ?? []))
-      .catch(err => console.error('Failed to fetch validation logs:', err))
+      .then(res => { setValidationLogs(Array.isArray(res.data) ? res.data : []); setIssuesCheckFailed(false); })
+      .catch(err => {
+        console.error('Failed to fetch validation logs:', err);
+        setValidationLogs([]);
+        setValidationError(err?.response?.data?.message || err?.message || 'Please try again.');
+      })
       .finally(() => setValidationLogsLoading(false));
   }, []);
 
@@ -104,10 +106,15 @@ export default function AccountingPage({ initialTab = 0 }) {
   const [stripDismissed, setStripDismissed] = React.useState(false);
   const [severityFilter, setSeverityFilter] = React.useState('all');
 
-  const [resolvedIds, setResolvedIds] = React.useState(() => {
-    try { return new Set(JSON.parse(sessionStorage.getItem('resolved_JOURNAL_MAPPING') ?? '[]')); }
-    catch { return new Set(); }
-  });
+  const resolvedKey = `resolved_JOURNAL_MAPPING.${tenant || 'default'}`;
+  const [resolvedIds, setResolvedIds] = React.useState(() => new Set());
+  React.useEffect(() => {
+    try { setResolvedIds(new Set(JSON.parse(localStorage.getItem(resolvedKey) ?? '[]'))); }
+    catch { setResolvedIds(new Set()); }
+  }, [resolvedKey]);
+  const saveResolved = (next) => {
+    try { localStorage.setItem(resolvedKey, JSON.stringify([...next])); } catch {}
+  };
 
   const unresolvedLogs = React.useMemo(() =>
     validationLogs.filter(r => !resolvedIds.has(String(r.id))),
@@ -117,14 +124,21 @@ export default function AccountingPage({ initialTab = 0 }) {
   const validationIssueCount = unresolvedLogs.length;
   const hasValidationIssues = validationIssueCount > 0;
 
+  // #24: the warning strip comes back when new issues appear.
+  const lastIssueCount = React.useRef(0);
+  React.useEffect(() => {
+    if (validationIssueCount > lastIssueCount.current) setStripDismissed(false);
+    lastIssueCount.current = validationIssueCount;
+  }, [validationIssueCount]);
+
   const recheckValidationIssues = React.useCallback(() => {
     if (!tenant) return;
     dataloaderApi.get('/validation-logs/ref/by-type/JOURNAL_MAPPING')
       .then(res => {
-        setValidationLogs(res.data ?? []);
-        if ((res.data ?? []).length === 0) setStripDismissed(false);
+        setValidationLogs(Array.isArray(res.data) ? res.data : []);
+        setIssuesCheckFailed(false);
       })
-      .catch(() => {});
+      .catch(() => setIssuesCheckFailed(true)); // the badge says so instead of "no issues"
   }, [tenant]);
 
   React.useEffect(() => { recheckValidationIssues(); }, [recheckValidationIssues]);
@@ -140,7 +154,7 @@ export default function AccountingPage({ initialTab = 0 }) {
     setResolvedIds(prev => {
       const next = new Set(prev);
       next.add(String(row.id));
-      try { sessionStorage.setItem('resolved_JOURNAL_MAPPING', JSON.stringify([...next])); } catch {}
+      saveResolved(next);
       return next;
     });
   };
@@ -150,7 +164,7 @@ export default function AccountingPage({ initialTab = 0 }) {
     setResolvedIds(prev => {
       const next = new Set(prev);
       filteredLogs.forEach(r => next.add(String(r.id)));
-      try { sessionStorage.setItem('resolved_JOURNAL_MAPPING', JSON.stringify([...next])); } catch {}
+      saveResolved(next);
       return next;
     });
     showToast(`${count} issue${count !== 1 ? 's' : ''} marked as resolved.`, 'success');
@@ -166,6 +180,7 @@ export default function AccountingPage({ initialTab = 0 }) {
     } else if (panelIndex === 2) {
       setRefreshChartOfAccountKey(prevKey => prevKey + 1);
     }
+    recheckValidationIssues();
   };
 
   const handleOpenFileUpload = () => {
@@ -181,36 +196,6 @@ export default function AccountingPage({ initialTab = 0 }) {
     setRefreshChartOfAccountKey(k => k + 1);
     showToast('Reference data uploaded successfully — tables refreshed.');
     recheckValidationIssues();
-  };
-
-  const handleFileDrop = (acceptedFiles) => {
-
-    const serviceURL = '/accounting/rule/upload';
-    const formData = new FormData();
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      formData.append('files', acceptedFiles[i]);
-    }
-
-    dataloaderApi.post(serviceURL, formData)
-      .then(response => {
-        // Handle success response if needed
-        showToast('Accounting rules uploaded successfully.');
-      })
-      .catch(error => {
-        console.error('Upload error:', error);
-        showToast('Failed to upload accounting rules.', 'error');
-      });
-
-    // You can handle the uploaded files here
-    handleCloseFileUpload(); // Close the dialog after handling the files
-  };
-
-  const handleClickOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
   };
 
   const [panelIndex, setPanelIndex] = React.useState(initialTab);
@@ -282,7 +267,7 @@ export default function AccountingPage({ initialTab = 0 }) {
           </Box>
           <Divider />
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Validation Log">
+            <Tooltip title={issuesCheckFailed ? 'Validation Log — issues could not be checked' : 'Validation Log'}>
               <IconButton
                 aria-label="validation-log"
                 onClick={handleOpenValidationLog}
@@ -293,7 +278,7 @@ export default function AccountingPage({ initialTab = 0 }) {
                   '&:active': { transform: 'scale(0.94)' },
                 }}
               >
-                <Badge badgeContent={validationIssueCount} color="error" max={99}
+                <Badge badgeContent={issuesCheckFailed ? '!' : validationIssueCount} color="error" max={99}
                   sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
                   <WarningAmberOutlinedIcon sx={{ color: '#d97706' }} />
                 </Badge>
@@ -352,16 +337,13 @@ export default function AccountingPage({ initialTab = 0 }) {
           borderRadius: 3,
           boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}, 0px 0px 2px ${alpha(theme.palette.grey[400], 0.2)}`,
           bgcolor: 'background.paper',
-          transition: 'box-shadow 0.3s, transform 0.2s ease-in-out',
-          '&:hover': {
-            boxShadow: `0px 12px 24px ${alpha(theme.palette.grey[400], 0.3)}`,
-            transform: 'translateY(-2px)',
-          },
+          // No hover lift: the whole grid would jump.
+          '&:hover': { transform: 'none' },
           overflow: 'hidden',
         }}>
           <Box>
             <Box sx={{ width: '100%', display: 'flex', borderBottom: 1, borderColor: 'divider', alignItems: 'flex-start', margin: 0, padding: 0 }}>
-              <Tabs sx={{ width: '90rem' }} value={panelIndex} onChange={handleTransactionChange} aria-label="Accounting Configuration">
+              <Tabs sx={{ width: '100%' }} value={panelIndex} onChange={handleTransactionChange} aria-label="Accounting Configuration">
                 <Tab label="Account Type" sx={{ textTransform: 'none' }} />
                 <Tab label="Subledger Mapping" sx={{ textTransform: 'none' }} />
                 <Tab label="Chart of Accounts" sx={{ textTransform: 'none' }} />
@@ -583,7 +565,7 @@ export default function AccountingPage({ initialTab = 0 }) {
               initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
               disableRowSelectionOnClick
               slots={{ noRowsOverlay: ValidationNoRows }}
-              slotProps={{ noRowsOverlay: { severityFilter, context: 'journal' } }}
+              slotProps={{ noRowsOverlay: { severityFilter, context: 'journal', error: validationError, onRetry: fetchValidationLogs } }}
               columns={[
                 {
                   field: 'sourceTable',

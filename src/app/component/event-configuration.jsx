@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -44,7 +44,10 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import { dataloaderApi } from '../services/api-client';
+import DisplayNamesDialog, { DISPLAY_NAME_RULE, isValidDisplayName, normalizeDisplayName } from './display-names-dialog';
 
 const TRIGGER_TYPES = [
   { value: 'ON_MODEL_EXECUTION',   label: 'On Model Execution' },
@@ -61,6 +64,23 @@ const validateEventId = (value) => {
   if (!/^[A-Za-z0-9_]+$/.test(value)) return 'Event ID cannot have special characters (only letters, numbers and underscores are allowed).';
   if (value.length > 63) return 'Event ID cannot exceed 63 characters.';
   return null;
+};
+
+const comboKey = (column, version, mapping) => JSON.stringify([column, version || '', mapping || '']);
+
+// Generated column name of a standard source: SOURCETABLE_SOURCECOLUMN_VERSIONTYPE (Attribute) or
+// SOURCETABLE_SOURCECOLUMN_MAPFIELD (Balances, Transactions), upper case, non-alphanumerics as "_".
+// e.g. ATTRIBUTE_PRODUCT_ID_CURRENT, BALANCES_ENDINGBALANCE_REVENUE, TRANSACTIONS_AMOUNT_NEW_BILLING
+const toColumnPart = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const standardColumnName = (...parts) => parts.filter(Boolean).map(toColumnPart).filter(Boolean).join('_');
+
+// Saved display names ([{ sourceColumn, versionType, dataMapping, displayName }]) → { [comboKey]: name }
+const displayNamesFromSaved = (saved) => {
+    const out = {};
+    (Array.isArray(saved) ? saved : []).forEach(d => {
+        if (d && d.sourceColumn && d.displayName) out[comboKey(d.sourceColumn, d.versionType, d.dataMapping)] = d.displayName;
+    });
+    return out;
 };
 
 export default function EventConfiguration({ open, onClose, editData }) {
@@ -94,6 +114,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [loading, setLoading] = useState(false);
     const [eventIdError, setEventIdError] = useState(null);
     const [submitted, setSubmitted] = useState(false);
+    // Priority: a whole number of 1 or more.
+    const priorityValid = /^\d+$/.test(String(eventData.priority ?? '').trim()) && Number(eventData.priority) >= 1;
 
     const [newSource, setNewSource] = useState({
         sourceTable: '',
@@ -116,7 +138,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const [customReferenceTables, setCustomReferenceTables] = useState([]);
     const [customOperationalTables, setCustomOperationalTables] = useState([]);
     const [customTableColumns, setCustomTableColumns] = useState([]);
-    const [customTableMappings, setCustomTableMappings] = useState([]);
+    // Map fields per operational table: { [tableName]: { loaded: boolean, options: [] } }.
+    // Each mapping row uses its own table's fields, so several tables can be mapped.
+    const [mapFieldsByTable, setMapFieldsByTable] = useState({});
+    const requestedMapTables = useRef(new Set());
     const [referenceTables, setReferenceTables] = useState([]);
     const [operationalTables, setOperationalTables] = useState([]);
     const [triggerTypePickerAnchor, setTriggerTypePickerAnchor] = useState(null);
@@ -162,33 +187,45 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
 
+    // Lists the pickers offer, which failed to load (shown with a Retry).
+    const [metaErrors, setMetaErrors] = useState([]);
+    const metaFailed = (name) => setMetaErrors(prev => (prev.includes(name) ? prev : [...prev, name]));
+    const metaLoaded = (name) => setMetaErrors(prev => prev.filter(n => n !== name));
+    const loadAllMetadata = () => {
+        fetchAttributeMetadata();
+        fetchTransactionMetadata();
+        fetchMetricsMetadata();
+        fetchOperationalableMetadata();
+        fetchReferenceTableMetadata();
+    };
+
+    // Loaded when the dialog opens (not while it sits closed), so each opening has current lists.
     useEffect(() => {
-        if (tenant) {
-            fetchAttributeMetadata();
-            fetchTransactionMetadata();
-            fetchMetricsMetadata();
-            fetchOperationalableMetadata();
-            fetchReferenceTableMetadata();
-        }
-    }, [tenant]);
+        if (tenant && open) loadAllMetadata();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tenant, open]);
 
     const fetchAttributeMetadata = () => {
         dataloaderApi.get(`${baseURL}/attribute/get/all/options`)
             .then(response => {
-                setAttributeList(response.data);
+                setAttributeList(Array.isArray(response.data) ? response.data : []);
+                metaLoaded('attributes');
             })
             .catch(error => {
                 console.error('Error fetching attribute metadata:', error);
+                metaFailed('attributes');
             });
     };
 
     const fetchTransactionMetadata = () => {
         dataloaderApi.get(`${baseURL}/transaction/get/all/options`)
             .then(response => {
-                setTransactionList(response.data);
+                setTransactionList(Array.isArray(response.data) ? response.data : []);
+                metaLoaded('transactions');
             })
             .catch(error => {
                 console.error('Error fetching transaction metadata:', error);
+                metaFailed('transactions');
             });
     };
 
@@ -203,10 +240,12 @@ export default function EventConfiguration({ open, onClose, editData }) {
                     }))
                     : [];
                 setMetricList(formattedMetrics);
+                metaLoaded('balances');
             })
             .catch(error => {
                 console.error('Error fetching metric metadata:', error);
                 setMetricList([]);
+                metaFailed('balances');
             });
     };
 
@@ -224,6 +263,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 const formattedTables = metadata.map(item => item.tableName);
 
                 setReferenceTables(formattedTables);
+                metaLoaded('reference tables');
 
                 console.log('📋 Full Reference Metadata:', metadata);
                 console.log('📋 Reference Table Names:', formattedTables);
@@ -232,6 +272,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 console.error('Error fetching reference table metadata:', error);
                 setCustomReferenceTables([]);   // full response
                 setReferenceTables([]);         // table names only
+                metaFailed('reference tables');
             });
     };
 
@@ -250,6 +291,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 const formattedTables = metadata.map(item => item.tableName);
 
                 setOperationalTables(formattedTables);
+                metaLoaded('operational tables');
 
                 console.log('📋 Full Reference Metadata:', metadata);
                 console.log('📋 Reference Table Names:', formattedTables);
@@ -258,38 +300,74 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 console.error('Error fetching reference table metadata:', error);
                 setCustomOperationalTables([]);   // full response
                 setOperationalTables([]);         // table names only
+                metaFailed('operational tables');
             });
     };
 
 
-    const fetchCustomSourceMapping = useCallback((reference, referenceType) => {
-        let uri = `${baseURL}/fyntrac/custom-table/get/values/reference_table/${reference}`;
-        if (referenceType === 'operational_table') {
-            uri = `${baseURL}/fyntrac/custom-table/get/values/operational_table/${reference}`;
-        }
-
-        dataloaderApi.get(uri)
+    // Fetches an operational table's map fields once and caches them by table name.
+    const fetchCustomSourceMapping = useCallback((tableName) => {
+        if (!tableName || requestedMapTables.current.has(tableName)) return;
+        requestedMapTables.current.add(tableName);
+        dataloaderApi.get(`${baseURL}/fyntrac/custom-table/get/values/operational_table/${encodeURIComponent(tableName)}`)
             .then(response => {
-                const metadata = Array.isArray(response.data?.data)
-                    ? response.data.data
-                    : [];
-
-                console.log('📋 Full Reference Metadata:', metadata);
-                // ✅ 1. Keep FULL response as-is (for column lookup later)
-                setCustomTableMappings(metadata);
-
-                // ✅ 2. Keep ONLY table names in a separate variable
-                console.log('📋 Reference Table Names:', metadata);
+                const options = Array.isArray(response.data?.data) ? response.data.data : [];
+                setMapFieldsByTable(prev => ({ ...prev, [tableName]: { loaded: true, options } }));
             })
             .catch(error => {
                 console.error('Error fetching custom source mapping:', error);
-                setCustomTableMappings([]);
+                setMapFieldsByTable(prev => ({ ...prev, [tableName]: { loaded: true, options: [] } }));
             });
     }, [baseURL, tenant]);
+
+    const clearMapFields = () => {
+        requestedMapTables.current = new Set();
+        setMapFieldsByTable({});
+    };
+
+    const mapFieldsFor = (tableName) => mapFieldsByTable[tableName]?.options || [];
+
+    // Custom Data Trigger: switching between Reference and Operational tables invalidates the
+    // existing mapping rows (they belong to the other table type), so it is confirmed first.
+    const [pendingSourceSwitch, setPendingSourceSwitch] = useState(null); // the new trigger source option
+
+    // Changing the trigger type removes the mappings already added (they belong to the old type),
+    // so with mappings present it is confirmed first. { value } of the new type, or null.
+    const [pendingTriggerType, setPendingTriggerType] = useState(null);
+    const requestTriggerType = (value) => {
+        if (value === eventData.triggerType) return;
+        // Only real work counts: some trigger types open an empty row by themselves.
+        const draftRowHasContent = isAddingNew && Boolean(newSource.sourceTable || newSource.sourceColumns?.length
+            || newSource.versionType?.length || newSource.dataMapping?.length);
+        if (sourceMappings.length > 0 || draftRowHasContent) setPendingTriggerType({ value, draft: draftRowHasContent });
+        else handleChange('triggerType', value);
+    };
+    const confirmTriggerType = () => {
+        const pending = pendingTriggerType;
+        setPendingTriggerType(null);
+        if (!pending) return;
+        setIsAddingNew(false);
+        handleChange('triggerType', pending.value);
+    };
+
+    const confirmSourceSwitch = () => {
+        const opt = pendingSourceSwitch;
+        setPendingSourceSwitch(null);
+        if (!opt) return;
+        setSourceMappings([]);
+        setEditingRow(null);
+        setIsAddingNew(false);
+        setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] });
+        clearMapFields();
+        setAvailableSources(opt.value === 'reference_table' ? referenceTables : opt.value === 'operational_table' ? operationalTables : []);
+        handleChange('triggerSource', [opt]);
+    };
 
     // Load edit data when component opens
     useEffect(() => {
         if (open && editData && user) {
+            // Map fields may have changed since last time (e.g. data loaded on Ingest): fetch fresh.
+            clearMapFields();
             setEventData({
                 eventId: editData.eventId || '',
                 eventName: editData.eventName || '',
@@ -308,9 +386,19 @@ export default function EventConfiguration({ open, onClose, editData }) {
                     versionType: mapping.versionType?.map(ver => typeof ver === 'object' ? ver.value : ver) || [],
                     fieldType: mapping.fieldType || '',
                     dataMapping: mapping.dataMapping?.map(map => typeof map === 'object' ? map.value : map) || [],
+                    displayNames: displayNamesFromSaved(mapping.displayNames),
                 }));
 
                 setSourceMappings(transformedMappings);
+                const savedSigs = {};
+                editData.sourceMappings.forEach((mapping, index) => {
+                    if (Array.isArray(mapping.displayNames) && mapping.displayNames.length) {
+                        savedSigs[index + 1] = mapping.displayNames
+                            .map(d => comboKey(d.sourceColumn, d.versionType, d.dataMapping)).sort().join('\n');
+                    }
+                });
+                setReviewedSigs(savedSigs);
+                setNamesWarned(false);
                 const usedSources = transformedMappings.map(mapping => mapping.sourceTable.toLowerCase());
                 setAvailableSources(ALL_SOURCES.filter(source => !usedSources.includes(source.toLowerCase())));
             }
@@ -336,39 +424,22 @@ export default function EventConfiguration({ open, onClose, editData }) {
         console.log('🔄 New Source Updated:', newSource);
     }, [newSource]);
 
+    // Custom Data Trigger: the source table options are the reference or operational tables
+    // (minus those already mapped), and each selected operational table loads its own map fields.
+    const customTriggerSource = eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' ? eventData.triggerSource?.[0]?.value : null;
     useEffect(() => {
-        // 1. Define variables in the outer scope of the effect
-        let selectedSource = null;
-        let determinedTable = null; // <--- Define a variable to hold the table name
+        if (!customTriggerSource) return;
+        const tables = customTriggerSource === 'operational_table' ? operationalTables
+            : customTriggerSource === 'reference_table' ? referenceTables : null;
+        if (!tables) return;
+        const mapped = new Set(sourceMappings.map(m => m.sourceTable));
+        setAvailableSources(tables.filter(t => !mapped.has(t)));
+    }, [customTriggerSource, referenceTables, operationalTables, sourceMappings]);
 
-        if (eventData.triggerSource && eventData.triggerSource.length > 0) {
-            // 2. Assign value safely
-            selectedSource = eventData.triggerSource[0]?.value;
-
-            console.log('🔄 Trigger Source Changed:', selectedSource);
-
-            if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
-
-                // Determine which table list to use based on selection
-                if (selectedSource === 'operational_table') {
-                    determinedTable = operationalTables[0]; // Assign local variable
-                    // Assuming fetchCustomSourceMapping takes (TableName, SourceType)
-                    fetchCustomSourceMapping(determinedTable, 'operational_table');
-
-
-
-                } else if (selectedSource === 'reference_table') {
-                    setCustomTableMappings([]);
-                }
-            }
-
-            // Update State if needed (using the local variable)
-            if (determinedTable && newSource.sourceTable !== determinedTable) {
-                setNewSource(prev => ({ ...prev, sourceTable: determinedTable }));
-            }
-        }
-
-    }, [eventData.triggerSource, eventData.triggerType, referenceTables, operationalTables, newSource.sourceTable, fetchCustomSourceMapping]);
+    useEffect(() => {
+        if (customTriggerSource !== 'operational_table') return;
+        [newSource.sourceTable, ...sourceMappings.map(m => m.sourceTable)].forEach(t => fetchCustomSourceMapping(t));
+    }, [customTriggerSource, newSource.sourceTable, sourceMappings, fetchCustomSourceMapping]);
 
     const resetForm = () => {
         setEventData({
@@ -384,6 +455,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setAvailableSources([...ALL_SOURCES]);
         setEditingRow(null);
         setIsAddingNew(false);
+        setReviewedSigs({});
+        setNamesWarned(false);
+        setDisplayNamesRowId(null);
         setNewSource({
             sourceTable: '',
             sourceColumns: [],
@@ -392,7 +466,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
             dataMapping: [],
         });
         setAlert({ open: false, message: '', severity: 'success' });
-        setCustomTableMappings([]);
+        clearMapFields();
+        setPendingSourceSwitch(null);
         setSubmitted(false);
     };
 
@@ -404,21 +479,37 @@ export default function EventConfiguration({ open, onClose, editData }) {
         setAlert(prev => ({ ...prev, open: false }));
     };
 
+    // Alerts render at the top of the scrolling content: bring them into view whenever one is shown
+    // (e.g. a save error while scrolled down to the source mappings). Every showAlert sets a new object,
+    // so the same message shown twice scrolls again.
+    const contentRef = useRef(null);
+    useEffect(() => {
+        if (alert.open) contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [alert]);
+
     const handleChange = (key, value) => {
         console.log(`📝 Event Data Change: ${key}`, value);
 
 
-        setEventData((prev) => ({ ...prev, [key]: value }));
-        setEventData((prev) => ({ ...prev, ['triggerSource']: value }));
+        setEventData((prev) => ({
+            ...prev,
+            [key]: value,
+            // A new trigger type needs its own trigger source; other fields leave it alone.
+            ...(key === 'triggerType' ? { triggerSource: [] } : {}),
+        }));
+
+        if (key === 'triggerType') {
+            // Changing the trigger type invalidates any previously selected source mappings.
+            setSourceMappings([]);
+            setEditingRow(null);
+            setNewSource({ sourceTable: '', sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] });
+            clearMapFields();
+        }
 
         if (key === 'triggerType' && value === 'ON_CUSTOM_DATA_TRIGGER') {
-            {
-                if (referenceTables.length > 0)
-                    setAvailableSources(referenceTables);
-                else
-                    setAvailableSources([]);
-
-            }
+            // Don't populate the source-mapping tables yet — wait until the trigger source
+            // (Reference Table / Operational Table) is selected, which sets the correct sources.
+            setAvailableSources([]);
         }
 
 
@@ -438,11 +529,8 @@ export default function EventConfiguration({ open, onClose, editData }) {
 
     const dataMappingOptions = {
         Transactions: transactionList,
-        Balances: metricList.length > 0 ? metricList : [
-            { label: 'Balance Metric 1', value: 'metric1' },
-            { label: 'Balance Metric 2', value: 'metric2' },
-            { label: 'Balance Metric 3', value: 'metric3' },
-        ],
+        // Only real balances (metrics) can be mapped; none loaded → nothing to pick.
+        Balances: metricList,
         Attribute: attributeList,
         ExecutionState: [
             { label: 'Select Mapping', value: '' },
@@ -453,7 +541,6 @@ export default function EventConfiguration({ open, onClose, editData }) {
             { label: 'Operational Table', value: 'operational_table' },
         ],
         CustomTableColumns: customTableColumns,
-        CustomTableMappings: customTableMappings,
     };
 
     const triggerSourceOptions = {
@@ -465,6 +552,20 @@ export default function EventConfiguration({ open, onClose, editData }) {
     };
 
     const showTriggerSource = ['ON_ATTRIBUTE_CHANGE', 'ON_TRANSACTION_POST', 'ON_CUSTOM_DATA_TRIGGER', 'ON_REPLAY'].includes(eventData.triggerType);
+
+    // When the trigger is a Custom Data Trigger sourced from an Operational Table but the
+    // reference table behind it has no ingested data, there are no map fields to choose from.
+    // Surface a persistent warning that links to the Ingest page so the user can load data.
+    const tablesWithoutMapFields = customTriggerSource === 'operational_table'
+        ? [...new Set([newSource.sourceTable, ...sourceMappings.map(m => m.sourceTable)])]
+            .filter(t => t && mapFieldsByTable[t]?.loaded && mapFieldsByTable[t].options.length === 0)
+        : [];
+    const showNoMapFieldsWarning = tablesWithoutMapFields.length > 0;
+
+    const goToIngest = () => {
+        window.dispatchEvent(new CustomEvent('fyntrac:navigate', { detail: { segment: 'sync' } }));
+        if (onClose) onClose(false);
+    };
 
 
     const getColumnsByReferenceTableName = (tableName) => {
@@ -560,6 +661,77 @@ export default function EventConfiguration({ open, onClose, editData }) {
         });
     };
 
+    // Every source column × version type × map field combination of a row, with readable labels.
+    // Custom tables keep the source column as its name, so they have one combination per column.
+    const buildCombos = (row) => {
+        const labelOf = (options, v) => (options || []).find(o => o.value === v)?.label || v;
+        // Same options as resolveSourceColumnOptions, without its debug logging (this runs on every render).
+        const customSource = eventData.triggerSource?.[0]?.value;
+        const colOpts = sourceColumnsOptions[row.sourceTable]
+            || (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' && customSource === 'reference_table' ? getColumnsByReferenceTableName(row.sourceTable)
+                : eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' && customSource === 'operational_table' ? getColumnsByOperationalTableName(row.sourceTable)
+                : []);
+        if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
+            return (row.sourceColumns || []).map(col => ({
+                key: comboKey(col, '', ''),
+                values: { sourceColumn: col, versionType: null, dataMapping: null },
+                column: labelOf(colOpts, col), mapping: '', version: '',
+                columnName: col,
+                defaultName: col,
+            }));
+        }
+        const mapOpts = dataMappingOptions[row.sourceTable] || [];
+        const versions = isVersionTypeEnabled(row.sourceTable) && row.versionType?.length ? row.versionType : [''];
+        const mappings = isDataMappingEnabled(row.sourceTable) && row.dataMapping?.length ? row.dataMapping : [''];
+        const combos = [];
+        (row.sourceColumns || []).forEach(col => {
+            mappings.forEach(map => {
+                versions.forEach(ver => {
+                    const column = labelOf(colOpts, col);
+                    const mapping = map ? labelOf(mapOpts, map) : '';
+                    const version = ver ? labelOf(versionTypeOptions, ver) : '';
+                    const columnName = standardColumnName(row.sourceTable, col, ver, map);
+                    combos.push({
+                        key: comboKey(col, ver, map),
+                        values: { sourceColumn: col, versionType: ver || null, dataMapping: map || null },
+                        column, mapping, version,
+                        columnName,
+                        defaultName: columnName,
+                    });
+                });
+            });
+        });
+        return combos;
+    };
+
+    // The name of each combination: the one the user set, else the default.
+    const resolvedNames = (row) => buildCombos(row).map(c => ({ ...c, displayName: row.displayNames?.[c.key] || c.defaultName }));
+
+    const [displayNamesRowId, setDisplayNamesRowId] = useState(null);
+    // A row counts as reviewed once its Display Names were opened for its current combinations
+    // (or were saved for exactly those combinations). Changing columns/versions/map fields un-reviews it.
+    const [reviewedSigs, setReviewedSigs] = useState({});
+    const [namesWarned, setNamesWarned] = useState(false); // first Save warned; the next Save goes through
+    const comboSig = (row) => buildCombos(row).map(c => c.key).sort().join('\n');
+    const isNamesReviewed = (row) => buildCombos(row).length === 0 || reviewedSigs[row.id] === comboSig(row);
+    const openDisplayNames = (row) => {
+        setReviewedSigs(prev => ({ ...prev, [row.id]: comboSig(row) }));
+        setDisplayNamesRowId(row.id);
+        closeAlert();
+    };
+    const displayNamesRow = sourceMappings.find(r => r.id === displayNamesRowId) || null;
+    const displayNamesCombos = displayNamesRow ? buildCombos(displayNamesRow) : [];
+    const displayNamesTaken = displayNamesRow ? new Map(
+        sourceMappings
+            .filter(r => r.id !== displayNamesRowId)
+            .flatMap(r => resolvedNames(r).map(c => [normalizeDisplayName(c.displayName), r.sourceTable]))
+    ) : null;
+
+    const applyDisplayNames = (names) => {
+        setSourceMappings(prev => prev.map(r => (r.id === displayNamesRowId ? { ...r, displayNames: names } : r)));
+        setDisplayNamesRowId(null);
+    };
+
     // === Source Management Functions ===
     const updateAvailableSources = (oldSourceTable, newSourceTable) => {
         setAvailableSources(prevSources => {
@@ -637,6 +809,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 console.log('📝 Data Mapping Item:', item);
                 return item.value || item;
             }),
+            displayNames: {},
         };
 
         console.log('✅ New Row Created:', newRow);
@@ -702,7 +875,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 setSourceMappings(prev =>
                     prev.map(row =>
                         row.id === rowId
-                            ? { ...row, [field]: value, sourceColumns: [], versionType: [], fieldType: '', dataMapping: [] }
+                            ? { ...row, [field]: value, sourceColumns: [], versionType: [], fieldType: '', dataMapping: [], displayNames: {} }
                             : row
                     )
                 );
@@ -762,6 +935,18 @@ export default function EventConfiguration({ open, onClose, editData }) {
             showAlert("Please fill in all required fields: Event Name and Priority", 'error');
             return;
         }
+        if (!isEditMode && !priorityValid) {
+            showAlert('Priority must be a whole number of 1 or more.', 'error');
+            return;
+        }
+        if (!isEditMode && !eventData.triggerType) {
+            showAlert('Please select a Trigger Type.', 'error');
+            return;
+        }
+        if (!isEditMode && showTriggerSource && (!Array.isArray(eventData.triggerSource) || eventData.triggerSource.length === 0)) {
+            showAlert(`Please select the ${eventData.triggerType === 'ON_REPLAY' ? 'TimeLine Driver' : 'Trigger Source'}.`, 'error');
+            return;
+        }
 
         if (sourceMappings.length === 0) {
             showAlert("Please add at least one source mapping", 'error');
@@ -775,6 +960,50 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 showAlert(`Source mapping #${i + 1}: ${rowError}`, 'error');
                 return;
             }
+        }
+
+        const seenNames = new Map();
+        for (const row of sourceMappings) {
+            for (const c of resolvedNames(row)) {
+                if (!isValidDisplayName(c.displayName)) {
+                    showAlert(`Display name "${c.displayName}" in the ${row.sourceTable} mapping is not allowed. ${DISPLAY_NAME_RULE} Open its Display Names to change it.`, 'error');
+                    return;
+                }
+                const key = normalizeDisplayName(c.displayName);
+                const first = seenNames.get(key);
+                if (first) {
+                    showAlert(first === row.sourceTable
+                        ? `Display name "${c.displayName}" is used more than once in the ${row.sourceTable} mapping. Open its Display Names to change it.`
+                        : `Display name "${c.displayName}" is used in both the ${first} and ${row.sourceTable} mappings. Display names must be unique within an event.`, 'error');
+                    return;
+                }
+                seenNames.set(key, row.sourceTable);
+            }
+        }
+
+        const unreviewed = sourceMappings.filter(r => !isNamesReviewed(r));
+        if (unreviewed.length > 0 && !namesWarned) {
+            setNamesWarned(true);
+            showAlert(
+                <>
+                    The display names for the{' '}
+                    {unreviewed.map((r, i) => (
+                        <React.Fragment key={r.id}>
+                            {i > 0 && (i === unreviewed.length - 1 ? ' and ' : ', ')}
+                            <Box component="span" role="button" tabIndex={0}
+                                onClick={() => openDisplayNames(r)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') openDisplayNames(r); }}
+                                sx={{ fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}>
+                                {r.sourceTable}
+                            </Box>
+                        </React.Fragment>
+                    ))}{' '}
+                    {unreviewed.length === 1 ? 'mapping have' : 'mappings have'} not been reviewed. Click a mapping (or its tag icon) to review and edit them,
+                    or click {editData ? 'Update Event' : 'Save Event'} again to save with the current names.
+                </>,
+                'warning'
+            );
+            return;
         }
 
         setLoading(true);
@@ -826,7 +1055,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                         sourceColumns: transformArrayData(mapping.sourceColumns),
                         versionType: transformArrayData(mapping.versionType),
                         fieldType: mapping.fieldType || "",
-                        dataMapping: transformArrayData(mapping.dataMapping)
+                        dataMapping: transformArrayData(mapping.dataMapping),
+                        // One entry per source column × version type × map field combination.
+                        displayNames: resolvedNames(mapping).map(c => ({ ...c.values, columnName: c.columnName, displayName: c.displayName.trim().replace(/\s+/g, ' ') })),
                     };
 
                     console.log(`✅ Transformed Mapping ${index + 1}:`, transformedMapping);
@@ -910,7 +1141,23 @@ export default function EventConfiguration({ open, onClose, editData }) {
         if (onClose) onClose(false);
     };
 
+    // Sources a trigger type allows, minus those already mapped (an edited event keeps its rows,
+    // so its sources mustn't be offered a second time). Version types: On Instrument Add only has
+    // Current; every other trigger type has all three.
+    const ALL_VERSION_TYPES = [
+        { label: 'Current', value: 'Current' },
+        { label: 'Prior', value: 'Prior' },
+        { label: 'First', value: 'First' },
+    ];
+    const offerSources = (list) => {
+        const used = new Set(sourceMappings.map(m => m.sourceTable));
+        setAvailableSources(list.filter(src => !used.has(src)));
+    };
+
     useEffect(() => {
+        setVersionTypeOptions(eventData?.triggerType === 'ON_INSTRUMENT_ADD'
+            ? [{ label: 'Current', value: 'Current' }]
+            : ALL_VERSION_TYPES);
         if (eventData?.triggerType === 'ON_CUSTOM_DATA_TRIGGER') {
             if (!editData) {
                 setNewSource({
@@ -924,8 +1171,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
             }
         }
         else if (eventData?.triggerType === 'ON_TRANSACTION_POST') {
-            setAvailableSources([]);
-            setAvailableSources(['Transactions']);
+            offerSources(['Transactions']);
             if (!editData) {
                 setNewSource({
                     sourceTable: '',
@@ -938,27 +1184,20 @@ export default function EventConfiguration({ open, onClose, editData }) {
             }
         }
         else if (eventData?.triggerType === 'ON_INSTRUMENT_ADD') {
-            setAvailableSources([]);
-            setAvailableSources(['Attribute', 'Balances']);
-            setVersionTypeOptions([{ label: 'Current', value: 'Current' }]);
-
-
+            offerSources(['Attribute', 'Balances']);
         }
         else if (eventData?.triggerType === 'ON_ATTRIBUTE_CHANGE') {
-            setAvailableSources([]);
-            setVersionTypeOptions([
-                { label: 'Current', value: 'Current' },
-                { label: 'Prior', value: 'Prior' },
-                { label: 'First', value: 'First' },
-            ]);
-            setAvailableSources(['Attribute']);
-
+            offerSources(['Attribute']);
+        }
+        else if (eventData?.triggerType === 'ON_REPLAY') {
+            // Replay allows all standard sources (matches create-mode behaviour, which
+            // includes Transactions) so editing isn't missing it.
+            offerSources([...ALL_SOURCES]);
         }
         else {
-            setAvailableSources([]);
-            setAvailableSources(["Attribute", "Balances"]);
-
+            offerSources(["Attribute", "Balances"]);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventData?.triggerType]);
 
     // When editing an existing event only the source mappings should be editable.
@@ -970,6 +1209,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
     const cbIndeterminate = (color) => <Box sx={{ width: 16, height: 16, borderRadius: '3px', bgcolor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Box sx={{ width: 8, height: 1.5, bgcolor: '#fff', borderRadius: '1px' }} /></Box>;
 
     return (
+        <>
         <Dialog
             open={open}
             onClose={handleClose}
@@ -1055,7 +1295,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                 </Box>
             </DialogTitle>
 
-            <DialogContent sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03), maxHeight: '80vh', overflowY: 'auto' }}>
+            <DialogContent ref={contentRef} sx={{ p: 0, bgcolor: alpha(theme.palette.grey[500], 0.03), maxHeight: '80vh', overflowY: 'auto' }}>
                 <Box sx={{ px: 3.5, pt: 3, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                   {alert.open && (
                     <Alert
@@ -1064,11 +1304,44 @@ export default function EventConfiguration({ open, onClose, editData }) {
                       onClose={closeAlert}
                       sx={{
                         borderRadius: 2.5, py: 0.5, fontSize: '0.8rem',
-                        bgcolor: alert.severity === 'success' ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)',
-                        borderColor: alert.severity === 'success' ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)',
+                        bgcolor: alert.severity === 'success' ? 'rgba(22,163,74,0.08)' : alert.severity === 'warning' ? 'rgba(245,158,11,0.10)' : 'rgba(220,38,38,0.08)',
+                        borderColor: alert.severity === 'success' ? 'rgba(22,163,74,0.35)' : alert.severity === 'warning' ? 'rgba(245,158,11,0.4)' : 'rgba(220,38,38,0.35)',
                       }}
                     >
                       {alert.message}
+                    </Alert>
+                  )}
+                  {metaErrors.length > 0 && (
+                    <Alert
+                      severity="warning"
+                      variant="outlined"
+                      action={<Button color="inherit" size="small" onClick={loadAllMetadata} sx={{ fontWeight: 700 }}>Retry</Button>}
+                      sx={{ borderRadius: 2.5, fontSize: '0.8rem', bgcolor: 'rgba(245,158,11,0.08)' }}
+                    >
+                      Some lists could not be loaded ({metaErrors.join(', ')}), so their pickers may be empty.
+                    </Alert>
+                  )}
+                  {showNoMapFieldsWarning && (
+                    <Alert
+                      severity="warning"
+                      variant="standard"
+                      sx={{
+                        borderRadius: 2.5, fontSize: '0.8rem', fontWeight: 600,
+                        bgcolor: 'rgba(245,158,11,0.10)',
+                        border: '1px solid rgba(245,158,11,0.3)',
+                        color: '#b45309',
+                        '& .MuiAlert-icon': { color: '#d97706' },
+                      }}
+                    >
+                      It looks like no data has been loaded yet for the reference table attached to {tablesWithoutMapFields.length === 1 ? <>the operational table <strong>{tablesWithoutMapFields[0]}</strong></> : <>the operational tables <strong>{tablesWithoutMapFields.join(', ')}</strong></>}, so there are no map fields to choose from. Please load the data first, then the map field selection will appear here.{' '}
+                      <Box
+                        component="span"
+                        onClick={goToIngest}
+                        sx={{ fontWeight: 700, color: '#b45309', textDecoration: 'underline', cursor: 'pointer', '&:hover': { color: '#92400e' } }}
+                      >
+                        Click here
+                      </Box>{' '}
+                      to go to Ingest.
                     </Alert>
                   )}
                     {/* Event Details Card */}
@@ -1117,9 +1390,10 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     value={eventData.priority}
                                     onChange={(e) => handleChange('priority', e.target.value)}
                                     disabled={isEditMode}
-                                    error={!isEditMode && submitted && !eventData.priority}
-                                    helperText={!isEditMode && submitted && !eventData.priority ? "Priority is required" : ""}
-                                    slotProps={{ min: 1 }}
+                                    error={!isEditMode && ((submitted && !eventData.priority) || (eventData.priority !== '' && !priorityValid))}
+                                    helperText={!isEditMode && submitted && !eventData.priority ? "Priority is required"
+                                        : !isEditMode && eventData.priority !== '' && !priorityValid ? "Use a whole number of 1 or more" : ""}
+                                    slotProps={{ htmlInput: { min: 1, step: 1 } }}
                                 />
                             </Grid>
                             <Grid size={6}>
@@ -1159,7 +1433,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                         startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /></InputAdornment>,
                                         endAdornment: eventData.triggerType && !isEditMode ? (
                                             <InputAdornment position="end">
-                                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleChange('triggerType', ''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                                                <IconButton size="small" onClick={(e) => { e.stopPropagation(); requestTriggerType(''); }} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
                                                     <HighlightOffOutlinedIcon sx={{ fontSize: '0.95rem' }} />
                                                 </IconButton>
                                             </InputAdornment>
@@ -1184,7 +1458,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     <List dense disablePadding>
                                         {TRIGGER_TYPES.filter(t => t.label.toLowerCase().includes(triggerTypePickerSearch.toLowerCase())).map((t) => (
                                             <ListItemButton key={t.value} selected={t.value === eventData.triggerType}
-                                                onClick={() => { handleChange('triggerType', t.value); setTriggerTypePickerAnchor(null); }}
+                                                onClick={() => { setTriggerTypePickerAnchor(null); requestTriggerType(t.value); }}
                                                 sx={{ py: 1, px: 2, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }, '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.1) } }}
                                             >
                                                 <ListItemText primary={t.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }} />
@@ -1211,9 +1485,18 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                     else setAvailableSources(ALL_SOURCES);
                                     handleChange('triggerSource', newVal);
                                 } else {
+                                    const currentSource = tsSelected[0]?.value ?? tsSelected[0];
+                                    if (eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' && sourceMappings.length > 0
+                                        && currentSource && currentSource !== opt.value) {
+                                        setTsPickerAnchor(null);
+                                        setPendingSourceSwitch(opt);
+                                        return;
+                                    }
                                     const newVal = [opt];
-                                    if (opt.value === 'reference_table') setAvailableSources(referenceTables);
-                                    else if (opt.value === 'operational_table') setAvailableSources(operationalTables);
+                                    // Tables already mapped stay out of the list (re-picking the same source too).
+                                    const unmapped = (tables) => tables.filter(t => !sourceMappings.some(m => m.sourceTable === t));
+                                    if (opt.value === 'reference_table') setAvailableSources(unmapped(referenceTables));
+                                    else if (opt.value === 'operational_table') setAvailableSources(unmapped(operationalTables));
                                     else setAvailableSources([]);
                                     handleChange('triggerSource', newVal);
                                     setTsPickerAnchor(null);
@@ -1325,7 +1608,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                                         {['#', 'Source Table', 'Source Columns', 'Version Type', 'Map Fields', 'Actions'].map((label, i) => (
-                                            <TableCell key={label} sx={{ width: [60, 200, 300, 200, 300, 140][i], color: '#475569', fontSize: '0.72rem', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', borderBottom: '2px solid #e2e8f0', bgcolor: '#f8fafc' }}>
+                                            <TableCell key={label} sx={{ width: [60, 200, 300, 200, 300, 170][i], color: '#475569', fontSize: '0.72rem', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif', borderBottom: '2px solid #e2e8f0', bgcolor: '#f8fafc' }}>
                                                 {label}
                                             </TableCell>
                                         ))}
@@ -1512,7 +1795,9 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                             </TableCell>
                                             <TableCell>
                                                 {editingRow === row.id ? (() => {
-                                                    const dmOpts = dataMappingOptions[row.sourceTable] || [];
+                                                    const dmOpts = eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER'
+                                                        ? mapFieldsFor(row.sourceTable)
+                                                        : (dataMappingOptions[row.sourceTable] || []);
                                                     const dmEnabled = isDataMappingEnabled(row.sourceTable);
                                                     const filtDM = dmOpts.filter(o => o.label.toLowerCase().includes(emPickerSearch.toLowerCase()));
                                                     const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.secondary.main, 0.12), color: theme.palette.secondary.dark, border: `1px solid ${alpha(theme.palette.secondary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.secondary.main, 0.5), '&:hover': { color: theme.palette.secondary.dark } } };
@@ -1591,6 +1876,21 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                                     </Box>
                                                 ) : (
                                                     <Box sx={{ display: 'flex', gap: 0.75 }}>
+                                                        {(() => {
+                                                            const count = buildCombos(row).length;
+                                                            const flag = namesWarned && !isNamesReviewed(row);
+                                                            const tone = flag ? '#d97706' : theme.palette.primary.main;
+                                                            return (
+                                                                <Tooltip title={!count ? 'Select source columns first' : `${flag ? 'Review ' : ''}Display Names (${count} combination${count === 1 ? '' : 's'})`}>
+                                                                    <span>
+                                                                        <IconButton size="small" disabled={!count} onClick={() => openDisplayNames(row)} sx={{ position: 'relative', color: tone, bgcolor: alpha(tone, 0.1), borderRadius: 1.5, '&:hover': { bgcolor: alpha(tone, 0.18) } }}>
+                                                                            <LabelOutlinedIcon sx={{ fontSize: 16 }} />
+                                                                            {flag && <Box component="span" sx={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', bgcolor: '#d97706' }} />}
+                                                                        </IconButton>
+                                                                    </span>
+                                                                </Tooltip>
+                                                            );
+                                                        })()}
                                                         <Tooltip title="Edit">
                                                             <IconButton size="small" onClick={() => handleEditRow(row)} sx={{ color: '#14213d', bgcolor: alpha('#14213d', 0.06), borderRadius: 1.5, '&:hover': { bgcolor: alpha('#14213d', 0.14) } }}>
                                                                 <EditOutlinedIcon sx={{ fontSize: 16 }} />
@@ -1732,7 +2032,7 @@ export default function EventConfiguration({ open, onClose, editData }) {
                                             </TableCell>
                                             <TableCell>
                                                 {(() => {
-                                                    const nmOpts = eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' ? customTableMappings : (dataMappingOptions[newSource.sourceTable] || []);
+                                                    const nmOpts = eventData.triggerType === 'ON_CUSTOM_DATA_TRIGGER' ? mapFieldsFor(newSource.sourceTable) : (dataMappingOptions[newSource.sourceTable] || []);
                                                     const nmEnabled = isDataMappingEnabled(newSource.sourceTable);
                                                     const filtNM = nmOpts.filter(o => (o.label || o).toLowerCase().includes(nmPickerSearch.toLowerCase()));
                                                     const chipSx = { height: 22, fontSize: '0.72rem', fontWeight: 600, borderRadius: 1.5, bgcolor: alpha(theme.palette.secondary.main, 0.12), color: theme.palette.secondary.dark, border: `1px solid ${alpha(theme.palette.secondary.main, 0.25)}`, '& .MuiChip-deleteIcon': { fontSize: '14px', color: alpha(theme.palette.secondary.main, 0.5), '&:hover': { color: theme.palette.secondary.dark } } };
@@ -1819,5 +2119,97 @@ export default function EventConfiguration({ open, onClose, editData }) {
             </DialogActions>
 
         </Dialog>
+
+        <DisplayNamesDialog
+            open={Boolean(displayNamesRow)}
+            onClose={() => setDisplayNamesRowId(null)}
+            onApply={applyDisplayNames}
+            sourceTable={displayNamesRow?.sourceTable}
+            combos={displayNamesCombos}
+            names={displayNamesRow?.displayNames}
+            takenNames={displayNamesTaken}
+        />
+
+        {/* Confirm: switching the Custom Data Trigger source type removes the existing mappings */}
+        <Dialog
+            open={Boolean(pendingSourceSwitch || pendingTriggerType)}
+            onClose={() => { setPendingSourceSwitch(null); setPendingTriggerType(null); }}
+            maxWidth="xs" fullWidth
+            slots={{ transition: Slide }}
+            slotProps={{
+                transition: { direction: 'up' },
+                paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } },
+            }}
+        >
+            <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+                <Box sx={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    px: 3, pt: 3, pb: 2.5,
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+                    borderBottom: '1px solid', borderColor: 'divider',
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <img src="/fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+                        <Box>
+                            <Chip
+                                icon={<WarningAmberIcon sx={{ fontSize: '12px !important' }} />}
+                                label="Source Mapping"
+                                size="small"
+                                sx={{
+                                    height: 20, mb: 1, fontSize: '0.6rem', fontWeight: 700,
+                                    letterSpacing: 0.8, textTransform: 'uppercase',
+                                    bgcolor: alpha(theme.palette.warning.main, 0.1),
+                                    color: theme.palette.warning.dark, borderRadius: 1,
+                                }}
+                            />
+                            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary' }}>
+                                {pendingTriggerType ? 'Change Trigger Type?' : 'Change Trigger Source?'}
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Tooltip title="Close" placement="left">
+                        <IconButton onClick={() => { setPendingSourceSwitch(null); setPendingTriggerType(null); }} size="small" aria-label="Close" sx={{
+                            color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+                            '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+                        }}>
+                            <HighlightOffOutlinedIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            </DialogTitle>
+            <DialogContent sx={{ px: 3 }}>
+                <Typography sx={{ fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
+                    {pendingTriggerType ? (
+                        <>
+                            {pendingTriggerType.value
+                                ? <>Changing the trigger type to <strong style={{ color: '#14213d' }}>{TRIGGER_TYPES.find(t => t.value === pendingTriggerType.value)?.label ?? pendingTriggerType.value}</strong></>
+                                : 'Clearing the trigger type'}{' '}
+                            will remove the <strong>{sourceMappings.length} source mapping{sourceMappings.length === 1 ? '' : 's'}</strong> you added
+                            {pendingTriggerType.draft ? ' (and the row being added)' : ''}, because they belong to the current trigger type.
+                        </>
+                    ) : (
+                        <>
+                            Switching to <strong style={{ color: '#14213d' }}>{pendingSourceSwitch?.label}</strong> will remove the{' '}
+                            <strong>{sourceMappings.length} source mapping{sourceMappings.length === 1 ? '' : 's'}</strong> you added, because they use the other table type.
+                        </>
+                    )}{' '}
+                    Are you sure you want to continue?
+                </Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                <Button onClick={() => { setPendingSourceSwitch(null); setPendingTriggerType(null); }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+                    Cancel
+                </Button>
+                <Button onClick={pendingTriggerType ? confirmTriggerType : confirmSourceSwitch} variant="contained" sx={{
+                    borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 2.5,
+                    background: '#14213d', color: '#fff',
+                    boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
+                    '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)' },
+                }}>
+                    {pendingTriggerType ? 'Change & Remove Mappings' : 'Switch & Remove Mappings'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+        </>
     );
 }
