@@ -4,9 +4,11 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useTenant } from '../tenant-context';
 import { ADMIN_ROLE_ID, ALL_PERMISSIONS } from './permissions';
 import { fetchRoles, fetchUsers } from './user-management-api';
+import { userManagementEnabled } from '../services/runtime-config';
 
 /**
  * The signed-in user's permissions, from their user type.
+ *   - flag off          → everything (NEXT_PUBLIC_USER_MANAGEMENT isn't "true": no service to ask)
  *   - user found        → their user type's permissions (Admin: everything; deactivated: nothing)
  *   - user not listed   → nothing role-gated
  *   - service missing   → everything (404: the feature isn't deployed, so nobody is locked out)
@@ -22,7 +24,9 @@ const snapshot = () => state;
 
 const load = async (email) => {
   let next;
-  try {
+  if (!userManagementEnabled()) {
+    next = { status: 'ready', email, grants: null };
+  } else try {
     const [users, roles] = await Promise.all([fetchUsers(), fetchRoles()]);
     const me = (users || []).find((u) => String(u.email).toLowerCase() === email);
     const role = me && roles.find((r) => r.id === me.roleId);
