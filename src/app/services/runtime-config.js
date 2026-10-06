@@ -25,6 +25,7 @@ export function readServerRuntimeConfig() {
         gatewayUri: env("GATEWAY_URI") || DEFAULTS.gatewayUri,
         dslStudioUrl: env("DSL_STUDIO_URL") || DEFAULTS.dslStudioUrl,
         insightUrl: env("INSIGHT_URL") || DEFAULTS.insightUrl,
+        userManagement: env("USER_MANAGEMENT") === "true",
     };
 }
 
@@ -45,3 +46,12 @@ export const dslStudioUrl = () =>
 
 export const insightUrl = () =>
     runtimeValue("insightUrl") || process.env.NEXT_PUBLIC_INSIGHT_URL || DEFAULTS.insightUrl;
+
+/**
+ * Role-based access is enforced only when the user management service is deployed
+ * (NEXT_PUBLIC_USER_MANAGEMENT=true). Off by default, so environments without it stay unlocked.
+ */
+export const userManagementEnabled = () => {
+    const value = typeof window !== "undefined" ? window[RUNTIME_CONFIG_GLOBAL]?.userManagement : undefined;
+    return value !== undefined ? value === true : process.env.NEXT_PUBLIC_USER_MANAGEMENT === "true";
+};
