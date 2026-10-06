@@ -15,9 +15,20 @@
  *  - defaultCalcs           -> calculated columns added to the default layout
  *  - attributes             -> fixed column definitions (no attributes request); the columns show
  *                              even when there is no data
+ *  - fieldPaths             -> { column: 'nested.path' } for columns stored inside a sub-document:
+ *                              filters are sent on the path and rows get the column from it
+ *  - columns(source)        -> preferred column definitions (order, names, types) for the default
+ *                              layout; other columns the service lists are kept after them
+ *  - periodFrom             -> the yyyymmdd date column accountingPeriodId is derived from: rows get
+ *                              the period from it and period filters are sent as a range on it
  *  - defaultSort            -> field sorted newest-first by default (the service returns the latest
  *                              records first too, so a partial load is the most recent data)
  *  - periodDefault          -> false to skip the latest-accounting-period pre-filter
+ *  - postingDateDefault     -> pre-filter on the source's latest posting date instead (data that
+ *                              grows by posting date and has no accounting period column)
+ *  - splitBy                -> { field, valuesPath, when(source) }: fetch one value of `field` per
+ *                              request (values listed by POSTing the period conditions to
+ *                              valuesPath), for sources too large to return a period at once
  *  - rowLimit               -> rows loaded by default (else DEFAULT_ROW_LIMIT); the rest via "Load all"
  *  - groupedByDefault       -> false to open as individual records. Otherwise the layout groups by
  *                              the visible non-amount columns and sums the amount (decimal) columns,
@@ -47,14 +58,44 @@ export const CATEGORIES = [
   },
 ];
 
+const col = (attributeName, attributeAlias, dataType) => ({ attributeName, attributeAlias, dataType });
+const ROLLFORWARD_BALANCES = [col('beginningBalance', 'Beginning Balance', 'Double'), col('activity', 'Activity', 'Double'), col('endingBalance', 'Ending Balance', 'Double')];
+const ROLLFORWARD_COLUMNS = {
+  'attribute-rollforward': [col('accountingPeriodId', 'Accounting Period', 'Integer'), col('postingDate', 'Posting Date', 'Integer'), col('metricName', 'Metric', 'String'), col('instrumentId', 'Instrument Id', 'String'), col('attributeId', 'Attribute Id', 'String'), ...ROLLFORWARD_BALANCES],
+  'instrument-rollforward': [col('accountingPeriodId', 'Accounting Period', 'Integer'), col('postingDate', 'Posting Date', 'Integer'), col('metricName', 'Metric', 'String'), col('instrumentId', 'Instrument Id', 'String'), ...ROLLFORWARD_BALANCES],
+  'tenant-rollforward': [col('accountingPeriodId', 'Accounting Period', 'Integer'), col('postingDate', 'Posting Date', 'Integer'), col('metricName', 'Metric', 'String'), ...ROLLFORWARD_BALANCES],
+};
+const JOURNAL_COLUMNS = [
+  col('accountingPeriodId', 'Accounting Period', 'Integer'), col('postingDate', 'Posting Date', 'Integer'),
+  col('instrumentId', 'Instrument Id', 'String'), col('attributeId', 'Attribute Id', 'String'),
+  col('transactionName', 'Transaction Name', 'String'), col('glAccountNumber', 'GL Account Number', 'String'),
+  col('glAccountName', 'GL Account Name', 'String'), col('glAccountType', 'GL Account Type', 'String'),
+  col('glAccountSubType', 'GL Account Sub Type', 'String'), col('debitAmount', 'Debit Amount', 'Double'),
+  col('creditAmount', 'Credit Amount', 'Double'), col('isReclass', 'Is Reclass', 'Integer'), col('batchId', 'Batch Id', 'Long'),
+];
+
 export const REPORTS = [
   {
     id: 'transaction-activity',
     category: 'standard',
     name: 'Transaction Activity',
     description: 'Shows all transaction movements for each instrument over time.',
-    attributesPath: () => '/transaction-activity/get/attributes',
     executePath: () => '/transaction-activity/execute',
+    // Fixed columns: the service derives its column list from one stored record, which lists the
+    // nested accounting period fields and a top-level periodId that is always 0.
+    attributes: [
+      { attributeName: 'accountingPeriodId', attributeAlias: 'Accounting Period', dataType: 'Integer' },
+      { attributeName: 'postingDate', attributeAlias: 'Posting Date', dataType: 'Integer' },
+      { attributeName: 'effectiveDate', attributeAlias: 'Effective Date', dataType: 'Integer' },
+      { attributeName: 'instrumentId', attributeAlias: 'Instrument Id', dataType: 'String' },
+      { attributeName: 'attributeId', attributeAlias: 'Attribute Id', dataType: 'String' },
+      { attributeName: 'transactionName', attributeAlias: 'Transaction Name', dataType: 'String' },
+      { attributeName: 'amount', attributeAlias: 'Amount', dataType: 'Double' },
+      { attributeName: 'source', attributeAlias: 'Source', dataType: 'String' },
+      { attributeName: 'originalPeriodId', attributeAlias: 'Original Period', dataType: 'Integer' },
+      { attributeName: 'batchId', attributeAlias: 'Batch Id', dataType: 'Long' },
+    ],
+    fieldPaths: { accountingPeriodId: 'accountingPeriod.periodId' },
     defaultHidden: ['effectiveDate', 'originalPeriodId', 'batchId', 'instrumentId', 'attributeId'],
     defaultSort: 'postingDate',
   },
@@ -112,6 +153,12 @@ export const REPORTS = [
     defaultSort: 'postingDate',
     attributesPath: (source) => `/${source.value}/get/attributes`,
     executePath: (source) => `/${source.value}/execute`,
+
+    columns: (source) => ROLLFORWARD_COLUMNS[source?.value] ?? [],
+    // Instrument / attribute level hold a row per instrument (and attribute) per metric: a whole
+    // period at once is too much for the service, so each metric is fetched on its own. The
+    // tenant level lists the period's metrics.
+    splitBy: { field: 'metricName', valuesPath: '/tenant-rollforward/execute', when: (source) => source?.value !== 'tenant-rollforward' },
   },
   {
     id: 'journal-entry',
@@ -124,6 +171,8 @@ export const REPORTS = [
     // offered as dimensions and filters, hidden by default.
     defaultColumns: ['accountingPeriodId', 'postingDate', 'instrumentId', 'attributeId', 'transactionName', 'glAccountNumber', 'glAccountName', 'glAccountType', 'glAccountSubType', 'debitAmount', 'creditAmount', 'isReclass', 'batchId'],
     defaultHidden: ['batchId', 'glAccountSubType', 'instrumentId', 'attributeId', 'isReclass'],
+    columns: () => JOURNAL_COLUMNS,
+    periodFrom: 'postingDate', // the stored periodId is not reliable
     defaultSort: 'postingDate',
   },
   {
@@ -137,6 +186,8 @@ export const REPORTS = [
     executePath: () => '/jeReport/execute',
     defaultColumns: ['accountingPeriodId', 'postingDate', 'instrumentId', 'attributeId', 'transactionName', 'glAccountNumber', 'glAccountName', 'glAccountType', 'glAccountSubType', 'debitAmount', 'creditAmount', 'isReclass', 'batchId'],
     defaultHidden: ['postingDate', 'transactionName', 'instrumentId', 'attributeId', 'batchId', 'isReclass'],
+    columns: () => JOURNAL_COLUMNS,
+    periodFrom: 'postingDate', // the stored periodId is not reliable
     defaultSort: 'accountingPeriodId',
     defaultCalcs: [
       { id: 'tb-balance', name: 'Balance', expression: '[debitAmount] - [creditAmount]', format: 'number', template: 'custom' },
@@ -151,6 +202,7 @@ export const REPORTS = [
     sourcesPath: '/custom-operational-data/get/table-names',
     attributesPath: (source) => `/custom-operational-data/get/attributes/${source.label}`,
     executePath: (source) => `/custom-operational-data/execute/${source.value}`,
+    postingDateDefault: true, // each table's own latest posting date (they load on different dates)
     // The table's own first column, then posting / effective date and instrument / sub instrument.
     leadingAfter: 1,
     leadingColumns: ['postingDate', 'effectiveDate', 'instrumentId', 'attributeId'],

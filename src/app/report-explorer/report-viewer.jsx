@@ -10,7 +10,6 @@ import {
   Chip,
   Divider,
   IconButton,
-  LinearProgress,
   ListItemIcon,
   ListItemText,
   Menu,
@@ -32,6 +31,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import FunctionsRoundedIcon from '@mui/icons-material/FunctionsRounded';
 import ViewDayOutlinedIcon from '@mui/icons-material/ViewDayOutlined';
 import ReportGrid from './report-grid';
+import LoadingOverlay from './loading-overlay';
 import CalcDialog from './calc-dialog';
 import AppToast from './app-toast';
 import ColumnFilterPopover from './column-filter-popover';
@@ -213,6 +213,7 @@ export default function ReportViewer({
   const [criteria, setCriteria] = useState([]);
   const [view, setView] = useState(() => defaultView([], report));
   const [rows, setRows] = useState([]);
+  const [progress, setProgress] = useState(''); // step of a multi-request load
   // Rows loaded vs. rows matching the filters (the service may return a first slice only).
   const baseRowLimit = report.rowLimit ?? DEFAULT_ROW_LIMIT;
   const [rowLimit, setRowLimit] = useState(baseRowLimit);
@@ -327,13 +328,15 @@ export default function ReportViewer({
       }
       setLoading(true);
       setError('');
+      setProgress('');
+      const onProgress = (text) => { if (id === requestId.current) setProgress(text); };
       try {
         const result = force
           ? await (async () => {
-              const r = await executeReport(report, source, nextCriteria, { limit, grain: useGrain, fresh: true });
+              const r = await executeReport(report, source, nextCriteria, { limit, grain: useGrain, fresh: true, onProgress });
               return { rows: prepareRows(r.rows), total: r.total, elapsedMs: r.elapsedMs };
             })()
-          : await loadResult(report, source, nextCriteria, { limit, grain: useGrain });
+          : await loadResult(report, source, nextCriteria, { limit, grain: useGrain, onProgress });
         if (id !== requestId.current) return; // a newer run (or unmount) superseded this one
         setRows(result.rows);
         setTotalRows(result.total);
@@ -343,6 +346,7 @@ export default function ReportViewer({
         if (id !== requestId.current) return;
         console.error('Error executing report:', err);
         setRows([]);
+        setTotalRows(0);
         setError(errorMessage(err, 'Failed to execute report.'));
       } finally {
         if (id === requestId.current) setLoading(false);
@@ -401,10 +405,7 @@ export default function ReportViewer({
     () => new Set(attributes.filter((a) => isPeriodAttribute(a.attributeName, a.attributeAlias)).map((a) => a.attributeName)),
     [attributes]
   );
-  const loadPeriods = useCallback(
-    () => fetchPeriods(report, source, [...periodFields][0]),
-    [report, source, periodFields]
-  );
+  const loadPeriods = useCallback(() => fetchPeriods(), []);
   // Load them in the background once the columns are known, so the picker opens instantly.
   useEffect(() => {
     if (periodFields.size) loadPeriods().catch(() => {});
@@ -886,9 +887,7 @@ export default function ReportViewer({
 
       {/* Grid */}
       <Box sx={{ position: 'relative', flex: 1, minHeight: 320 }}>
-        {loading && rows.length > 0 && (
-          <LinearProgress sx={{ position: 'absolute', top: 0, left: 1, right: 1, zIndex: 2, height: 2, borderRadius: '10px 10px 0 0' }} />
-        )}
+        {loading && <LoadingOverlay progress={progress} overRows={rows.length > 0} />}
         <Box sx={{ position: 'absolute', inset: 0 }}>
           <ReportGrid
             apiRef={apiRef}
@@ -908,7 +907,7 @@ export default function ReportViewer({
             onRowDrill={drillToRecords}
             drillable={view.dimensions.length > 0}
             actions={gridActions}
-            loading={loading && rows.length === 0}
+            loading={false}
             density={density}
             pageModelRef={pageModelRef}
           />

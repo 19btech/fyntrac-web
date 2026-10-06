@@ -188,7 +188,7 @@ export function buildViewRows({ rows, dimensions, metrics, sortModel, collapsed,
     return out;
   };
 
-  const total = aggMetrics.length || pivotOn
+  const total = rows.length && (aggMetrics.length || pivotOn)
     ? [withCalcs({ __id: '__total', __kind: 'total', __count: rows.length, ...summarize(rows) })]
     : [];
 
