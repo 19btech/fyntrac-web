@@ -55,6 +55,12 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
     const [availableMetrics, setAvailableMetrics] = useState([]);
     const [isMetricssError, setIsMetricsError] = React.useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    // Auto-close after a save; cancelled if the dialog is closed (or unmounted) first.
+    const closeTimer = React.useRef(null);
+    const clearCloseTimer = () => {
+        if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    };
+    React.useEffect(() => clearCloseTimer, []);
     const serviceGetMetricsURL = '/aggregation/get/metrics'
 
     // Shared metric picker popover
@@ -144,10 +150,14 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 id: id
             }
             );
+            // A first save creates the configuration: later saves update that one.
+            if (response?.data?.id) setId(response.data.id);
             setSuccessMessage('Dashboard configuration saved successfully.');
             setShowSuccessMessage(true);
 
-            setTimeout(() => {
+            clearCloseTimer();
+            closeTimer.current = setTimeout(() => {
+                closeTimer.current = null;
                 setShowSuccessMessage(false);
                 setShowErrorMessage(false);
                 onClose(false);
@@ -165,7 +175,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
                 userFriendlyMessage = error.message;
             }
 
-            setErrorMessage('Failed to save dashboard configuration.');
+            setErrorMessage(`Failed to save dashboard configuration: ${userFriendlyMessage}`);
             setShowErrorMessage(true);
         } finally {
             setIsSaving(false);
@@ -174,6 +184,7 @@ const AddDashboardConfiguration = ({ open, onClose, editData }) => {
 
 
     const handleClose = () => {
+        clearCloseTimer();
         setShowErrorMessage(false);
         setShowSuccessMessage(false);
         onClose(false);

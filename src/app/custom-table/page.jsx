@@ -1,21 +1,16 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
-import Stack from '@mui/material/Stack';
-import { styled, alpha, useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 
 import CachedRoundedIcon from '@mui/icons-material/CachedRounded';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
-import FileUploadComponent from '../component/file-upload'
 import Tab from '@mui/material/Tab';
 import CustomTabPanel from '../component/custom-tab-panel';
-import { Container, Button, Tabs, Divider, Dialog, DialogActions, DialogContent, DialogTitle, Card, Snackbar, Alert, Slide, Typography } from '@mui/material';
+import { Container, Tabs, Divider, Card, Snackbar, Alert, Slide, Typography } from '@mui/material';
 import { dataloaderApi } from '../services/api-client';
 import Tooltip from '@mui/material/Tooltip';
-import GridHeader from '../component/gridHeader';
 import '../common.css';
 
 import { useTenant } from "../tenant-context";
@@ -27,30 +22,16 @@ const CreateTableDialog = dynamic(() => import('../component/custom-table'), {
     ssr: false
 });
 
-const VisuallyHiddenInput = styled('input')({
-    clip: 'rect(0 0 0 0)',
-    clipPath: 'inset(50%)',
-    height: 1,
-    overflow: 'hidden',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    whiteSpace: 'nowrap',
-    width: 1,
-});
-
 export default function CustomTablesMain() {
     const theme = useTheme();
     const [panelIndex, setPanelIndex] = React.useState(0);
     const [modelRefreshKey, setModelRefreshKey] = React.useState(0);
-    const [headerLabel, setHeaderLabel] = React.useState('Setup Custom Tables');
+    const headerLabel = 'Setup Custom Tables';
     const [openCustomTableModal, setOpenCustomTableModal] = React.useState(false);
     const [tableType, setTableType] = React.useState('REFERENCE');
     const initialRows = [];
     const [rows, setRows] = useState(initialRows);
     const { tenant, user } = useTenant();
-    const [isDataFetched, setIsDataFetched] = useState(false);
-    const [openFileUpload, setOpenFileUpload] = React.useState(false);
     const baseURL = "";
     const fetchCustomTablesCall = `${baseURL}/fyntrac/custom-table/reference-tables`;
     const [snackbar, setSnackbar] = React.useState({
@@ -63,33 +44,32 @@ export default function CustomTablesMain() {
         'X-Tenant': tenant,
         'X-User-Id': user?.id || '',
         Accept: '*/*',
-        'Postman-Token': '091bd74b-e836-4185-896a-008fd64b4f46',
     };
 
     const fetchCustomTables = () => {
 
-        console.log('Attempting to fetch from:', fetchCustomTablesCall);
         dataloaderApi.get(fetchCustomTablesCall, {
             headers: headers
         })
             .then(response => {
-                console.log('Custom Tables', response.data.data);
-                setRows(response.data.data);
+                const data = Array.isArray(response.data?.data) ? response.data.data : [];
+                setRows(data.filter(t => t && !t.isDeleted));
             })
             .catch(error => {
                 console.error('Error fetching custom tables:', error);
+                setSnackbar({ open: true, message: 'Reference tables could not be loaded. Use Refresh to try again.', severity: 'error' });
             });
     };
 
-    // Fetch data when the component mounts or when refreshTrigger changes
+    // On load and whenever a list changes (create, edit, delete, Refresh), so the reference tables
+    // offered to operational tables are current.
     useEffect(() => {
         fetchCustomTables();
-        setIsDataFetched(true);
-    }, [isDataFetched]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modelRefreshKey]);
 
     const handleTableTypeChange = (event, newValue) => {
         setPanelIndex(newValue);
-        console.log('Panel index changed:', newValue);
         if (newValue === 1) {
             setTableType('OPERATIONAL');
         } else {
@@ -98,7 +78,6 @@ export default function CustomTablesMain() {
     };
 
     const handleRefresh = () => {
-        fetchCustomTables();
         setModelRefreshKey(prev => prev + 1);
     };
 
@@ -112,7 +91,6 @@ export default function CustomTablesMain() {
     const handleDialogClose = (result) => {
         setOpenCustomTableModal(false);
         if (result === true) {
-            fetchCustomTables();
             setModelRefreshKey(prev => prev + 1);
             setSnackbar({
                 open: true,
@@ -128,13 +106,6 @@ export default function CustomTablesMain() {
 
 
 
-    const handleCloseFileUpload = () => {
-        setOpenFileUpload(false);
-    };
-
-    const handleOpenFileUpload = () => {
-        setOpenFileUpload(true);
-    };
     return (
         <Box sx={{ bgcolor: alpha(theme.palette.grey[50], 0.5), minHeight: '100vh', pb: 1 }}>
         <Container maxWidth={false} sx={{ py: 1, px: 2 }}>
@@ -174,11 +145,8 @@ export default function CustomTablesMain() {
                 borderRadius: 3,
                 boxShadow: `0px 2px 4px ${alpha(theme.palette.grey[300], 0.4)}, 0px 0px 2px ${alpha(theme.palette.grey[400], 0.2)}`,
                 bgcolor: 'background.paper',
-                transition: 'box-shadow 0.3s, transform 0.2s ease-in-out',
-                '&:hover': {
-                    boxShadow: `0px 12px 24px ${alpha(theme.palette.grey[400], 0.3)}`,
-                    transform: 'translateY(-2px)',
-                },
+                // No hover lift: the whole grid would jump.
+                '&:hover': { transform: 'none' },
                 overflow: 'hidden',
             }}>
             <Box>
@@ -201,7 +169,7 @@ export default function CustomTablesMain() {
             )}
 
             {tableType === 'REFERENCE' && (
-                <CreateTableDialog open={openCustomTableModal} onClose={handleDialogClose} tableType={'REFERENCE'} />
+                <CreateTableDialog open={openCustomTableModal} onClose={handleDialogClose} tableType={'REFERENCE'} tables={rows} />
             )}
 
             <Snackbar

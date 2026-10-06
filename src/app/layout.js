@@ -8,7 +8,7 @@ import { RUNTIME_CONFIG_GLOBAL, readServerRuntimeConfig } from './services/runti
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: "fyntrac",
+  title: "Fyntrac | Home",
   description: "Financial Platform",
 };
 

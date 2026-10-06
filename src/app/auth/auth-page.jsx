@@ -87,6 +87,8 @@ export default function LoginPage() {
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [loginError, setLoginError] = useState("");
+  // True from Continue (or the automatic redirect) until the dashboard has opened
+  const [continuing, setContinuing] = useState(false);
 
   useEffect(() => {
     if (tenant) console.log("✅ Tenant updated in context:", tenant);
@@ -119,6 +121,7 @@ export default function LoginPage() {
           const justLoggedOut = sessionStorage.getItem("just_logged_out");
           if (data.tenant && !justLoggedOut) {
             setTenant(data.tenant);
+            setContinuing(true);
             router.push("/main");
             return;
           }
@@ -162,7 +165,9 @@ export default function LoginPage() {
       alert("Please select a tenant before continuing.");
       return;
     }
+    if (continuing) return;
 
+    setContinuing(true);
     try {
       // Clear any cached data from a previous tenant before setting the new one
       localStorage.removeItem("attributeMetadata");
@@ -185,6 +190,7 @@ export default function LoginPage() {
       router.push("/main");
     } catch (error) {
       console.error("❌ Error selecting tenant:", error);
+      setContinuing(false);
       alert("Failed to set tenant. Please try again.");
     }
   };
@@ -363,7 +369,8 @@ export default function LoginPage() {
                   type="submit"
                   fullWidth
                   variant="contained"
-                  disabled={!selectedTenant}
+                  disabled={!selectedTenant || continuing}
+                  startIcon={continuing ? <CircularProgress size={18} color="inherit" /> : null}
                   sx={{
                     mt: 1,
                     mb: 2,
@@ -378,7 +385,7 @@ export default function LoginPage() {
                     }
                   }}
                 >
-                  Continue
+                  {continuing ? "Opening dashboard…" : "Continue"}
                 </Button>
               </Box>
             )}

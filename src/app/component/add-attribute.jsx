@@ -12,6 +12,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, clearAttributeMetadataCache, flagOn, normalizeDataType } from './rules-shared';
 
 const AddAttributeDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
@@ -20,12 +21,15 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   const [attributeName, setAttributeName] = useState('');
   const [isReclassable, setIsReclassable] = useState(false);
   const [isVersionable, setIsVersionable] = useState(false);
-  const [dataType, setDataType] = useState('String');
+  const [dataType, setDataType] = useState('STRING');
   const [isNullable, setIsNullable] = useState(false);
   const [id, setId] = useState(null);
   const [errorSnackbar, setErrorSnackbar] = useState({ open: false, message: '' });
   const [dataTypePickerAnchor, setDataTypePickerAnchor] = useState(null);
   const [dataTypePickerSearch, setDataTypePickerSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  // The next USERFIELD couldn't be worked out: saving would risk reusing one that is taken.
+  const [userFieldError, setUserFieldError] = useState('');
 
   const defaultDataTypes = ['STRING', 'NUMBER', 'DATE', 'BOOLEAN'];
   const filteredDataTypes = defaultDataTypes.filter(dt =>
@@ -39,11 +43,12 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
     if (editData) {
       setAttributeName(editData.attributeName || '');
       setUserField(editData.userField || '');
-      setDataType(editData.dataType || 'STRING');
-      setIsReclassable(editData.isReclassable === 1 ? true : false);
-      setIsVersionable(editData.isVersionable === 1 ? true : false);
-      setIsNullable(editData.isNullable === 1 ? true : false);
+      setDataType(normalizeDataType(editData.dataType));
+      setIsReclassable(flagOn(editData.isReclassable));
+      setIsVersionable(flagOn(editData.isVersionable));
+      setIsNullable(flagOn(editData.isNullable));
       setId(editData.id);
+      setUserFieldError('');
     } else {
       setAttributeName('');
       setIsReclassable(false);
@@ -52,6 +57,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
       setDataType('STRING');
       setId(null);
       setUserField('');
+      setUserFieldError('');
       // Auto-compute next USERFIELD value from existing attributes
       dataloaderApi.get('/attribute/get/all')
         .then(res => {
@@ -62,7 +68,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
           }, 0);
           setUserField(`USERFIELD${String(maxNum + 1).padStart(2, '0')}`);
         })
-        .catch(() => setUserField('USERFIELD01'));
+        .catch((error) => setUserFieldError(apiErrorMessage(error, 'The existing attributes could not be loaded, so the next user field is unknown.') + ' Close and try again.'));
     }
     setErrorSnackbar({ open: false, message: '' });
   }, [editData, open]);
@@ -74,11 +80,15 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   }, [errorSnackbar.open]);
 
   const handleAddAttribute = async () => {
-    console.log('Tenant...', tenant);
+    if (saving) return;
     if (isReclassable && !isVersionable) {
       setErrorSnackbar({ open: true, message: 'Reclassable requires Versionable to be enabled.' });
       return;
     }
+    const oldName = editData?.attributeName ?? null;
+    const newName = attributeName.trim();
+    const renamed = Boolean(editData) && oldName && oldName !== newName;
+    setSaving(true);
     try {
       const response = await dataloaderApi.post('/attribute/add', {
         userField: userField.trim(),
@@ -89,18 +99,44 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
         isNullable: isNullable ? 1 : 0,
         id: id
       });
+      clearAttributeMetadataCache(tenant); // Chart of Accounts columns come from the attributes
+
+      // #6: a rename moves the chart of accounts values stored under the old name.
+      if (renamed) {
+        try {
+          const coa = await dataloaderApi.get('/chartofaccount/get/all');
+          const updates = (coa.data || [])
+            .filter(c => c.attributes && Object.prototype.hasOwnProperty.call(c.attributes, oldName))
+            .map(c => {
+              const { [oldName]: value, ...rest } = c.attributes;
+              return dataloaderApi.post('/chartofaccount/add', {
+                id: c.id,
+                accountNumber: c.accountNumber,
+                accountName: c.accountName,
+                accountSubtype: c.accountSubtype,
+                attributes: { ...rest, [newName]: value },
+              });
+            });
+          await Promise.all(updates);
+        } catch (cascadeErr) {
+          console.error('Attribute rename cascade failed:', cascadeErr);
+          setErrorSnackbar({ open: true, message: `Attribute saved, but chart of accounts values stored under "${oldName}" could not be moved to "${newName}". Please update them manually. Events using "${oldName}" also need updating.` });
+          return; // stay open so the message is seen; closing refreshes the list
+        }
+      }
       onClose(true);
     } catch (error) {
       console.error('Attribute save failed', error);
-      const raw = error.response?.data?.message || error.response?.data || error.message || 'Unable to save attribute config.';
-      const detailMessage = String(raw).replace(/^\[ERR_[A-Z0-9_]+\]\s*/, '');
-      setErrorSnackbar({ open: true, message: detailMessage });
+      setErrorSnackbar({ open: true, message: apiErrorMessage(error, 'Unable to save attribute config.') });
+    } finally {
+      setSaving(false);
     }
   };
 
 
   const handleClose = () => {
-    onClose(false);
+    // After a save whose follow-up failed, closing still refreshes the list.
+    onClose(Boolean(errorSnackbar.open && /^Attribute saved/.test(errorSnackbar.message)));
   };
 
   const isEditMode = !!editData;
@@ -109,7 +145,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
   const isNameEmpty = !attributeName.trim();
   const hasAnySpace = attributeName.includes(' ');
   const isNameFormatValid = isNameEmpty || nameRegex.test(attributeName);
-  const canSave = userField.trim() && !isNameEmpty && dataType && isNameFormatValid;
+  const canSave = userField.trim() && !userFieldError && !isNameEmpty && dataType && isNameFormatValid && !saving;
 
   return (
     <Dialog
@@ -241,6 +277,8 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               size="small"
               disabled
               value={userField}
+              error={Boolean(userFieldError)}
+              helperText={userFieldError || ''}
               inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -253,7 +291,7 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               value={attributeName}
               onChange={(e) => setAttributeName(e.target.value)}
               error={!isNameFormatValid}
-              helperText={!isNameFormatValid ? (hasAnySpace ? "Leading or trailing spaces are not allowed." : "Only alphanumeric characters and underscores are permitted.") : ""}
+              helperText={!isNameFormatValid ? (hasAnySpace ? "Spaces are not allowed — use underscores instead." : "Only alphanumeric characters and underscores are permitted.") : (isEditMode && editData?.attributeName && attributeName.trim() !== editData.attributeName ? 'Renaming moves its chart of accounts values; events using the old name must be updated by hand.' : "")}
               inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
@@ -264,8 +302,10 @@ const AddAttributeDialog = ({ open, onClose, editData }) => {
               required
               size="small"
               value={dataType}
-              onClick={(e) => { setDataTypePickerAnchor(e.currentTarget); setDataTypePickerSearch(''); }}
-              inputProps={{ readOnly: true, style: { cursor: 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
+              disabled={isEditMode}
+              helperText={isEditMode ? 'The data type can’t be changed once the attribute exists.' : ''}
+              onClick={(e) => { if (!isEditMode) { setDataTypePickerAnchor(e.currentTarget); setDataTypePickerSearch(''); } }}
+              inputProps={{ readOnly: true, style: { cursor: isEditMode ? 'default' : 'pointer', fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}
               InputProps={{

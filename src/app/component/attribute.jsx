@@ -6,6 +6,7 @@ import { alpha } from '@mui/material/styles';
 import AddAttributeDialog from '../component/add-attribute';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, clearAttributeMetadataCache } from './rules-shared';
 
 function Attribute({ refreshData, onToast }) {
   const { tenant } = useTenant();
@@ -16,6 +17,9 @@ function Attribute({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // What still uses the item being deleted (shown in the confirmation), or null.
+  const [deleteRefs, setDeleteRefs] = useState(null);
   const [loading, setLoading] = useState(true);
 
 
@@ -26,26 +30,45 @@ function Attribute({ refreshData, onToast }) {
 
   const handleDeleteClick = (row) => {
     setRowToDelete(row);
+    setDeleteRefs(null);
     setDeleteDialogOpen(true);
+    // Chart of accounts entries that hold a value for this attribute.
+    dataloaderApi.get('/chartofaccount/get/all')
+      .then(res => {
+        const used = (res.data || []).filter(c => {
+          const v = c.attributes?.[row.attributeName];
+          return v !== undefined && v !== null && v !== '';
+        }).length;
+        setDeleteRefs(used ? [`${used} chart of account entr${used === 1 ? 'y' : 'ies'}`] : []);
+      })
+      .catch(() => setDeleteRefs([]));
   };
 
   const handleConfirmDelete = async () => {
-    if (!rowToDelete) return;
+    if (!rowToDelete || deleting) return;
+    setDeleting(true);
     try {
       await dataloaderApi.delete(`/attribute/delete/${rowToDelete.id}`);
+      clearAttributeMetadataCache(tenant);
+      onToast?.(`${rowToDelete.attributeName} deleted successfully.`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
+      setDeleteRefs(null);
       fetchAttributeData();
     } catch (error) {
-      console.error('Error deleting attribute:', error);
-      setDeleteDialogOpen(false);
-      setRowToDelete(null);
+      console.error('Delete failed:', error);
+      // Keep the dialog open: the item still exists, and the reason is shown.
+      onToast?.(apiErrorMessage(error, `${rowToDelete.attributeName} could not be deleted. Please try again.`), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancelDelete = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setRowToDelete(null);
+    setDeleteRefs(null);
   };
 
   const BoolChip = ({ value }) => value
@@ -140,8 +163,8 @@ function Attribute({ refreshData, onToast }) {
   const fetchAttributeData = () => {
     setLoading(true);
     dataloaderApi.get('/attribute/get/all')
-      .then(response => setRows(response.data))
-      .catch(() => {})
+      .then(response => setRows(Array.isArray(response.data) ? response.data : []))
+      .catch((error) => onToast?.(apiErrorMessage(error, 'Attributes could not be loaded.'), 'error'))
       .finally(() => setLoading(false));
   };
 
@@ -224,6 +247,7 @@ function Attribute({ refreshData, onToast }) {
         onClose={(didSave) => {
           setOpen(false);
           if (didSave) {
+            clearAttributeMetadataCache(tenant);
             fetchAttributeData();
             onToast?.('Attribute saved successfully.');
           }
@@ -235,11 +259,16 @@ function Attribute({ refreshData, onToast }) {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete <strong>{rowToDelete?.attributeName}</strong>? This action cannot be undone.
+            {deleteRefs?.length > 0 && (
+              <Box component="span" sx={{ display: 'block', mt: 1.5, color: '#b45309' }}>
+                Still used by {deleteRefs.join('; ')}. Those references will point at a deleted item — update them as well.
+              </Box>
+            )}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+          <Button onClick={handleCancelDelete} disabled={deleting} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>{deleting ? 'Deleting…' : 'Delete'}</Button>
         </DialogActions>
       </Dialog>
 
@@ -248,4 +277,3 @@ function Attribute({ refreshData, onToast }) {
 }
 
 export default Attribute;
-// legacy removed

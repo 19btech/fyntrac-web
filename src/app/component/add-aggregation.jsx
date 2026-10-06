@@ -11,8 +11,11 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import SearchIcon from '@mui/icons-material/Search';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
+import SwapVertRoundedIcon from '@mui/icons-material/SwapVertRounded';
 import { dataloaderApi } from '../services/api-client';
+import { AppSwitch } from '../user-management/ui';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage } from './rules-shared';
 
 const AddAggregationDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
@@ -28,6 +31,20 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   const [txPickerAnchor, setTxPickerAnchor] = useState(null);
   const [txPickerSearch, setTxPickerSearch] = useState('');
+  // Per transaction: reverse the sign of its amounts in this balance (default false).
+  const [signReversal, setSignReversal] = useState({});
+
+  // What this dialog has already saved, so a retry after a partial failure only re-sends the rest:
+  // created = { [tx]: signReversal } for records added here; flags = { [tx]: signReversal } for updates.
+  const [committed, setCommitted] = useState({ created: {}, flags: {} });
+  const anySaved = React.useRef(false);
+
+  // Saved records of the balance being edited, by transaction name: { id, signReversal }.
+  const savedTransactions = React.useMemo(() => {
+    const map = {};
+    (editData?.transactions || []).forEach((t) => { map[t.name] = { id: t.id, signReversal: t.signReversal === true }; });
+    return map;
+  }, [editData]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -44,13 +61,17 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
       );
       setMetricName(editData.metricName || '');
       setId(editData.id);
+      setSignReversal(Object.fromEntries((editData.transactions || []).map((t) => [t.name, t.signReversal === true])));
     } else {
       // Clear form fields if no editData (e.g., for adding new transaction)
       setSelectedTransactions([]);
       setMetricName('');
       setId(null);
+      setSignReversal({});
     }
     setErrorSnackbar({ open: false, message: '' });
+    setCommitted({ created: {}, flags: {} });
+    anySaved.current = false;
   }, [editData, open]);
 
   React.useEffect(() => {
@@ -63,62 +84,95 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
 
     dataloaderApi.get(serviceGetTransactionNamesURL)
       .then(response => {
-        setTransactionNames(response.data);
+        setTransactionNames(Array.isArray(response.data) ? response.data : []);
       })
       .catch(error => {
-        // Handle error if needed
+        setErrorSnackbar({ open: true, message: apiErrorMessage(error, 'Transactions could not be loaded. Close and try again.') });
       });
   };
 
+  const errorText = (error) => apiErrorMessage(error,
+    error?.response?.status === 400 ? 'Invalid input. Please check your data.' : 'Server error. Please try again later.');
+
   const handleAddAggregation = async () => {
-    try {
-      const originalTransactions = isEditMode
-        ? (editData.transactionNames || (editData.transactionName ? [editData.transactionName] : []))
-        : [];
+    const committedNames = Object.keys(committed.created);
+    // Everything already stored for this balance: the edited balance's records plus any this dialog saved.
+    const originalTransactions = [
+      ...(isEditMode ? (editData.transactionNames || (editData.transactionName ? [editData.transactionName] : [])) : []),
+      ...committedNames,
+    ];
+    const savedFlag = (tx) => (tx in committed.flags ? committed.flags[tx]
+      : tx in committed.created ? committed.created[tx]
+        : savedTransactions[tx]?.signReversal === true);
 
-      // Transactions the user removed from the original list
-      const toDelete = originalTransactions.filter(tx => !selectedTransactions.includes(tx));
-      if (toDelete.length > 0) {
-        setErrorSnackbar({ open: true, message: `Removing transactions (${toDelete.join(', ')}) requires a backend delete endpoint — please raise this with your backend team.` });
-        return;
-      }
-
-      // Only POST transactions that don't already exist for this metric
-      const toCreate = selectedTransactions.filter(tx => !originalTransactions.includes(tx));
-
-      if (toCreate.length === 0 && isEditMode) {
-        // Nothing new to add — treat as success and close
-        onClose(false);
-        return;
-      }
-
-      await Promise.all(
-        toCreate.map((txName) =>
-          dataloaderApi.post(serviceURL, {
-            transactionName: txName,
-            metricName: metricName.trim(),
-            id: null,
-          })
-        )
-      );
-      onClose(true);
-    } catch (error) {
-      console.error('Submission failed:', error);
-      if (error.response && error.response.status === 400) {
-        const errorList = error.response.data;
-        const formattedMessage = Array.isArray(errorList)
-          ? errorList.map(err => err.message).join(' | ')
-          : 'Invalid input. Please check your data.';
-        setErrorSnackbar({ open: true, message: formattedMessage });
-      } else {
-        setErrorSnackbar({ open: true, message: 'Server error. Please try again later.' });
-      }
+    // Transactions the user removed from the stored list
+    const toDelete = originalTransactions.filter(tx => !selectedTransactions.includes(tx));
+    if (toDelete.length > 0) {
+      setErrorSnackbar({ open: true, message: `Removing transactions (${toDelete.join(', ')}) requires a backend delete endpoint — please raise this with your backend team.` });
+      return;
     }
+
+    // Only POST transactions that aren't stored yet
+    const toCreate = selectedTransactions.filter(tx => !originalTransactions.includes(tx));
+    // Stored transactions whose sign reversal was switched: re-post that record (same id).
+    const toUpdate = selectedTransactions.filter(
+      tx => originalTransactions.includes(tx) && (signReversal[tx] === true) !== savedFlag(tx)
+    );
+
+    const missingIds = toUpdate.filter(tx => savedTransactions[tx]?.id == null);
+    if (missingIds.length > 0) {
+      setErrorSnackbar({ open: true, message: `Changing sign reversal for ${missingIds.join(', ')} needs the record id from the backend — please raise this with your backend team.` });
+      return;
+    }
+
+    if (toCreate.length === 0 && toUpdate.length === 0) {
+      // Nothing left to save — close (refreshing the list if this dialog saved anything)
+      onClose(anySaved.current);
+      return;
+    }
+
+    // The name is fixed once records exist (edit mode, or after a partial save), so every record
+    // of this balance shares it.
+    const metric = isEditMode ? editData.metricName : metricName.trim();
+    const requests = [
+      ...toCreate.map((tx) => ({ tx, kind: 'create', body: { transactionName: tx, metricName: metric, id: null, signReversal: signReversal[tx] === true } })),
+      ...toUpdate.map((tx) => ({ tx, kind: 'update', body: { transactionName: tx, metricName: metric, id: savedTransactions[tx].id, signReversal: signReversal[tx] === true } })),
+    ];
+
+    // Each record is saved independently; record what succeeded before reporting what failed.
+    const results = await Promise.allSettled(requests.map((r) => dataloaderApi.post(serviceURL, r.body)));
+    const next = { created: { ...committed.created }, flags: { ...committed.flags } };
+    const failed = [];
+    let firstError = null;
+    results.forEach((result, i) => {
+      const { tx, kind, body } = requests[i];
+      if (result.status === 'fulfilled') {
+        if (kind === 'create') next.created[tx] = body.signReversal;
+        else next.flags[tx] = body.signReversal;
+        anySaved.current = true;
+      } else {
+        console.error(`Saving ${tx} failed:`, result.reason);
+        failed.push(tx);
+        firstError = firstError ?? result.reason;
+      }
+    });
+    setCommitted(next);
+
+    if (failed.length === 0) {
+      onClose(true);
+      return;
+    }
+    const savedCount = requests.length - failed.length;
+    setErrorSnackbar({
+      open: true,
+      message: `${savedCount > 0 ? `Saved ${savedCount} of ${requests.length}. ` : ''}Could not save ${failed.join(', ')}: ${errorText(firstError)}${savedCount > 0 ? ' Saving again retries only these.' : ''}`,
+    });
   };
 
 
   const handleClose = () => {
-    onClose(false);
+    // Refresh the list if part of this balance was saved before closing.
+    onClose(anySaved.current);
   };
 
   const isEditMode = !!editData;
@@ -127,6 +181,8 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
   const metricRegex = /^[a-zA-Z0-9_]+$/;
   const isMetricEmpty = !metricName.trim();
   const isMetricFormatValid = isMetricEmpty || metricRegex.test(metricName);
+  // Renaming would split the balance (stored records keep the old name), so lock it once records exist.
+  const metricLocked = isEditMode || Object.keys(committed.created).length > 0;
   
   const canSave = selectedTransactions.length > 0 && !isMetricEmpty && isMetricFormatValid;
 
@@ -310,6 +366,36 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
                     }
                   </List>
                 </Popover>
+
+                {selectedTransactions.length > 0 && (
+                  <Box sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', overflow: 'hidden' }}>
+                    <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha(theme.palette.grey[500], 0.04) }}>
+                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.primary' }}>Sign Reversal</Typography>
+                      <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+                        Reverse the sign of a transaction's amounts when it rolls into this balance.
+                      </Typography>
+                    </Box>
+                    <Box sx={{ maxHeight: 220, overflow: 'auto' }}>
+                      {selectedTransactions.map((tx) => {
+                        const reversed = signReversal[tx] === true;
+                        return (
+                          <Box key={tx} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.5, '&:not(:last-of-type)': { borderBottom: '1px solid', borderColor: alpha(theme.palette.divider, 0.6) } }}>
+                            {reversed && <SwapVertRoundedIcon sx={{ fontSize: 16, color: '#b45309' }} />}
+                            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: '0.82rem', fontWeight: 600, color: reversed ? '#b45309' : 'text.primary' }}>{tx}</Typography>
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: 'text.secondary', minWidth: 52, textAlign: 'right' }}>
+                              {reversed ? 'Reversed' : 'As is'}
+                            </Typography>
+                            <AppSwitch
+                              checked={reversed}
+                              onChange={(e) => setSignReversal((prev) => ({ ...prev, [tx]: e.target.checked }))}
+                              slotProps={{ input: { 'aria-label': `Reverse sign for ${tx}` } }}
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                )}
               </>
             );
           })()}
@@ -321,8 +407,11 @@ const AddAggregationDialog = ({ open, onClose, editData }) => {
             size="small"
             value={metricName}
             onChange={(e) => setMetricName(e.target.value)}
-            error={!isMetricFormatValid}
-            helperText={!isMetricFormatValid ? "Only alphanumeric and underscores allowed. Spaces not permitted." : ""}
+            disabled={metricLocked}
+            error={!metricLocked && !isMetricFormatValid}
+            helperText={metricLocked
+              ? "The metric name can't be changed once the balance has been saved."
+              : !isMetricFormatValid ? "Only alphanumeric and underscores allowed. Spaces not permitted." : ""}
             inputProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             InputLabelProps={{ style: { fontSize: '0.9rem', fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif' } }}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' } }}

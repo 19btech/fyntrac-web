@@ -12,6 +12,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, normalizeDataType } from './rules-shared';
 
 const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const { tenant } = useTenant();
@@ -29,6 +30,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [accountNumberError, setAccountNumberError] = useState('');
   const [subtypePickerAnchor, setSubtypePickerAnchor] = useState(null);
   const [subtypePickerSearch, setSubtypePickerSearch] = useState('');
+  const [subtypesError, setSubtypesError] = useState('');
   const filteredAccountSubtypes = accountSubtypes.filter(st =>
     st.toLowerCase().includes(subtypePickerSearch.toLowerCase())
   );
@@ -41,37 +43,38 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const [formErrors, setFormErrors] = useState({});
 
   const subtypeRegex = /^[a-zA-Z0-9_ ]+$/;
-  const validateTextField = (value) => {
+  const accountNumberRegex = /^[a-zA-Z0-9_ .-]+$/;
+  const validateTextField = (value, allowed = subtypeRegex, allowedText = 'Special characters are not allowed.') => {
     if (!value) return '';
     if (/\s{2,}/.test(value)) return 'Double spacing is not allowed.';
     if (value !== value.trim()) return 'Leading or trailing spaces are not allowed.';
-    if (!subtypeRegex.test(value)) return 'Special characters are not allowed.';
+    if (!allowed.test(value)) return allowedText;
     return '';
   };
+  const validateAccountNumber = (value) => validateTextField(value, accountNumberRegex,
+    'Only letters, numbers, spaces, "-", "." and "_" are allowed.');
 
   React.useEffect(() => {
-    // Fetch attribute metadata from backend on component mount
-    fetchAttributeMetadata();
-  }, []);
+    // Re-read the attributes each time the dialog opens: they may have changed in Accounting Rules.
+    if (open) fetchAttributeMetadata();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const fetchAttributeMetadata = () => {
     dataloaderApi.get('/attribute/get/isreclassable/attributes')
       .then(response => {
-        const metadata = response.data;
+        const metadata = Array.isArray(response.data) ? response.data : [];
         setAttributeMetadata(metadata);
-        initializeForm(metadata);
+        // Keep values already entered (or loaded for editing); add any new attributes empty.
+        setFormValues(prev => {
+          const next = { ...(prev || {}) };
+          metadata.forEach(a => { if (!(a.attributeName in next)) next[a.attributeName] = ''; });
+          return next;
+        });
       })
       .catch(error => {
         console.error('Error fetching attribute metadata:', error);
       });
-  };
-
-  const initializeForm = (metadata) => {
-    const initialFormValues = {};
-    metadata.forEach(attribute => {
-      initialFormValues[attribute.attributeName] = '';
-    });
-    setFormValues(initialFormValues);
   };
 
   const handleInputChange = (event) => {
@@ -83,16 +86,16 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   const validateInput = (name, value) => {
     const attribute = attributeMetadata.find(attr => attr.attributeName === name);
     if (!attribute) return;
-    const { dataType } = attribute;
+    const dataType = normalizeDataType(attribute.dataType);
     let errMsg = '';
 
-    if (dataType === 'String' || !dataType) {
+    if (dataType === 'STRING') {
       errMsg = validateTextField(value);
-    } else if (dataType === 'Number') {
+    } else if (dataType === 'NUMBER') {
       if (value && isNaN(value)) errMsg = 'Invalid number value.';
-    } else if (dataType === 'Date') {
+    } else if (dataType === 'DATE') {
       if (value && isNaN(Date.parse(value))) errMsg = 'Invalid date value.';
-    } else if (dataType === 'Boolean') {
+    } else if (dataType === 'BOOLEAN') {
       if (value && value !== 'true' && value !== 'false') errMsg = 'Invalid boolean value.';
     }
 
@@ -105,21 +108,23 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
   };
 
   React.useEffect(() => {
-    if (accountSubtypes.length === 0) {
-      fetchAccountSubtypes();
-    }
+    if (open) fetchAccountSubtypes(); // subtypes may have been added since
     if (editData) {
       // Populate form fields with editData if provided
-      setAccountName(editData.accountName);
-      setAccountNumber(editData.accountNumber);
-      setAccountSubtype(editData.accountSubtype);
+      setAccountName(editData.accountName ?? '');
+      setAccountNumber(editData.accountNumber ?? '');
+      setAccountSubtype(editData.accountSubtype ?? '');
       setId(editData.id);
-      setFormValues(editData.attributes);
+      setFormValues({
+        ...attributeMetadata.reduce((acc, a) => ({ ...acc, [a.attributeName]: '' }), {}),
+        ...(editData.attributes && typeof editData.attributes === 'object' ? editData.attributes : {}),
+      });
     } else {
       // Clear form fields if no editData (eaccountSubtypes.g., for adding new transaction)
       setAccountName('');
       setAccountNumber('');
       setAccountSubtype('');
+      setId(null);
       setFormValues(attributeMetadata.reduce((acc, a) => ({ ...acc, [a.attributeName]: '' }), {}));
     }
     setAccountNameError('');
@@ -133,11 +138,11 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
     dataloaderApi.get(sericeGetSubTypeURL)
       .then(response => {
-        setAccountSubtypes(response.data);
-        // Handle success response if needed
+        setAccountSubtypes(Array.isArray(response.data) ? response.data : []);
+        setSubtypesError('');
       })
       .catch(error => {
-        // Handle error if needed
+        setSubtypesError(apiErrorMessage(error, 'Account subtypes could not be loaded.'));
       });
   };
 
@@ -147,7 +152,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
 
     // ── Field-level validation ────────────────────────────────────────────
     const nameErr = validateTextField(accountName);
-    const numErr = validateTextField(accountNumber);
+    const numErr = validateAccountNumber(accountNumber);
     if (nameErr) { setAccountNameError(nameErr); return; }
     if (numErr) { setAccountNumberError(numErr); return; }
     const hasAttrError = Object.values(formErrors).some(e => !!e);
@@ -221,7 +226,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
         responseText.includes('already exists') || responseText.includes('unique');
       setErrorMessage(isDuplicate
         ? 'Duplicate chart of account entry found. Please check your data.'
-        : 'Server error. Please try again later.');
+        : apiErrorMessage(error, 'Server error. Please try again later.'));
       setShowErrorMessage(true);
     }
   };
@@ -330,7 +335,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
               label="Account Number"
               fullWidth required size="small"
               value={accountNumber}
-              onChange={(e) => { setAccountNumber(e.target.value); setAccountNumberError(validateTextField(e.target.value)); }}
+              onChange={(e) => { setAccountNumber(e.target.value); setAccountNumberError(validateAccountNumber(e.target.value)); }}
               error={!!accountNumberError}
               helperText={accountNumberError}
               sx={{
@@ -385,7 +390,7 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
             <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
               {filteredAccountSubtypes.length === 0 ? (
                 <ListItemButton disabled sx={{ justifyContent: 'center', py: 2.5 }}>
-                  <Typography variant="caption" color="text.disabled">No subtypes found.</Typography>
+                  <Typography variant="caption" color={subtypesError ? 'error' : 'text.disabled'}>{subtypesError || 'No subtypes found.'}</Typography>
                 </ListItemButton>
               ) : filteredAccountSubtypes.map((st) => (
                 <ListItemButton key={st} selected={st === accountSubtype}
@@ -405,8 +410,8 @@ const AddChartOfAccountDialog = ({ open, onClose, editData }) => {
                   name={attribute.attributeName}
                   label={attribute.attributeName}
                   size="small"
-                  type={attribute.dataType === 'Number' ? 'number' : 'text'}
-                  value={formValues[attribute.attributeName] ?? ''}
+                  type={normalizeDataType(attribute.dataType) === 'NUMBER' ? 'number' : 'text'}
+                  value={formValues?.[attribute.attributeName] ?? ''}
                   onChange={handleInputChange}
                   error={!!formErrors[attribute.attributeName]}
                   helperText={formErrors[attribute.attributeName] || ''}

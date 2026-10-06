@@ -14,13 +14,14 @@ import {
     DialogContent,
     DialogContentText,
     DialogActions,
-    Chip
+    Chip,
+    Alert
 } from '@mui/material';
 import SuccessAlert from '../component/success-alert';
 import ErrorAlert from '../component/error-alert';
 import { styled, alpha } from '@mui/material/styles';
 import { useTenant } from "../tenant-context";
-import { DeleteOutlineOutlined, EditOutlined, Add, DataArray } from '@mui/icons-material';
+import { DeleteOutlineOutlined, EditOutlined } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
 
 // Dynamically import the CustomTableModal component
@@ -28,15 +29,58 @@ const CreateTableDialog = dynamic(() => import('./custom-table'), {
     ssr: false
 });
 
+const Android12Switch = styled(Switch)(({ theme }) => ({
+    padding: 8,
+    '& .MuiSwitch-track': {
+        borderRadius: 22 / 2,
+        '&::before, &::after': {
+            content: '""',
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 16,
+            height: 16,
+        },
+        '&::before': {
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+                theme.palette.getContrastText(theme.palette.primary.main),
+            )}" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>')`,
+            left: 12,
+        },
+        '&::after': {
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+                theme.palette.getContrastText(theme.palette.primary.main),
+            )}" d="M19,13H5V11H19V13Z" /></svg>')`,
+            right: 12,
+        },
+    },
+    '& .MuiSwitch-thumb': {
+        boxShadow: 'none',
+        width: 16,
+        height: 16,
+        margin: 2,
+    },
+    '& .MuiSwitch-switchBase.Mui-checked': { color: '#1e88e5' },
+    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#1e88e5' },
+    '& .MuiSwitch-switchBase:not(.Mui-checked)': { color: '#6d6d6d' },
+    '& .MuiSwitch-switchBase:not(.Mui-checked) + .MuiSwitch-track': { backgroundColor: '#6d6d6d' },
+}));
+
+// Soft-deleted definitions are never listed.
+const liveTables = (data) => (Array.isArray(data) ? data.filter(t => t && !t.isDeleted) : []);
+
 function CustomTablesList({ refreshData, tableType, referenceTables }) {
     const { tenant, user } = useTenant();
 
     const initialRows = [];
 
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [currentPage, setCurrentPage] = useState(0);
+    const [rowsPerPage] = useState(10);
     const [isDataFetched, setIsDataFetched] = useState(false);
     const [rows, setRows] = useState(initialRows);
+    const [loadingRows, setLoadingRows] = useState(true);
+    const [loadError, setLoadError] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [statusBusyId, setStatusBusyId] = useState(null);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -53,44 +97,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     // just so the confirmation dialog can tell the user upfront.
     const [dependentTables, setDependentTables] = useState([]);
 
-    const Android12Switch = styled(Switch)(({ theme }) => ({
-        padding: 8,
-        '& .MuiSwitch-track': {
-            borderRadius: 22 / 2,
-            '&::before, &::after': {
-                content: '""',
-                position: 'absolute',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 16,
-                height: 16,
-            },
-            '&::before': {
-                backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
-                    theme.palette.getContrastText(theme.palette.primary.main),
-                )}" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>')`,
-                left: 12,
-            },
-            '&::after': {
-                backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
-                    theme.palette.getContrastText(theme.palette.primary.main),
-                )}" d="M19,13H5V11H19V13Z" /></svg>')`,
-                right: 12,
-            },
-        },
-        '& .MuiSwitch-thumb': {
-            boxShadow: 'none',
-            width: 16,
-            height: 16,
-            margin: 2,
-        },
-    }));
-
     const fetchCustomTable = (tableId, fallbackRow) => {
         dataloaderApi.get(`/fyntrac/custom-table/get/${tableId}`)
             .then(response => {
                 const metadata = response.data;
-                console.log('Custom table [TableId]:', tableId, metadata.data);
                 setEditData(metadata);
                 setOpen(true);
             })
@@ -131,21 +141,27 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     }
 
     const handleCustomTableAction = async (row, isActive) => {
+        if (statusBusyId) return;
+        setStatusBusyId(row.id);
         try {
             const response = await updateCustomTableStatus(row.id, isActive);
-            row.isActive = response.isActive;
+            // The service's answer wins (it may refuse the change).
+            const saved = typeof response?.isActive === 'boolean' ? response.isActive
+                : typeof response?.data?.isActive === 'boolean' ? response.data.isActive : isActive;
             setRows(prevRows =>
                 prevRows.map(r =>
-                    r.id === row.id ? { ...r, isActive: isActive } : r
+                    r.id === row.id ? { ...r, isActive: saved } : r
                 )
             );
 
-            setSuccessMessage('Status updated successfully!');
+            setSuccessMessage(`${row.tableName} is now ${saved ? 'active' : 'inactive'}.`);
             setShowSuccessMessage(true);
         } catch (error) {
             console.error('Error in handleCustomTableAction:', error);
             setErrorMessage(error.response?.data?.message || error.message || 'An error occurred');
             setShowErrorMessage(true);
+        } finally {
+            setStatusBusyId(null);
         }
     };
 
@@ -176,15 +192,14 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
     // pair (see CustomTableDefinitionService.softDeleteById) - nothing to block here, the physical
     // data is never touched.
     const handleConfirmDelete = async () => {
-        if (!tableToDelete) return;
+        if (!tableToDelete || deleting) return;
+        setDeleting(true);
 
         try {
             const deletedIds = await deleteCustomTable(tableToDelete.id);
-            setRows(prevRows =>
-                prevRows.map(r =>
-                    deletedIds.includes(r.id) ? { ...r, isDeleted: true } : r
-                )
-            );
+            // Gone from the list straight away (the requested table and any cascaded ones).
+            const gone = new Set([tableToDelete.id, ...(Array.isArray(deletedIds) ? deletedIds : [])]);
+            setRows(prevRows => prevRows.filter(r => !gone.has(r.id)));
 
             setSuccessMessage(
                 dependentTables.length > 0
@@ -199,6 +214,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             setDeleteDialogOpen(false);
             setTableToDelete(null);
             setDependentTables([]);
+            setDeleting(false);
         } catch (error) {
             console.error('Error in handleConfirmDelete:', error);
             setErrorMessage(error.response?.data?.error || error.response?.data?.message || error.message || 'An error occurred while deleting');
@@ -207,11 +223,13 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             setDeleteDialogOpen(false);
             setTableToDelete(null);
             setDependentTables([]);
+            setDeleting(false);
         }
     };
 
     // Handle cancel delete
     const handleCancelDelete = () => {
+        if (deleting) return;
         setDeleteDialogOpen(false);
         setTableToDelete(null);
         setDependentTables([]);
@@ -228,19 +246,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
         }
     };
 
-    const handleViewData = (tableId) => {
-        console.log('View data for table:', tableId);
-        // Navigate to data view page
-    };
-
     const handleEdit = (rowData) => {
-        // Sample rows have string IDs (e.g. 's-ref-1') — open modal directly
-        if (typeof rowData.id === 'string' && rowData.id.startsWith('s-')) {
-            setEditData({ data: rowData });
-            setOpen(true);
-        } else {
-            fetchCustomTable(rowData.id, rowData);
-        }
+        fetchCustomTable(rowData.id, rowData);
     };
 
     const columns = [
@@ -307,7 +314,9 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             headerName: 'Reference Field',
             width: 150,
             editable: false,
-            renderCell: (params) => (
+            renderCell: (params) => (!params.value ? (
+                <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+            ) : (
                 <Chip
                     label={params.value}
                     size="small"
@@ -319,7 +328,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         borderRadius: 1,
                     }}
                 />
-            ),
+            )),
         },
         {
             field: 'columns',
@@ -328,7 +337,7 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             editable: false,
             renderCell: (params) => (
                 <Chip
-                    label={`${params.value.length} columns`}
+                    label={`${Array.isArray(params.value) ? params.value.length : 0} columns`}
                     size="small"
                     sx={{
                         bgcolor: 'rgba(99,102,241,0.10)',
@@ -345,7 +354,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             headerName: 'Primary Keys',
             width: 200,
             editable: false,
-            renderCell: (params) => (
+            // Primary keys are optional, so a table may have none (empty list or null).
+            renderCell: (params) => {
+                const keys = Array.isArray(params.value) ? params.value : [];
+                return (
                 <Box
                     sx={{
                         display: 'flex',
@@ -356,7 +368,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         flexWrap: 'wrap',
                     }}
                 >
-                    {params.value.slice(0, 2).map((pk, idx) => (
+                    {keys.length === 0 && (
+                        <Typography variant="body2" sx={{ color: 'text.disabled' }}>—</Typography>
+                    )}
+                    {keys.slice(0, 2).map((pk, idx) => (
                         <Chip
                             key={idx}
                             label={pk}
@@ -372,9 +387,9 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         />
                     ))}
 
-                    {params.value.length > 2 && (
+                    {keys.length > 2 && (
                         <Chip
-                            label={`+${params.value.length - 2}`}
+                            label={`+${keys.length - 2}`}
                             size="small"
                             sx={{
                                 bgcolor: 'rgba(148,163,184,0.15)',
@@ -387,9 +402,29 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                         />
                     )}
                 </Box>
-            ),
+                );
+            },
         }
         ,
+        {
+            field: 'isActive',
+            headerName: 'Active',
+            width: 100,
+            sortable: false,
+            filterable: false,
+            renderCell: (params) => (
+                <Tooltip title={params.row.isActive === false ? 'Inactive — click to activate' : 'Active — click to deactivate'}>
+                    <span>
+                        <Android12Switch
+                            checked={params.row.isActive !== false}
+                            disabled={statusBusyId === params.row.id}
+                            onChange={(e) => handleCustomTableAction(params.row, e.target.checked)}
+                            inputProps={{ 'aria-label': `${params.row.tableName} active` }}
+                        />
+                    </span>
+                </Tooltip>
+            ),
+        },
         {
             field: 'action',
             headerName: 'Action',
@@ -421,18 +456,17 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             ? '/fyntrac/custom-table/operational-tables'
             : '/fyntrac/custom-table/reference-tables';
 
+        setLoadingRows(true);
         dataloaderApi.get(endpoint)
             .then(response => {
-                console.log('Custom Tables', response.data.data);
-                const data = response.data.data;
-                if (Array.isArray(data) && data.length > 0) {
-                    setRows(data);
-                }
-                // else keep sample rows
+                setRows(liveTables(response.data?.data));
+                setLoadError('');
             })
             .catch(error => {
-                // keep sample rows on error
-            });
+                console.error('Error fetching custom tables:', error);
+                setLoadError(error.response?.data?.message || 'Custom tables could not be loaded.');
+            })
+            .finally(() => setLoadingRows(false));
     };
 
     // Fetch data when the component mounts or when refreshTrigger changes.
@@ -452,6 +486,16 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
 
     return (
         <div>
+            {loadError && (
+                <Alert
+                    severity="error"
+                    variant="outlined"
+                    sx={{ mb: 1.5, borderRadius: 2 }}
+                    action={<Button color="inherit" size="small" onClick={fetchCustomTables} sx={{ fontWeight: 700 }}>Retry</Button>}
+                >
+                    {loadError}
+                </Alert>
+            )}
             <Box
                 sx={{
                     width: '100%',
@@ -477,7 +521,8 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                     paginationMode='client'
                     disableRowSelectionOnClick
                     autoHeight
-                    key={refreshTrigger}
+                    loading={loadingRows}
+                    localeText={{ noRowsLabel: loadError ? 'Custom tables could not be loaded.' : `No ${tableType === 'OPERATIONAL' ? 'operational' : 'reference'} tables yet.` }}
                     sx={{
                         border: 0,
                         fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
@@ -526,12 +571,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             {tableType === 'REFERENCE' && (<CreateTableDialog
                 open={open}
                 onClose={(result) => {
-                    console.log('Parent: Modal onClose called with result:', result);
                     setOpen(false);
                     setEditData(null);
 
                     if (result === true) {
-                        console.log('Parent: Refreshing grid data...');
                         refreshGridData();
                     }
                 }}
@@ -543,12 +586,10 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
             {tableType === 'OPERATIONAL' && (<CreateTableDialog
                 open={open}
                 onClose={(result) => {
-                    console.log('Parent: Modal onClose called with result:', result);
                     setOpen(false);
                     setEditData(null);
 
                     if (result === true) {
-                        console.log('Parent: Refreshing grid data...');
                         refreshGridData();
                     }
                 }}
@@ -583,16 +624,17 @@ function CustomTablesList({ refreshData, tableType, referenceTables }) {
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCancelDelete} color="primary">
+                    <Button onClick={handleCancelDelete} color="primary" disabled={deleting}>
                         Cancel
                     </Button>
                     <Button
                         onClick={handleConfirmDelete}
                         color="error"
                         variant="contained"
+                        disabled={deleting}
                         autoFocus
                     >
-                        Delete
+                        {deleting ? 'Deleting…' : 'Delete'}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -6,6 +6,7 @@ import { alpha } from '@mui/material/styles';
 import AddAccountTypeDialog from '../component/add-account-type';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, countOf } from './rules-shared';
 
 function AccountType({ refreshData, onToast }) {
   const { tenant } = useTenant();
@@ -16,6 +17,9 @@ function AccountType({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // What still uses the item being deleted (shown in the confirmation), or null.
+  const [deleteRefs, setDeleteRefs] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const handleEdit = (rowData) => {
@@ -25,27 +29,48 @@ function AccountType({ refreshData, onToast }) {
 
   const handleDeleteClick = (row) => {
     setRowToDelete(row);
+    setDeleteRefs(null);
     setDeleteDialogOpen(true);
+    // Subledger mappings and chart of accounts entries that use this subtype.
+    const subtype = String(row.accountSubType || '').toLowerCase();
+    Promise.all([
+      dataloaderApi.get('/subledgermapping/get/all').catch(() => ({ data: [] })),
+      dataloaderApi.get('/chartofaccount/get/all').catch(() => ({ data: [] })),
+    ]).then(([sml, coa]) => {
+      const mappings = (sml.data || []).filter(m => m.accountSubType?.toLowerCase() === subtype).length;
+      const accounts = (coa.data || []).filter(c => c.accountSubtype?.toLowerCase() === subtype).length;
+      const refs = [];
+      if (mappings) refs.push(countOf(mappings, 'subledger mapping'));
+      if (accounts) refs.push(countOf(accounts, 'chart of account entry', 'chart of account entries'));
+      setDeleteRefs(refs);
+    });
   };
 
   const handleConfirmDelete = async () => {
-    if (!rowToDelete) return;
+    if (!rowToDelete || deleting) return;
+    setDeleting(true);
     try {
       await dataloaderApi.delete(`/accounttype/delete/${rowToDelete.id}`);
+      
+      onToast?.(`${rowToDelete.accountSubType} deleted successfully.`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
+      setDeleteRefs(null);
       fetchAccountTypeData();
-      onToast?.('Account type deleted successfully.');
     } catch (error) {
-      console.error('Error deleting account type:', error);
-      setDeleteDialogOpen(false);
-      setRowToDelete(null);
+      console.error('Delete failed:', error);
+      // Keep the dialog open: the item still exists, and the reason is shown.
+      onToast?.(apiErrorMessage(error, `${rowToDelete.accountSubType} could not be deleted. Please try again.`), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancelDelete = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setRowToDelete(null);
+    setDeleteRefs(null);
   };
 
   const columns = [
@@ -228,11 +253,16 @@ function AccountType({ refreshData, onToast }) {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete account subtype <strong>{rowToDelete?.accountSubType}</strong>? This action cannot be undone.
+            {deleteRefs?.length > 0 && (
+              <Box component="span" sx={{ display: 'block', mt: 1.5, color: '#b45309' }}>
+                Still used by {deleteRefs.join('; ')}. Those references will point at a deleted item — update them as well.
+              </Box>
+            )}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+          <Button onClick={handleCancelDelete} disabled={deleting} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>{deleting ? 'Deleting…' : 'Delete'}</Button>
         </DialogActions>
       </Dialog>
     </>

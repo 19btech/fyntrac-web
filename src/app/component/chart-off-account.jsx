@@ -8,6 +8,7 @@ import { alpha } from '@mui/material/styles';
 import AddChartOfAccountDialog from '../component/add-chart-of-account';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, attributeMetadataKey } from './rules-shared';
 
 function ChartOfAccount({ refreshData, onToast }) {
   const { tenant } = useTenant();
@@ -24,6 +25,9 @@ function ChartOfAccount({ refreshData, onToast }) {
   const [rowsPerPage] = useState(10);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // What still uses the item being deleted (shown in the confirmation), or null.
+  const [deleteRefs, setDeleteRefs] = useState(null);
 
   const handleDeleteClick = (row) => {
     setRowToDelete(row);
@@ -31,35 +35,42 @@ function ChartOfAccount({ refreshData, onToast }) {
   };
 
   const handleConfirmDelete = async () => {
-    if (!rowToDelete) return;
+    if (!rowToDelete || deleting) return;
+    setDeleting(true);
     try {
       await dataloaderApi.delete(`/chartofaccount/delete/${rowToDelete.id}`);
+      
+      onToast?.(`${rowToDelete.accountName} deleted successfully.`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
+      setDeleteRefs(null);
       fetchChartOfAccountData();
-      onToast?.('Chart of account deleted successfully.');
     } catch (error) {
-      console.error('Error deleting chart of account:', error);
-      setDeleteDialogOpen(false);
-      setRowToDelete(null);
+      console.error('Delete failed:', error);
+      // Keep the dialog open: the item still exists, and the reason is shown.
+      onToast?.(apiErrorMessage(error, `${rowToDelete.accountName} could not be deleted. Please try again.`), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancelDelete = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setRowToDelete(null);
+    setDeleteRefs(null);
   };
 
+  // Columns: drawn from the cached attribute list straight away, then always re-read from the
+  // service (attributes may have been added, renamed or made reclassable since).
   useEffect(() => {
-    if (typeof window !== 'undefined' && tenant) {
-      const cacheKey = `attributeMetadata_${tenant}`;
-      const cachedMetadata = localStorage.getItem(cacheKey);
-      if (cachedMetadata) {
-        generateColumns(JSON.parse(cachedMetadata));
-      } else {
-        fetchAttributeMetadata();
-      }
-    }
+    if (typeof window === 'undefined' || !tenant) return;
+    try {
+      const cachedMetadata = localStorage.getItem(attributeMetadataKey(tenant));
+      if (cachedMetadata) generateColumns(JSON.parse(cachedMetadata));
+    } catch { /* unreadable cache: the fetch below replaces it */ }
+    fetchAttributeMetadata();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
 
   useEffect(() => {
@@ -74,16 +85,13 @@ function ChartOfAccount({ refreshData, onToast }) {
       },
     })
       .then(response => {
-        const metadata = response.data;
-        if (typeof window !== 'undefined') {
-          const cacheKey = `attributeMetadata_${tenant}`;
-          localStorage.setItem(cacheKey, JSON.stringify(metadata));
-        }
+        const metadata = Array.isArray(response.data) ? response.data : [];
+        try { localStorage.setItem(attributeMetadataKey(tenant), JSON.stringify(metadata)); } catch { /* storage full */ }
         generateColumns(metadata);
       })
       .catch(error => {
         console.error('Error fetching attribute metadata:', error);
-        setFetchError('Unable to load column configuration. The server may be temporarily unavailable (502). Please try again later.');
+        setFetchError(`Unable to load the attribute columns: ${apiErrorMessage(error, 'the service did not respond')}. Use Refresh to try again.`);
         setLoading(false);
       });
   };
@@ -134,7 +142,10 @@ function ChartOfAccount({ refreshData, onToast }) {
 
           // Only convert to Date if it is TRULY a date column
           if (colType === 'date') {
-            const date = new Date(value);
+            // A date-only value (yyyy-mm-dd) is that calendar day here too — not midnight UTC,
+            // which shows as the previous day west of UTC.
+            const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+            const date = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(value);
             // Safety check: If "ABC" somehow gets here, treat it as null to prevent crash
             return isNaN(date.getTime()) ? null : date;
           }
@@ -155,6 +166,7 @@ function ChartOfAccount({ refreshData, onToast }) {
         <Tooltip title="Edit" placement="left">
           <IconButton
             size="small"
+            disabled={params.row.__noId}
             onClick={() => handleEdit(params.row)}
             sx={{
               color: '#14213d',
@@ -181,6 +193,7 @@ function ChartOfAccount({ refreshData, onToast }) {
         <Tooltip title="Delete" placement="left">
           <IconButton
             size="small"
+            disabled={params.row.__noId}
             onClick={() => handleDeleteClick(params.row)}
             sx={{
               color: '#dc2626',
@@ -231,18 +244,21 @@ function ChartOfAccount({ refreshData, onToast }) {
       },
     })
       .then(response => {
-        console.log('Fetched chart of account data:', response.data);
-        const dataWithIds = response.data.map((item, index) => ({
-          ...item,
-          // 👇 THIS IS THE FIX: Spread the attributes to the top level
+        const data = Array.isArray(response.data) ? response.data : [];
+        const dataWithIds = data.map((item, index) => ({
+          // Attribute values become columns; the account's own fields win on a name clash.
           ...(item.attributes || {}),
-          id: item.id || index + 1,
+          ...item,
+          // Rows without an id get a display-only one (never sent to the service).
+          id: item.id ?? `row-${index + 1}`,
+          __noId: item.id == null,
         }));
         setRows(dataWithIds);
+        setFetchError(null);
       })
       .catch(error => {
         console.error('Error fetching chart of account:', error);
-        setFetchError('Unable to load Chart of Accounts. The server may be temporarily unavailable (502). Please try again later.');
+        setFetchError(`Unable to load Chart of Accounts: ${apiErrorMessage(error, 'the service did not respond')}. Use Refresh to try again.`);
       })
       .finally(() => setLoading(false));
   };
@@ -344,8 +360,8 @@ function ChartOfAccount({ refreshData, onToast }) {
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+          <Button onClick={handleCancelDelete} disabled={deleting} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>{deleting ? 'Deleting…' : 'Delete'}</Button>
         </DialogActions>
       </Dialog>
     </>

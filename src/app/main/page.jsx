@@ -30,9 +30,11 @@ import {
   Chip,
   Slide,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import { useTenant } from "../tenant-context";
 import PageContent from '../component/pageContent';
+import { useAccess } from '../user-management/access';
 import { dataloaderApi, reportingApi } from '../services/api-client';
 import fyntracTheme from "../theme/fyntrac-theme";
 // Icons
@@ -57,6 +59,8 @@ import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 // ----------------------------------------------------------------------
@@ -142,9 +146,6 @@ const PAGE_TITLES = {
 // ----------------------------------------------------------------------
 function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandSidebar }) {
   const [open, setOpen] = React.useState(false);
-
-  if (item.kind === 'divider') return <Divider sx={{ my: 2, mx: 2, borderStyle: 'dashed', borderColor: 'rgba(145, 158, 171, 0.24)', display: isCollapsed ? 'none' : 'block' }} />;
-
   const hasChildren = item.children && item.children.length > 0;
   const isSelected = pathname === item.segment;
 
@@ -154,6 +155,9 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
     }
   }, [pathname, hasChildren, item.children]);
 
+  // After the hooks, so every item calls the same hooks in the same order.
+  if (item.kind === 'divider') return <Divider sx={{ my: 2, mx: 2, borderStyle: 'dashed', borderColor: 'rgba(145, 158, 171, 0.24)', display: isCollapsed ? 'none' : 'block' }} />;
+
   const handleClick = () => {
     if (isCollapsed && hasChildren) {
       onExpandSidebar();
@@ -162,8 +166,15 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
     }
     if (hasChildren) {
       setOpen(!open);
-    } else {
-      onNavigate(item.segment, item.onClick);
+      return;
+    }
+    onNavigate(item.segment, item.onClick);
+    // Any click on a collapsed sidebar expands it — once the new page has rendered and the
+    // browser is idle (at most 400 ms later), so the width animation isn't competing with the
+    // page's first render. Reports keeps it collapsed (it needs the full width).
+    if (isCollapsed && item.segment !== 'report-dashboard') {
+      const whenIdle = window.requestIdleCallback ?? ((cb) => setTimeout(cb, 120));
+      requestAnimationFrame(() => whenIdle(() => onExpandSidebar(), { timeout: 400 }));
     }
   };
 
@@ -176,10 +187,12 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
           sx={{
             borderRadius: '12px',
             mb: '2px',
-            pl: isCollapsed ? '10px' : `${14 + depth * 16}px`,
-            pr: isCollapsed ? '10px' : '14px',
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            pl: `${12 + (isCollapsed ? 0 : depth * 16)}px`,
+            pr: '12px',
+            justifyContent: 'flex-start',
             minHeight: 42,
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
             bgcolor: isSelected ? '#eef2ff' : 'transparent',
             transition: 'background-color 160ms, color 160ms',
             // Text label — high specificity to prevent theme overrides
@@ -205,24 +218,31 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
           }}
         >
           <ListItemIcon sx={{
-            minWidth: isCollapsed ? 0 : 32,
-            mr: isCollapsed ? 'auto' : 1,
+            minWidth: 24,
+            mr: 1.5,
+            flexShrink: 0,
             justifyContent: 'center',
             color: isSelected ? '#6366f1' : '#64748b',
           }}>
             {item.icon}
           </ListItemIcon>
 
-          {!isCollapsed && (
-            <ListItemText
-              primary={item.title}
-              primaryTypographyProps={{
-                fontSize: '0.875rem',
-                fontWeight: isSelected ? 700 : 500,
-                sx: { color: isSelected ? '#4f46e5' : '#334155' },
-              }}
-            />
-          )}
+          <ListItemText
+            primary={item.title}
+            aria-hidden={isCollapsed || undefined}
+            sx={{
+              m: 0,
+              opacity: isCollapsed ? 0 : 1,
+              // Fade in once the sidebar has widened a little; fade out immediately when collapsing.
+              transition: isCollapsed ? 'opacity 90ms ease-out' : 'opacity 200ms ease-in 90ms',
+            }}
+            primaryTypographyProps={{
+              noWrap: true,
+              fontSize: '0.875rem',
+              fontWeight: isSelected ? 700 : 500,
+              sx: { color: isSelected ? '#4f46e5' : '#334155' },
+            }}
+          />
 
           {!isCollapsed && hasChildren ? (open ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />) : null}
         </ListItemButton>
@@ -253,6 +273,9 @@ function NavItem({ item, pathname, onNavigate, depth = 0, isCollapsed, onExpandS
 // 🧩 COMPONENT: Drawer Content
 // ----------------------------------------------------------------------
 function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onLogout, onReadiness }) {
+  const { can } = useAccess();
+  // Role-gated pages are hidden once the user's access is known to exclude them.
+  const GATED = { diagnostic: 'diagnostic.run' };
   const NAVIGATION = [
     { segment: "getstarted", title: "Get Started", icon: <StartOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
     { segment: "main", title: "Dashboard", icon: <DashboardOutlinedIcon />, fontSize: 'fontSize: "14px !important"' },
@@ -298,9 +321,13 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
         />
       </Box>
 
-      {/* WORKSPACE label */}
-      {!isCollapsed && (
-        <Typography variant="overline" sx={{
+      {/* WORKSPACE label (kept in place and faded, so the list below doesn't jump) */}
+      {(
+        <Typography variant="overline" aria-hidden={isCollapsed || undefined} sx={{
+          opacity: isCollapsed ? 0 : 1,
+          transition: isCollapsed ? 'opacity 90ms ease-out' : 'opacity 200ms ease-in 90ms',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
           px: 2.5,
           mt: 2,
           mb: 0.5,
@@ -321,9 +348,9 @@ function DrawerContent({ isCollapsed, onExpandSidebar, pathname, onNavigate, onL
       {/* 1. Main Navigation */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
         <List component="nav" sx={{ px: 1.5 }}>
-          {NAVIGATION.map((item, index) => (
+          {NAVIGATION.filter((item) => !GATED[item.segment] || can(GATED[item.segment]) !== false).map((item, index) => (
             <NavItem
-              key={index}
+              key={item.segment ?? `${item.kind}-${index}`}
               item={item}
               pathname={pathname.replace('/', '')}
               onNavigate={onNavigate}
@@ -378,119 +405,210 @@ export default function DashboardLayoutModern() {
   const [mounted, setMounted] = React.useState(false);
   const [openReadiness, setOpenReadiness] = React.useState(false);
   const [readinessLoading, setReadinessLoading] = React.useState(false);
+  // A background refresh is running (the checklist shows the previous results meanwhile).
+  const [readinessRefreshing, setReadinessRefreshing] = React.useState(false);
   const [readinessStatus, setReadinessStatus] = React.useState({});
+  // Data the checklist could not read (its items show as "couldn't check").
+  const [readinessErrors, setReadinessErrors] = React.useState([]);
   const [selectedPhase, setSelectedPhase] = React.useState('tenant');
   const readinessLoadedRef = React.useRef(false);
+  const readinessSeq = React.useRef(0);
 
   const fetchReadinessStatus = React.useCallback(async (showLoading = true) => {
     if (!tenant) return;
-    if (showLoading) setReadinessLoading(true);
+    // Only the latest load is applied (a slower, older one never overwrites it).
+    const seq = ++readinessSeq.current;
+    if (showLoading) setReadinessLoading(true); else setReadinessRefreshing(true);
     try {
-      const results = await Promise.allSettled([
-        dataloaderApi.get('/setting/get/settings'),
-        dataloaderApi.get('/accounting-period/get/open-periods'),
-        dataloaderApi.get('/transaction/get/all'),
-        dataloaderApi.get('/attribute/get/all'),
-        dataloaderApi.get('/aggregation/get/all'),
-        dataloaderApi.get('/chartofaccount/get/all'),
-        dataloaderApi.get('/subledgermapping/get/all'),
-        dataloaderApi.get('/fyntrac/event-configurations/all'),
-        dataloaderApi.get('/validation-logs/ref/by-type/ACCOUNTING_RULES'),
-        dataloaderApi.get('/validation-logs/ref/by-type/JOURNAL_MAPPING'),
-        dataloaderApi.get('/fyntrac/custom-table/reference-tables'),
-        dataloaderApi.get('/fyntrac/custom-table/operational-tables'),
-        dataloaderApi.get('/model/get/all'),
-        dataloaderApi.get('/accounttype/get/subtypes'),
-      ]);
-      const val = (r) => r.status === 'fulfilled' ? (r.value?.data ?? null) : null;
-      const cnt = (d) => {
-        if (!d) return 0;
-        if (Array.isArray(d)) return d.length;
-        // Spring paginated response
-        if (Array.isArray(d?.content)) return d.content.length;
-        if (typeof d === 'object') return Object.keys(d).length;
-        return 0;
-      };
-      const [settings, periods, txns, attrs, aggs, coa, subledger, events, rulesLog, mappingLog, customTables, operationalTables, models, subtypes] = results.map(val);
-      const resolvedRules = new Set(JSON.parse(sessionStorage.getItem('resolved_ACCOUNTING_RULES') ?? '[]'));
-      const resolvedMapping = new Set(JSON.parse(sessionStorage.getItem('resolved_JOURNAL_MAPPING') ?? '[]'));
+      const SOURCES = [
+        ['settings', '/setting/get/settings', 'tenant settings'],
+        ['periods', '/accounting-period/get/open-periods', 'accounting periods'],
+        ['txns', '/transaction/get/all', 'transactions'],
+        ['attrs', '/attribute/get/all', 'attributes'],
+        ['aggs', '/aggregation/get/all', 'balances'],
+        ['coa', '/chartofaccount/get/all', 'chart of accounts'],
+        ['subledger', '/subledgermapping/get/all', 'subledger mappings'],
+        ['events', '/fyntrac/event-configurations/all', 'events'],
+        ['rulesLog', '/validation-logs/ref/by-type/ACCOUNTING_RULES', 'accounting rules validation log'],
+        ['mappingLog', '/validation-logs/ref/by-type/JOURNAL_MAPPING', 'journal mapping validation log'],
+        ['customTables', '/fyntrac/custom-table/reference-tables', 'reference tables'],
+        ['operationalTables', '/fyntrac/custom-table/operational-tables', 'operational tables'],
+        ['models', '/model/get/all', 'models'],
+        ['subtypes', '/accounttype/get/subtypes', 'account subtypes'],
+      ];
+      const results = await Promise.allSettled(SOURCES.map(([, url]) => dataloaderApi.get(url)));
+      if (seq !== readinessSeq.current) return;
+      const data = {};
+      const failed = new Set();
+      results.forEach((r, i) => {
+        const [key, , label] = SOURCES[i];
+        if (r.status === 'fulfilled') data[key] = r.value?.data ?? null;
+        else { data[key] = null; failed.add(key); console.warn('Readiness: could not load', label, r.reason); }
+      });
+      const errorLabels = SOURCES.filter(([key]) => failed.has(key)).map(([, , label]) => label);
+
+      const listOf = (d) => (Array.isArray(d) ? d : Array.isArray(d?.content) ? d.content : Array.isArray(d?.data) ? d.data : []);
+      // Soft-deleted records never count; "live" = not deleted.
+      const live = (list) => list.filter(x => x && !x.isDeleted);
+      const cnt = (d) => live(listOf(d)).length;
+      const { settings, periods, txns, attrs, aggs, coa, subledger, events, rulesLog, mappingLog, customTables, operationalTables, models, subtypes } = data;
+
+      // Issues marked resolved on the Accounting Rules / Journal Mapping screens (per tenant; the
+      // older per-tab keys are read too).
+      const readIds = (storage, key) => { try { return JSON.parse(storage.getItem(key) ?? '[]'); } catch { return []; } };
+      const resolvedFor = (type) => new Set([
+        ...readIds(localStorage, `resolved_${type}.${tenant || 'default'}`),
+        ...readIds(sessionStorage, `resolved_${type}`),
+      ].map(String));
+      const resolvedRules = resolvedFor('ACCOUNTING_RULES');
+      const resolvedMapping = resolvedFor('JOURNAL_MAPPING');
       const unresolvedRules = Array.isArray(rulesLog) ? rulesLog.filter(r => !resolvedRules.has(String(r.id))) : [];
       const unresolvedMapping = Array.isArray(mappingLog) ? mappingLog.filter(r => !resolvedMapping.has(String(r.id))) : [];
-      const hasIssueFor = (logs, keyword) => logs.some(r => (r.sourceTable ?? '').toLowerCase().includes(keyword));
+      const tableOf = (r) => String(r.sourceTable ?? '').toLowerCase();
+      const hasIssueFor = (logs, ...keywords) => logs.some(r => keywords.some(k => tableOf(r).includes(k)));
       const hasTxnErrors = hasIssueFor(unresolvedRules, 'transaction');
       const hasAttrErrors = hasIssueFor(unresolvedRules, 'attribute');
-      const hasAggErrors = hasIssueFor(unresolvedRules, 'aggregation') || hasIssueFor(unresolvedRules, 'balance');
-      const hasSubtypeErrors = hasIssueFor(unresolvedMapping, 'account') && hasIssueFor(unresolvedMapping, 'type');
+      const hasAggErrors = hasIssueFor(unresolvedRules, 'aggregation', 'balance');
+      // One issue whose table is the account type / subtype table (not "account" and "type" from two issues).
+      const hasSubtypeErrors = unresolvedMapping.some(r => tableOf(r).includes('account') && (tableOf(r).includes('type') || tableOf(r).includes('subtype')));
       const hasSubledgerErrors = hasIssueFor(unresolvedMapping, 'subledger');
-      const hasCoaErrors = hasIssueFor(unresolvedMapping, 'chart') || hasIssueFor(unresolvedMapping, 'coa');
-      const customTablesArr = Array.isArray(customTables) ? customTables : (Array.isArray(customTables?.data) ? customTables.data : []);
-      const tableNames = customTablesArr.map(t => t.tableName || t.name || String(t)).filter(Boolean);
-      const operationalTablesArr = Array.isArray(operationalTables) ? operationalTables : (Array.isArray(operationalTables?.data) ? operationalTables.data : []);
-      const operationalTableNames = operationalTablesArr.map(t => t.tableName || t.name || String(t)).filter(Boolean);
-      const eventNames = Array.isArray(events) ? events.map(e => e.eventName || e.name).filter(Boolean) : [];
-      const activeModels = Array.isArray(models) ? models : [];
-      const primaryModel = activeModels[0] ?? null;
+      const hasCoaErrors = hasIssueFor(unresolvedMapping, 'chart', 'coa');
 
-      // Reference Table Data: for every reference custom table, confirm its data has been
-      // ingested. The reporting "execute" endpoint returns the actual loaded rows, keyed by the
-      // table's id (not its name — a name-keyed call returns []). Empty rows = data not loaded.
+      const notes = {};
+      const statusOf = (key, count, hasErrors, logKey) => {
+        if (failed.has(key)) { notes[key] = 'Could not be checked — the data did not load.'; return 'unknown'; }
+        if (hasErrors) return 'warning';
+        if (count > 0 && failed.has(logKey)) {
+          notes[key] = 'Configured, but its validation issues could not be checked.';
+          return 'warning';
+        }
+        return count > 0 ? 'done' : 'pending';
+      };
+
+      // Custom tables: live and active ones count.
+      const activeTable = (t) => t.isActive !== false;
+      const refTables = live(listOf(customTables)).filter(activeTable);
+      const opTables = live(listOf(operationalTables)).filter(activeTable);
+      const tableNames = refTables.map(t => t.tableName || t.name).filter(Boolean);
+      const operationalTableNames = opTables.map(t => t.tableName || t.name).filter(Boolean);
+
+      // Events: live ones; inactive events don't run.
+      const liveEvents = live(listOf(events));
+      const activeEvents = liveEvents.filter(e => e.isActive !== false);
+      const eventNames = activeEvents.map(e => e.eventName || e.name).filter(Boolean);
+
+      // Models: live and ACTIVE ones can run.
+      const liveModels = live(listOf(models));
+      const activeModels = liveModels.filter(m => String(m.modelStatus ?? 'ACTIVE').toUpperCase() === 'ACTIVE');
+      const modelTypes = [...new Set(activeModels.map(m => String(m.modelType || '').toUpperCase()).filter(Boolean))];
+
+      // Reference Table Data: each active reference table must have data. One row is enough to
+      // know (limit=1 — the full table is never downloaded). Keyed by the table's id.
       let referenceTableData;
       const refTablesMissingData = [];
-      const refTablesToCheck = customTablesArr
+      const refTablesUnchecked = [];
+      const refTablesToCheck = refTables
         .map(t => ({ id: t.id || t._id, name: t.tableName || t.name }))
         .filter(t => t.id && t.name);
-      if (refTablesToCheck.length > 0) {
+      if (failed.has('customTables')) {
+        referenceTableData = 'unknown';
+        notes.referenceTableData = 'Could not be checked — the reference tables did not load.';
+      } else if (refTablesToCheck.length > 0) {
         const dataResults = await Promise.allSettled(
-          refTablesToCheck.map(t => reportingApi.post(`/custom-ref-data/execute/${t.id}`, []))
+          refTablesToCheck.map(t => reportingApi.post(`/custom-ref-data/execute/${t.id}`, [], { params: { limit: 1 } }))
         );
+        if (seq !== readinessSeq.current) return;
         dataResults.forEach((r, i) => {
           const { name } = refTablesToCheck[i];
           if (r.status !== 'fulfilled') {
             console.warn('Reference data check failed for', name, r.reason);
-            refTablesMissingData.push(name);
+            refTablesUnchecked.push(name);
             return;
           }
           const rows = Array.isArray(r.value?.data) ? r.value.data : [];
           if (rows.length === 0) refTablesMissingData.push(name);
         });
-        referenceTableData = refTablesMissingData.length === 0 ? 'done' : 'warning';
+        referenceTableData = refTablesMissingData.length > 0 ? 'warning'
+          : refTablesUnchecked.length > 0 ? 'unknown' : 'done';
+        if (refTablesUnchecked.length) notes.referenceTableData = `Could not check: ${refTablesUnchecked.join(', ')}.`;
       } else {
         // No reference tables to load: 'done' when the Custom Tables phase is otherwise
         // populated (e.g. operational-only), else 'pending' so a fully empty phase stays optional.
         referenceTableData = operationalTableNames.length > 0 ? 'done' : 'pending';
       }
+
+      // Model step: an active model is needed; models that exist but are all inactive is a warning.
+      let modelStatus;
+      if (failed.has('models')) { modelStatus = 'unknown'; notes.model = 'Could not be checked — the models did not load.'; }
+      else if (activeModels.length > 0) modelStatus = 'done';
+      else if (liveModels.length > 0) { modelStatus = 'warning'; notes.model = 'Models are loaded, but none is active — activate one to run it.'; }
+      else modelStatus = 'pending';
+
+      let eventsStatus;
+      if (failed.has('events')) { eventsStatus = 'unknown'; notes.events = 'Could not be checked — the events did not load.'; }
+      else if (activeEvents.length > 0) eventsStatus = 'done';
+      else if (liveEvents.length > 0) { eventsStatus = 'warning'; notes.events = 'Events exist, but all are inactive.'; }
+      else eventsStatus = 'pending';
+
       setReadinessStatus({
-        currency: (settings?.currency || settings?.homeCurrency || settings?.fiscalPeriodStartDate) ? 'done' : 'pending',
-        fiscal: cnt(periods) > 0 ? 'done' : 'pending',
-        dashboard: (settings?.dashboardConfiguration || settings?.dashboardConfig || settings?.widgetConfig) ? 'done' : 'pending',
-        transactions: cnt(txns) > 0 ? (hasTxnErrors ? 'warning' : 'done') : (hasTxnErrors ? 'warning' : 'pending'),
-        attributes: cnt(attrs) > 0 ? (hasAttrErrors ? 'warning' : 'done') : (hasAttrErrors ? 'warning' : 'pending'),
-        balances: cnt(aggs) > 0 ? (hasAggErrors ? 'warning' : 'done') : (hasAggErrors ? 'warning' : 'pending'),
-        coa: cnt(coa) > 0 ? (hasCoaErrors ? 'warning' : 'done') : (hasCoaErrors ? 'warning' : 'pending'),
-        subledger: cnt(subledger) > 0 ? (hasSubledgerErrors ? 'warning' : 'done') : (hasSubledgerErrors ? 'warning' : 'pending'),
-        accountsubtypes: cnt(subtypes) > 0 ? (hasSubtypeErrors ? 'warning' : 'done') : (hasSubtypeErrors ? 'warning' : 'pending'),
-        events: cnt(events) > 0 ? 'done' : 'pending',
+        // Home currency: a currency is actually set.
+        currency: failed.has('settings') ? 'unknown' : (settings?.currency || settings?.homeCurrency) ? 'done' : 'pending',
+        fiscal: failed.has('periods') ? 'unknown' : cnt(periods) > 0 ? 'done' : 'pending',
+        dashboard: failed.has('settings') ? 'unknown' : (settings?.dashboardConfiguration || settings?.dashboardConfig || settings?.widgetConfig) ? 'done' : 'pending',
+        transactions: statusOf('txns', cnt(txns), hasTxnErrors, 'rulesLog'),
+        attributes: statusOf('attrs', cnt(attrs), hasAttrErrors, 'rulesLog'),
+        balances: statusOf('aggs', cnt(aggs), hasAggErrors, 'rulesLog'),
+        coa: statusOf('coa', cnt(coa), hasCoaErrors, 'mappingLog'),
+        subledger: statusOf('subledger', cnt(subledger), hasSubledgerErrors, 'mappingLog'),
+        accountsubtypes: statusOf('subtypes', cnt(subtypes), hasSubtypeErrors, 'mappingLog'),
+        events: eventsStatus,
         eventNames,
-        customtables: (tableNames.length + operationalTableNames.length) > 0 ? 'done' : 'pending',
+        // Done once any table is known to exist; with none found, a failed load means "couldn't check".
+        customtables: (tableNames.length + operationalTableNames.length) > 0 ? 'done'
+          : (failed.has('customTables') || failed.has('operationalTables')) ? 'unknown' : 'pending',
         customTableNames: tableNames,
         operationalTableNames,
         referenceTableData,
         referenceTableDataMissing: refTablesMissingData,
-        model: primaryModel ? 'done' : 'pending',
-        modelName: primaryModel?.modelName ?? null,
-        modelType: primaryModel?.modelType ?? null,
+        model: modelStatus,
+        modelTypes,
         modelNames: activeModels.map(m => m.modelName).filter(Boolean),
+        // Per-item explanations, keyed like the items (statusOf keys map to item ids below).
+        notes: {
+          ...notes,
+          transactions: notes.txns, attributes: notes.attrs, balances: notes.aggs,
+          accountsubtypes: notes.subtypes,
+          ...((tableNames.length + operationalTableNames.length) === 0 && (failed.has('customTables') || failed.has('operationalTables'))
+            ? { customtables: 'Could not be checked — the custom tables did not load.' } : {}),
+        },
       });
-    } catch {}
-    readinessLoadedRef.current = true;
-    setReadinessLoading(false);
+      setReadinessErrors(errorLabels);
+      readinessLoadedRef.current = true;
+    } catch (err) {
+      if (seq !== readinessSeq.current) return;
+      console.error('Readiness check failed:', err);
+      setReadinessErrors(['the readiness check']);
+    } finally {
+      if (seq === readinessSeq.current) {
+        setReadinessLoading(false);
+        setReadinessRefreshing(false);
+      }
+    }
   }, [tenant]);
 
-  // Pre-fetch silently on mount so modal opens instantly
+  // A different tenant starts from an empty checklist (never shows the previous tenant's), then
+  // pre-fetches silently so the modal opens instantly.
   React.useEffect(() => {
+    readinessSeq.current += 1;
+    readinessLoadedRef.current = false;
+    setReadinessStatus({});
+    setReadinessErrors([]);
+    setReadinessRefreshing(false);
     if (tenant) fetchReadinessStatus(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
   const [settingsKey, setSettingsKey] = React.useState(0);
+  const [reportsKey, setReportsKey] = React.useState(0);
   const [rulesInitialTab, setRulesInitialTab] = React.useState(0);
   const [journalInitialTab, setJournalInitialTab] = React.useState(0);
 
@@ -517,6 +635,11 @@ export default function DashboardLayoutModern() {
       window.open("https://docs.fyntrac.com", "_blank");
     } else if (segment) {
       if (segment === 'settings-dashboard') setSettingsKey(k => k + 1);
+      // Reports needs the full width for its grid and side panel
+      if (segment === 'report-dashboard') {
+        setIsCollapsed(true);
+        setReportsKey(k => k + 1); // always land on the Standard reports tab
+      }
       setPathname(`/${segment}`);
       setMobileOpen(false);
     }
@@ -543,7 +666,7 @@ export default function DashboardLayoutModern() {
           sx={{
             width: { sm: currentDrawerWidth },
             flexShrink: { sm: 0 },
-            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'width 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           {/* Mobile Drawer */}
@@ -575,7 +698,8 @@ export default function DashboardLayoutModern() {
               '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
                 width: currentDrawerWidth,
-                transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'width 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+                willChange: 'width',
                 overflow: 'visible',
                 borderRight: `1px solid ${SLATE_200}`,
                 bgcolor: '#ffffff',
@@ -726,7 +850,7 @@ export default function DashboardLayoutModern() {
               bgcolor: 'background.default',
             }}
           >
-            <PageContent pathname={pathname} settingsKey={settingsKey} rulesInitialTab={rulesInitialTab} journalInitialTab={journalInitialTab} />
+            <PageContent pathname={pathname} settingsKey={settingsKey} reportsKey={reportsKey} rulesInitialTab={rulesInitialTab} journalInitialTab={journalInitialTab} />
           </Box>
         </Box>
 
@@ -853,7 +977,8 @@ export default function DashboardLayoutModern() {
             if (!phase.mandatory && phase.items.every(i => (readinessStatus[i.id] ?? 'pending') === 'pending')) return 'optional';
             const statuses = phase.items.map(i => readinessStatus[i.id] ?? 'pending');
             if (statuses.every(s => s === 'done')) return 'done';
-            if (statuses.some(s => s === 'warning')) return 'warning';
+            // Couldn't check = not known to be fine.
+            if (statuses.some(s => s === 'warning' || s === 'unknown')) return 'warning';
             if (statuses.some(s => s === 'done')) return 'progress';
             return 'pending';
           };
@@ -881,11 +1006,12 @@ export default function DashboardLayoutModern() {
             pending: '#94a3b8',
             optional: '#cbd5e1',
           }[ps] || '#94a3b8');
-          const itemColor = (s) => ({ done: '#16a34a', warning: '#d97706', pending: '#94a3b8' }[s] || '#94a3b8');
+          const itemColor = (s) => ({ done: '#16a34a', warning: '#d97706', unknown: '#64748b', pending: '#94a3b8' }[s] || '#94a3b8');
 
           const StatusIcon = ({ status, size = 18 }) => {
             if (status === 'done') return <CheckCircleOutlinedIcon sx={{ fontSize: size, color: '#16a34a', flexShrink: 0 }} />;
             if (status === 'warning') return <WarningAmberOutlinedIcon sx={{ fontSize: size, color: '#d97706', flexShrink: 0 }} />;
+            if (status === 'unknown') return <HelpOutlineOutlinedIcon sx={{ fontSize: size, color: '#64748b', flexShrink: 0 }} />;
             return <RadioButtonUncheckedIcon sx={{ fontSize: size, color: '#cbd5e1', flexShrink: 0 }} />;
           };
 
@@ -930,11 +1056,25 @@ export default function DashboardLayoutModern() {
                       </Typography>
                     </Box>
                   </Box>
-                  <Tooltip title="Close" placement="left">
-                    <IconButton onClick={() => setOpenReadiness(false)} size="small" sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' } }}>
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {readinessRefreshing && !readinessLoading && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <CircularProgress size={12} sx={{ color: '#2563EB' }} /> Updating…
+                      </Typography>
+                    )}
+                    <Tooltip title="Refresh">
+                      <span>
+                        <IconButton onClick={() => fetchReadinessStatus(false)} disabled={readinessLoading || readinessRefreshing} size="small" aria-label="Refresh readiness" sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' } }}>
+                          <RefreshRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="Close" placement="left">
+                      <IconButton onClick={() => setOpenReadiness(false)} size="small" sx={{ color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2, '&:hover': { bgcolor: alpha('#2563EB', 0.08), color: '#2563EB' } }}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 </Box>
               </DialogTitle>
 
@@ -945,6 +1085,17 @@ export default function DashboardLayoutModern() {
                   </Box>
                 ) : (
                   <>
+                    {readinessErrors.length > 0 && (
+                      <Alert
+                        severity="warning"
+                        sx={{ borderRadius: 0, fontSize: '0.8rem' }}
+                        action={<Button color="inherit" size="small" onClick={() => fetchReadinessStatus(false)} sx={{ fontWeight: 700 }}>Retry</Button>}
+                      >
+                        <span title={readinessErrors.join(', ')}>
+                          {readinessErrors.length > 1 ? `Couldn’t load ${readinessErrors.length} setup checks.` : `Couldn’t load ${readinessErrors[0]}.`} Check the server connection and retry.
+                        </span>
+                      </Alert>
+                    )}
                     {/* Pipeline */}
                     <Box sx={{ px: 3, pt: 3, pb: 2.5, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha('#f8fafc', 0.8) }}>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -1027,7 +1178,7 @@ export default function DashboardLayoutModern() {
                             >
                               <StatusIcon status={status} size={20} />
                               <Box sx={{ flex: 1 }}>
-                                <Typography variant="body2" fontWeight={600} sx={{ color: status === 'pending' ? 'text.secondary' : 'text.primary', fontSize: '0.85rem' }}>
+                                <Typography variant="body2" fontWeight={600} sx={{ color: status === 'pending' || status === 'unknown' ? 'text.secondary' : 'text.primary', fontSize: '0.85rem' }}>
                                   {item.label}
                                 </Typography>
                                 {/* Generic names list (events, custom tables, model names) */}
@@ -1059,8 +1210,12 @@ export default function DashboardLayoutModern() {
                                           </Box>
                                         </Box>
                                       )}
-                                      {item.showModelType && readinessStatus.modelType && (
-                                        <Chip label={readinessStatus.modelType === 'DSL' || readinessStatus.modelType === 'PYTHON' ? 'Python Model' : readinessStatus.modelType === 'EXCEL' ? 'Excel Model' : `${readinessStatus.modelType} Model`} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#64748b', 0.08), color: '#64748b', borderRadius: 1, width: 'fit-content' }} />
+                                      {item.showModelType && (readinessStatus.modelTypes ?? []).length > 0 && (
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                          {[...new Set(readinessStatus.modelTypes.map(t => (t === 'DSL' || t === 'PYTHON' ? 'Python Model' : t === 'EXCEL' ? 'Excel Model' : `${t} Model`)))].map(label => (
+                                            <Chip key={label} label={label} size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600, bgcolor: alpha('#64748b', 0.08), color: '#64748b', borderRadius: 1, width: 'fit-content' }} />
+                                          ))}
+                                        </Box>
                                       )}
                                     </Box>
                                   ) : (
@@ -1093,10 +1248,11 @@ export default function DashboardLayoutModern() {
                                   }
                                   return null;
                                 })()}
-                                {/* Warning label */}
-                                {status === 'warning' && (
-                                  <Typography variant="caption" sx={{ color: '#d97706', fontSize: '0.72rem', fontWeight: 600, display: 'block', mt: 0.5 }}>
-                                    {item.missingKey ? 'Load data for the highlighted reference tables to continue' : 'Has validation issues — review before proceeding'}
+                                {/* Warning / couldn't-check label */}
+                                {(status === 'warning' || status === 'unknown') && (
+                                  <Typography variant="caption" sx={{ color: status === 'unknown' ? '#64748b' : '#d97706', fontSize: '0.72rem', fontWeight: 600, display: 'block', mt: 0.5 }}>
+                                    {readinessStatus.notes?.[item.id]
+                                      ?? (item.missingKey ? 'Load data for the highlighted reference tables to continue' : 'Has validation issues — review before proceeding')}
                                   </Typography>
                                 )}
                               </Box>

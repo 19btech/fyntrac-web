@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField,
@@ -10,6 +10,15 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from '../tenant-context';
+
+// mm/dd/yyyy that is a real calendar date (rejects 02/31, 04/31, 02/29 in non-leap years).
+const isValidExecutionDate = (value) => {
+  const m = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/(\d{4})$/.exec(value);
+  if (!m) return false;
+  const [month, day, year] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+};
 
 const ExecuteModel = ({ open, onClose, modelType }) => {
   const { tenant } = useTenant();
@@ -23,48 +32,75 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
   const [latestExecutionState, setLatestExecutionState] = useState(null);
   const [showWarningMessage, setShowWarningMessage] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
+  // 'loading' | 'ready' | 'failed' — the destructive-date check needs the latest execution date.
+  const [stateStatus, setStateStatus] = useState('loading');
+  const [submitting, setSubmitting] = useState(false);
+  const closeTimer = useRef(null);
+  // Whether this opening of the dialog started a run (the page then watches for it).
+  const startedRef = useRef(false);
 
   const fetchLatestExecutionState = async () => {
+    setStateStatus('loading');
     try {
       const response = await dataloaderApi.get('/execution/state/get/latest', {
         headers: { 'X-Tenant': tenant },
       });
       setLatestExecutionState(response.data);
+      setStateStatus('ready');
     } catch (err) {
       console.error('Failed to fetch latest execution state:', err);
+      setLatestExecutionState(null);
+      setStateStatus('failed');
     }
   };
 
   useEffect(() => {
     if (open) {
+      startedRef.current = false;
       fetchLatestExecutionState();
     }
   }, [open, tenant]);
 
+  // A pending auto-close must never fire after the dialog was closed (or reopened) or unmounted.
+  const clearCloseTimer = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  useEffect(() => clearCloseTimer, []);
+
   const handleChange = (event) => {
     const value = event.target.value;
     setDate(value);
-    const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
-    setError(!regex.test(value));
+    setError(!isValidExecutionDate(value));
     setShowWarningMessage(false);
   };
 
   const handleClose = () => {
+    clearCloseTimer();
+    setSubmitting(false);
     setShowErrorMessage(false);
     setShowSuccessMessage(false);
     setShowWarningMessage(false);
     setDate('');
     setError(false);
-    onClose(false);
+    onClose(startedRef.current);
   };
 
   const WARNING_DESTRUCTIVE = `DESTRUCTIVE ACTION: Continuing permanently deletes all future data after this date. This cannot be undone. Press "Execute Model" to proceed.`;
+  const WARNING_UNVERIFIED = `The latest execution date could not be checked. If this date is earlier than the last execution, continuing permanently deletes all data after it. Press "Execute Model" to proceed.`;
   const handleModelExecution = async () => {
+    if (submitting || showSuccessMessage) return; // one run per click
     if (date.length === 0) {
       setError(true);
       return;
     }
-    if (error) return;
+    if (error || !isValidExecutionDate(date)) {
+      setError(true);
+      return;
+    }
+    if (stateStatus === 'loading') return;
 
     // Check warning condition (execution date < latest execution date)
     const parts = date.split('/');
@@ -74,16 +110,20 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
       const day = parts[1];
       const year = parts[2];
       const dateInt = parseInt(`${year}${month}${day}`, 10);
-      if (dateInt < latestExecutionState.executionDate) {
+      if (dateInt < Number(latestExecutionState.executionDate)) {
         isWarningCondition = true;
       }
     }
+    // If the latest execution date couldn't be checked, the run might be destructive: confirm first.
+    const unverified = stateStatus === 'failed';
 
-    if (isWarningCondition && !showWarningMessage) {
+    if ((isWarningCondition || unverified) && !showWarningMessage) {
       setShowWarningMessage(true);
-      setWarningMessage(WARNING_DESTRUCTIVE);
+      setWarningMessage(isWarningCondition ? WARNING_DESTRUCTIVE : WARNING_UNVERIFIED);
       return;
     }
+
+    setSubmitting(true);
 
     const isDsl = modelType === 'DSL' || modelType === 'PYTHON';
     const serviceURL = isDsl ? '/model/execute/dsl' : '/model/execute';
@@ -99,6 +139,7 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
       });
 
       const started = response.data;
+      startedRef.current = true;
       setSuccessMessage(typeof started === 'string'
         ? started
         : `Execution started for ${date}. Follow its progress on the Model page.`);
@@ -106,10 +147,10 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
       setShowWarningMessage(false);
       fetchLatestExecutionState();
 
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        setShowErrorMessage(false);
-        onClose(false);
+      clearCloseTimer();
+      closeTimer.current = setTimeout(() => {
+        closeTimer.current = null;
+        handleClose();
       }, 3000);
     } catch (err) {
       console.log("err", err);
@@ -123,6 +164,8 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
       setErrorMessage(msg);
       setShowErrorMessage(true);
       setShowWarningMessage(false);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -302,7 +345,7 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
         <Button
           onClick={handleModelExecution}
           variant="contained"
-          disabled={!date.trim() || error}
+          disabled={!date.trim() || error || submitting || showSuccessMessage || stateStatus === 'loading'}
           startIcon={<PlayArrowIcon />}
           sx={{
             borderRadius: 2,
@@ -317,7 +360,7 @@ const ExecuteModel = ({ open, onClose, modelType }) => {
             '&.Mui-disabled': { background: 'rgba(20,33,61,0.35)', color: '#fff', boxShadow: 'none' },
           }}
         >
-          Execute Model
+          {submitting ? 'Starting…' : stateStatus === 'loading' && !showSuccessMessage ? 'Checking…' : 'Execute Model'}
         </Button>
       </DialogActions>
     </Dialog>

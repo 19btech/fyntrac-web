@@ -21,6 +21,13 @@ import {
   Fade,
   Avatar,
   Chip,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Slide,
+  Tooltip,
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
@@ -29,19 +36,25 @@ import {
   Error as ErrorIcon,
   DescriptionOutlined as DescriptionIcon,
   Check as CheckIcon,
+  WarningAmber as WarningAmberIcon,
+  HighlightOffOutlined as HighlightOffOutlinedIcon,
 } from "@mui/icons-material";
 import { alpha, useTheme } from "@mui/material/styles";
-import axios from "axios";
 import { useTenant } from "../tenant-context";
 import { dataloaderApi } from "../services/api-client";
+import { checkActivityFiles } from "./activity-file-check";
 
 const ACTIVITY_TYPES = {
   STANDARD: "Standard Activity",
   CUSTOM: "Custom Activity",
 };
 
+const FONT = '"Inter", "Helvetica Neue", Arial, sans-serif';
+
 export default function FileUploadComponent({
   onDrop,
+  onBusyChange,
+  filesLimit,
   showActivitySelector = false,
   showLoadModeSelector = false,
   headerMessage = "Upload reference data files for secure validation, ingestion, and processing"
@@ -51,7 +64,7 @@ export default function FileUploadComponent({
 
   const [activityType, setActivityType] = useState(ACTIVITY_TYPES.STANDARD);
   const activityTypeRef = useRef(activityType);
-  const [loadMode, setLoadMode] = useState('OVERWRITE');
+  const [loadMode, setLoadMode] = useState('APPEND');
   const loadModeRef = useRef(loadMode);
 
   const [files, setFiles] = useState([]);
@@ -62,6 +75,35 @@ export default function FileUploadComponent({
 
   // ✅ Lock to prevent double-loading
   const uploadLock = useRef(false);
+
+  // Overwrite replaces activity data, so it waits for the user to confirm.
+  const [pendingOverwrite, setPendingOverwrite] = useState(null); // { files, activityType }
+
+  // The success countdown before the parent closes the dialog. If the dialog is closed first, the
+  // countdown is dropped (so it can't close a dialog opened later) and the parent refreshes now.
+  const successTimer = useRef(null);
+  const onDropRef = useRef(onDrop);
+  onDropRef.current = onDrop;
+  useEffect(() => () => {
+    if (successTimer.current) {
+      clearTimeout(successTimer.current);
+      successTimer.current = null;
+      onDropRef.current?.();
+    }
+  }, []);
+
+  // The parent keeps the dialog open while files are uploading.
+  useEffect(() => { onBusyChange?.(status === "uploading"); }, [status, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
+
+  // #3: after an error the type / mode can be changed again; changing them starts over.
+  const resetAfterError = () => {
+    if (status !== "error") return;
+    setStatus("idle");
+    setErrorMessage(null);
+    setFiles([]);
+    setUploadProgress({});
+  };
 
   useEffect(() => {
     activityTypeRef.current = activityType;
@@ -85,7 +127,10 @@ export default function FileUploadComponent({
     setSuccessMessage(null);
 
     if (fileRejections.length > 0) {
-      setErrorMessage("Invalid file type or size. Please check your files.");
+      const tooMany = fileRejections.some((r) => r.errors?.some((e) => e.code === "too-many-files"));
+      setErrorMessage(tooMany
+        ? `Too many files — upload at most ${filesLimit} at a time.`
+        : "Invalid file type or size. Please check your files.");
       uploadLock.current = false;
       return;
     }
@@ -95,42 +140,53 @@ export default function FileUploadComponent({
       : ACTIVITY_TYPES.STANDARD;
 
     if (showActivitySelector) {
-      const isStandardFile = (fileName) => {
-        const name = fileName.toLowerCase();
-        return name.includes("transactionactivity") || name.includes("instrumentattribute");
-      };
-
-      const csvFiles = acceptedFiles.filter(f => f.name.toLowerCase().endsWith(".csv"));
-      if (csvFiles.length > 0) {
-        if (currentActivityType === ACTIVITY_TYPES.STANDARD) {
-          const hasInvalidFile = csvFiles.some(f => !isStandardFile(f.name));
-          if (hasInvalidFile) {
-            setErrorMessage("Standard Activity upload only accepts 'transactionactivity' or 'instrumentattribute' files.");
-            uploadLock.current = false;
-            return;
-          }
-        } else if (currentActivityType === ACTIVITY_TYPES.CUSTOM) {
-          const hasStandardFile = csvFiles.some(f => isStandardFile(f.name));
-          if (hasStandardFile) {
-            setErrorMessage("Custom Activity upload does not accept standard activity files. Please select Standard Activity type.");
-            uploadLock.current = false;
-            return;
-          }
-        }
+      const problem = await checkActivityFiles(acceptedFiles, currentActivityType === ACTIVITY_TYPES.STANDARD);
+      if (problem) {
+        setStatus("error");
+        setErrorMessage(problem);
+        uploadLock.current = false;
+        return;
       }
     }
 
+    if (acceptedFiles.length === 0) {
+      uploadLock.current = false;
+      return;
+    }
+
+    const currentMode = showLoadModeSelector ? loadModeRef.current : "APPEND";
+    if (currentMode === "OVERWRITE") {
+      // Hold the files (lock stays on) until the user confirms or cancels.
+      setPendingOverwrite({ files: acceptedFiles, activityType: currentActivityType });
+      return;
+    }
+
+    await uploadFiles(acceptedFiles, currentActivityType, currentMode);
+  };
+
+  const cancelOverwrite = () => {
+    setPendingOverwrite(null);
+    uploadLock.current = false; // 🔓 Release lock
+  };
+
+  const confirmOverwrite = () => {
+    const pending = pendingOverwrite;
+    setPendingOverwrite(null);
+    if (pending) uploadFiles(pending.files, pending.activityType, "OVERWRITE");
+  };
+
+  const uploadFiles = async (acceptedFiles, currentActivityType, currentMode) => {
     const targetUrl = (() => {
-      console.log("Mode:", loadMode, "Activity Type:", currentActivityType);
-      if(!showLoadModeSelector){
+      console.log("Mode:", currentMode, "Activity Type:", currentActivityType);
+      if (!showLoadModeSelector) {
         return activity_appendURL;
-      }else if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
+      } else if (currentMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
         return custom_overwriteURL;
-      } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
+      } else if (currentMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.CUSTOM) {
         return custom_appendURL;
-      } else if (loadMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.STANDARD) { // ◄ Fixed here
+      } else if (currentMode === "OVERWRITE" && currentActivityType === ACTIVITY_TYPES.STANDARD) {
         return activity_overwriteURL;
-      } else if (loadMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.STANDARD) {  // ◄ Fixed here
+      } else if (currentMode === "APPEND" && currentActivityType === ACTIVITY_TYPES.STANDARD) {
         return activity_appendURL;
       }
 
@@ -138,9 +194,7 @@ export default function FileUploadComponent({
     })();
 
 
-    const newFiles = acceptedFiles.map((file) =>
-      Object.assign(file, { preview: URL.createObjectURL(file) })
-    );
+    const newFiles = acceptedFiles;
 
     setFiles(newFiles);
     setStatus("uploading");
@@ -148,7 +202,7 @@ export default function FileUploadComponent({
     const formData = new FormData();
     newFiles.forEach((file) => formData.append("files", file));
     if (showLoadModeSelector) {
-      formData.append("loadMode", loadModeRef.current);
+      formData.append("loadMode", currentMode);
     }
 
     try {
@@ -171,13 +225,14 @@ export default function FileUploadComponent({
       setStatus("success");
       setSuccessMessage("Upload Successful!");
 
-      setTimeout(() => {
+      successTimer.current = setTimeout(() => {
+        successTimer.current = null;
         setSuccessMessage(null);
         setStatus("idle");
         setFiles([]);
         setUploadProgress({});
-        uploadLock.current = false;
-        onDrop()// 🔓 Release lock
+        uploadLock.current = false; // 🔓 Release lock
+        onDropRef.current?.();
       }, 5000);
 
     } catch (err) {
@@ -209,6 +264,7 @@ export default function FileUploadComponent({
     onDrop: handleDrop,
     disabled: status === "uploading" || status === "success",
     noClick: false, // ✅ enable click
+    maxFiles: filesLimit || 0, // 0 = no limit
     accept: {
       "text/csv": [".csv"],
       "application/vnd.ms-excel": [".xls", ".xlsx"],
@@ -270,8 +326,97 @@ export default function FileUploadComponent({
     );
   }
 
+  const fileCount = pendingOverwrite?.files.length ?? 0;
+  const overwriteDialog = (
+    <Dialog
+      open={Boolean(pendingOverwrite)}
+      onClose={cancelOverwrite}
+      maxWidth="xs" fullWidth
+      slots={{ transition: Slide }}
+      slotProps={{
+        transition: { direction: 'up' },
+        paper: { sx: { borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'divider' } },
+      }}
+    >
+      <DialogTitle sx={{ p: 0, flexShrink: 0 }}>
+        <Box sx={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          px: 3, pt: 3, pb: 2.5,
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+          borderBottom: '1px solid', borderColor: 'divider',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <img src="/fyntrac.png" alt="Fyntrac" style={{ width: 72, height: 'auto' }} />
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Chip
+                  icon={<WarningAmberIcon sx={{ fontSize: '12px !important' }} />}
+                  label="Overwrite"
+                  size="small"
+                  sx={{
+                    height: 20, fontSize: '0.6rem', fontWeight: 700,
+                    letterSpacing: 0.8, textTransform: 'uppercase',
+                    bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    color: theme.palette.warning.dark, borderRadius: 1,
+                  }}
+                />
+              </Box>
+              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2, color: 'text.primary', fontFamily: FONT }}>
+                Overwrite Activity Data
+              </Typography>
+            </Box>
+          </Box>
+          <Tooltip title="Close" placement="left">
+            <IconButton onClick={cancelOverwrite} size="small" aria-label="Close" sx={{
+              color: 'text.secondary', bgcolor: 'action.hover', borderRadius: 2,
+              '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main' },
+            }}>
+              <HighlightOffOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ pt: 5, px: 3 }}>
+        <Typography sx={{ fontFamily: FONT, fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 3 }}>
+          Loading with <strong>Overwrite</strong> will <strong>replace all existing{' '}
+          {pendingOverwrite?.activityType === ACTIVITY_TYPES.CUSTOM ? 'custom' : 'standard'} activity data</strong> for the current posting date with the {fileCount === 1 ? 'file' : `${fileCount} files`} below. This cannot be undone.
+        </Typography>
+        {fileCount > 0 && (
+          <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.grey[500], 0.06), border: '1px solid', borderColor: 'divider', maxHeight: 140, overflow: 'auto' }}>
+            {pendingOverwrite.files.map((f) => (
+              <Typography key={f.name} noWrap sx={{ fontFamily: FONT, fontSize: '0.78rem', fontWeight: 600, color: 'text.primary' }}>
+                {f.name}
+              </Typography>
+            ))}
+          </Box>
+        )}
+        <Typography sx={{ fontFamily: FONT, fontSize: '0.88rem', color: 'text.secondary', lineHeight: 1.7, mt: 2 }}>
+          Are you sure you want to continue? Choose <strong>Append</strong> instead to add to the existing data.
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+        <Button onClick={cancelOverwrite} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, color: 'text.secondary', fontFamily: FONT }}>
+          Cancel
+        </Button>
+        <Button onClick={confirmOverwrite} variant="contained" sx={{
+          borderRadius: 2, textTransform: 'none', fontWeight: 700,
+          fontFamily: FONT, px: 2.5,
+          background: '#14213d', color: '#fff',
+          boxShadow: '0 4px 12px rgba(20,33,61,0.28)',
+          transition: 'all 0.2s ease-in-out',
+          '&:hover': { background: '#1e3057', boxShadow: '0 6px 18px rgba(20,33,61,0.4)', transform: 'translateY(-1px)' },
+          '&.Mui-disabled': { background: 'rgba(20,33,61,0.4)', color: '#fff' },
+        }}>
+          Overwrite &amp; Load
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   /* -------------------- RENDER UPLOAD -------------------- */
   return (
+    <>
+    {overwriteDialog}
     <Paper
       elevation={0}
       variant="outlined"
@@ -318,8 +463,8 @@ export default function FileUploadComponent({
                   <Select
                     value={activityType}
                     label="Activity Type"
-                    disabled={status !== "idle"}
-                    onChange={(e) => setActivityType(e.target.value)}
+                    disabled={status === "uploading" || status === "success"}
+                    onChange={(e) => { setActivityType(e.target.value); resetAfterError(); }}
                     sx={{ bgcolor: 'background.paper' }}
                   >
                     <MenuItem value={ACTIVITY_TYPES.STANDARD}>Standard Activity</MenuItem>
@@ -338,9 +483,9 @@ export default function FileUploadComponent({
                         key={mode}
                         label={label}
                         icon={selected ? <CheckIcon sx={{ fontSize: '13px !important' }} /> : undefined}
-                        onClick={() => setLoadMode(mode)}
+                        onClick={() => { setLoadMode(mode); resetAfterError(); }}
                         size="small"
-                        disabled={status !== 'idle'}
+                        disabled={status === 'uploading' || status === 'success'}
                         sx={{
                           fontSize: '0.78rem',
                           fontWeight: 600,
@@ -386,15 +531,15 @@ export default function FileUploadComponent({
                 : alpha(theme.palette.text.secondary, 0.2),
               borderRadius: 3,
               textAlign: "center",
-              cursor: status === "idle" ? "pointer" : "default",
+              cursor: (status === "idle" || status === "error") ? "pointer" : "default",
               bgcolor: isDragActive
                 ? alpha(theme.palette.primary.main, 0.04)
                 : alpha(theme.palette.background.default, 0.5),
               transition: "all 0.3s ease",
               opacity: status === "uploading" ? 0.6 : 1,
               "&:hover": {
-                borderColor: status === "idle" ? theme.palette.primary.main : undefined,
-                bgcolor: status === "idle" ? alpha(theme.palette.primary.main, 0.02) : undefined
+                borderColor: (status === "idle" || status === "error") ? theme.palette.primary.main : undefined,
+                bgcolor: (status === "idle" || status === "error") ? alpha(theme.palette.primary.main, 0.02) : undefined
               }
             }}
           >
@@ -505,5 +650,6 @@ export default function FileUploadComponent({
         </Stack>
       </Box>
     </Paper>
+    </>
   );
 }

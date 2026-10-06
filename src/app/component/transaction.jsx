@@ -7,6 +7,7 @@ import { alpha } from '@mui/material/styles';
 import AddTransactionDialog from '../component/add-transaction';
 import { dataloaderApi } from '../services/api-client';
 import { useTenant } from "../tenant-context";
+import { apiErrorMessage, countOf } from './rules-shared';
 
 function Transaction({ refreshData, onToast }) {
   const { tenant } = useTenant();
@@ -16,6 +17,9 @@ function Transaction({ refreshData, onToast }) {
   const [editData, setEditData] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  // What still uses the item being deleted (shown in the confirmation), or null.
+  const [deleteRefs, setDeleteRefs] = useState(null);
   const [loading, setLoading] = useState(true);
 
 
@@ -26,26 +30,48 @@ function Transaction({ refreshData, onToast }) {
 
   const handleDeleteClick = (row) => {
     setRowToDelete(row);
+    setDeleteRefs(null);
     setDeleteDialogOpen(true);
+    // Balances and subledger mappings that use this transaction.
+    const name = String(row.name || '').toLowerCase();
+    Promise.all([
+      dataloaderApi.get('/aggregation/get/all').catch(() => ({ data: [] })),
+      dataloaderApi.get('/subledgermapping/get/all').catch(() => ({ data: [] })),
+    ]).then(([agg, sml]) => {
+      const balances = [...new Set((agg.data || []).filter(a => a.transactionName?.toLowerCase() === name).map(a => a.metricName))];
+      const mappings = (sml.data || []).filter(m => m.transactionName?.toLowerCase() === name).length;
+      const refs = [];
+      if (balances.length) refs.push(`balance${balances.length === 1 ? '' : 's'} ${balances.join(', ')}`);
+      if (mappings) refs.push(countOf(mappings, 'subledger mapping'));
+      setDeleteRefs(refs);
+    });
   };
 
   const handleConfirmDelete = async () => {
-    if (!rowToDelete) return;
+    if (!rowToDelete || deleting) return;
+    setDeleting(true);
     try {
       await dataloaderApi.delete(`/transaction/delete/name/${encodeURIComponent(rowToDelete.name)}`);
+      
+      onToast?.(`${rowToDelete.name} deleted successfully.`);
       setDeleteDialogOpen(false);
       setRowToDelete(null);
+      setDeleteRefs(null);
       fetchTransactionData();
     } catch (error) {
-      console.error('Error deleting transaction:', error);
-      setDeleteDialogOpen(false);
-      setRowToDelete(null);
+      console.error('Delete failed:', error);
+      // Keep the dialog open: the item still exists, and the reason is shown.
+      onToast?.(apiErrorMessage(error, `${rowToDelete.name} could not be deleted. Please try again.`), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancelDelete = () => {
+    if (deleting) return;
     setDeleteDialogOpen(false);
     setRowToDelete(null);
+    setDeleteRefs(null);
   };
 
   const BoolChip = ({ value }) => value
@@ -246,11 +272,16 @@ function Transaction({ refreshData, onToast }) {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete <strong>{rowToDelete?.name}</strong>? This action cannot be undone.
+            {deleteRefs?.length > 0 && (
+              <Box component="span" sx={{ display: 'block', mt: 1.5, color: '#b45309' }}>
+                Still used by {deleteRefs.join('; ')}. Those references will point at a deleted item — update them as well.
+              </Box>
+            )}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button onClick={handleCancelDelete} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>Delete</Button>
+          <Button onClick={handleCancelDelete} disabled={deleting} variant="text" sx={{ textTransform: 'none', borderRadius: 2 }}>No</Button>
+          <Button onClick={handleConfirmDelete} disabled={deleting} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>{deleting ? 'Deleting…' : 'Delete'}</Button>
         </DialogActions>
       </Dialog>
 

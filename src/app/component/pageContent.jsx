@@ -2,25 +2,38 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import PropTypes from 'prop-types';
+import dynamic from 'next/dynamic';
+import CircularProgress from '@mui/material/CircularProgress';
 import HomePage from '../fyntrac-home/page';
-import AccountingPage from '../accounting/page';
 import GridHeader from './gridHeader';
-import RulePage from '../rules/page';
-import ModelPage from '../model/page';
-import SettingsPage from '../settings/page'
-import SyncPage from '../sync/page';
-import GLEReportPage from '../reports/gle-report/page';
-import TransactionActivityReportPage from '../reports/transaction-activity-report/page';
-import RollforwardReportPage from '../reports/rollforward-report/page';
-import InstrumentDiagnosticPage from '../diagnostic/page';
-import PythonModel from './python-model';
-import EventConfigurationMain from '../event-configuration/page';
-import CustomTableMain from '../custom-table/page';
-import CustomRefDataReportPage from '../reports/custom-ref-data-report/page';
-import CustomOperationalDataReportPage from '../reports/custom-operational-data-report/page';
-import SettingsDashboard from '../settings-dashboard/page';
-import ReportDashboard from '../report-dashboard/page';
-export default function PageContent({ pathname, method, settingsKey, rulesInitialTab, journalInitialTab }) {
+import AccessGate from '../user-management/access-gate';
+
+// Each screen is loaded only when it is first opened, so the dashboard does not have to
+// download the whole app up front.
+const ScreenLoading = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 240 }}>
+    <CircularProgress size={32} />
+  </Box>
+);
+const lazy = (load) => dynamic(load, { loading: ScreenLoading });
+
+const AccountingPage = lazy(() => import('../accounting/page'));
+const RulePage = lazy(() => import('../rules/page'));
+const ModelPage = lazy(() => import('../model/page'));
+const SettingsPage = lazy(() => import('../settings/page'));
+const SyncPage = lazy(() => import('../sync/page'));
+const GLEReportPage = lazy(() => import('../reports/gle-report/page'));
+const TransactionActivityReportPage = lazy(() => import('../reports/transaction-activity-report/page'));
+const RollforwardReportPage = lazy(() => import('../reports/rollforward-report/page'));
+const InstrumentDiagnosticPage = lazy(() => import('../diagnostic/page'));
+const PythonModel = lazy(() => import('./python-model'));
+const EventConfigurationMain = lazy(() => import('../event-configuration/page'));
+const CustomTableMain = lazy(() => import('../custom-table/page'));
+const CustomRefDataReportPage = lazy(() => import('../reports/custom-ref-data-report/page'));
+const CustomOperationalDataReportPage = lazy(() => import('../reports/custom-operational-data-report/page'));
+const SettingsDashboard = lazy(() => import('../settings-dashboard/page'));
+const ReportDashboard = lazy(() => import('../report-dashboard/page'));
+export default function PageContent({ pathname, method, settingsKey, reportsKey, rulesInitialTab, journalInitialTab }) {
 
   const renderContent = () => {
     console.log('pathName:', pathname);
@@ -48,7 +61,7 @@ export default function PageContent({ pathname, method, settingsKey, rulesInitia
       case '/sync':
         return <SyncPage />
       case '/report-dashboard':
-        return <ReportDashboard />
+        return <ReportDashboard key={reportsKey} />
       case '/reports/gle-report':
         return <GLEReportPage />
       case '/reports/transaction-activity-report':
@@ -60,7 +73,7 @@ export default function PageContent({ pathname, method, settingsKey, rulesInitia
       case '/reports/custom-operational-data-report':
         return <CustomOperationalDataReportPage />
       case '/diagnostic':
-        return <InstrumentDiagnosticPage />
+        return <AccessGate permission="diagnostic.run" area="Diagnostic"><InstrumentDiagnosticPage /></AccessGate>
       case '/settings-dashboard':
         return <SettingsDashboard key={settingsKey} />
       case '/python-model':
