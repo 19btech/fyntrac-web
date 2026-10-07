@@ -551,8 +551,8 @@ export default function DashboardLayoutModern() {
       else eventsStatus = 'pending';
 
       setReadinessStatus({
-        // Home currency: a currency is actually set.
-        currency: failed.has('settings') ? 'unknown' : (settings?.currency || settings?.homeCurrency) ? 'done' : 'pending',
+        // Home currency: always set — a tenant that never chose one uses USD.
+        currency: failed.has('settings') ? 'unknown' : 'done',
         fiscal: failed.has('periods') ? 'unknown' : cnt(periods) > 0 ? 'done' : 'pending',
         dashboard: failed.has('settings') ? 'unknown' : (settings?.dashboardConfiguration || settings?.dashboardConfig || settings?.widgetConfig) ? 'done' : 'pending',
         transactions: statusOf('txns', cnt(txns), hasTxnErrors, 'rulesLog'),
